@@ -19,13 +19,12 @@ enum Token {
 
 struct Tokenizer {
     string: String
-    index: usize
 }
 
 impl Tokenizer {
     pub fn new(string: String) -> Self {
         assert!(string.is_ascii());
-        Tokenizer { string, index: 0 }
+        Tokenizer { string }
     }
 }
 
@@ -33,7 +32,6 @@ impl Iterator for Tokenizer {
     type Item = Result<Token, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-
         if self.string.contains("PRINT") {
             Some(Ok(Token::Print))
         } else {
