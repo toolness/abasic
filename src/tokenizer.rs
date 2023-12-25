@@ -70,13 +70,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
         LineCruncher::new(self.remaining_bytes())
     }
 
-    fn chomp_remaining_whitespace(&mut self) -> bool {
+    fn chomp_leading_whitespace(&mut self) {
         let mut cruncher = LineCruncher::new(self.remaining_bytes());
-        if cruncher.next().is_none() {
-            self.index += cruncher.pos();
-            true
+        if cruncher.next().is_some() {
+            self.index = cruncher.pos() - 1;
         } else {
-            false
+            self.index += cruncher.pos();
         }
     }
 
@@ -129,14 +128,14 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
     type Item = Result<Token, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.chomp_leading_whitespace();
+
         if self.index == self.bytes().len() {
             return None;
         }
 
         if let Some(token) = self.chomp_any_keyword() {
             Some(Ok(token))
-        } else if self.chomp_remaining_whitespace() {
-            None
         } else if self.chomp_newline() {
             Some(Ok(Token::Newline))
         } else {
