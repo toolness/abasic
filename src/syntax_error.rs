@@ -3,6 +3,7 @@ use std::{error::Error, fmt::Display};
 #[derive(Debug, PartialEq)]
 pub enum SyntaxError {
     IllegalCharacter,
+    UnterminatedStringLiteral,
 }
 
 impl Error for SyntaxError {}

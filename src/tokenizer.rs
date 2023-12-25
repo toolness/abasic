@@ -5,6 +5,7 @@ pub enum Token {
     Print,
     Goto,
     Newline,
+    StringLiteral(String),
 }
 
 /// First-generation BASIC dialects completely ignored spaces
@@ -23,6 +24,10 @@ impl<'a> LineCruncher<'a> {
         LineCruncher { bytes, index: 0 }
     }
 
+    pub fn is_basic_whitespace(byte: u8) -> bool {
+        byte.is_ascii_whitespace() && byte != b'\n'
+    }
+
     /// Returns the total number of bytes that have been consumed
     /// so far, including whitespace.
     pub fn pos(&self) -> usize {
@@ -39,7 +44,7 @@ impl<'a> Iterator for LineCruncher<'a> {
         while self.index < self.bytes.len() {
             let byte = self.bytes[self.index];
             self.index += 1;
-            if !(byte.is_ascii_whitespace() && byte != b'\n') {
+            if !LineCruncher::is_basic_whitespace(byte) {
                 return Some((byte, self.index));
             }
         }
@@ -73,7 +78,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_leading_whitespace(&mut self) {
         let mut cruncher = LineCruncher::new(self.remaining_bytes());
         if cruncher.next().is_some() {
-            self.index = cruncher.pos() - 1;
+            self.index += cruncher.pos() - 1;
         } else {
             self.index += cruncher.pos();
         }
@@ -90,6 +95,32 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
 
         false
+    }
+
+    fn chomp_string(&mut self) -> Option<Result<Token, SyntaxError>> {
+        let bytes = self.remaining_bytes();
+
+        assert_ne!(bytes.len(), 0, "we must have remaining bytes to read");
+
+        let first_byte = bytes[0];
+
+        assert!(
+            !LineCruncher::is_basic_whitespace(first_byte),
+            "first byte must not be BASIC whitespace"
+        );
+
+        if first_byte == b'"' {
+            let remaining_str = std::str::from_utf8(&bytes[1..]).unwrap();
+            if let Some(end_quote_index) = remaining_str.find('"') {
+                let string = String::from(&remaining_str[..end_quote_index]);
+                self.index += 1 + end_quote_index + 1;
+                Some(Ok(Token::StringLiteral(string)))
+            } else {
+                Some(Err(SyntaxError::UnterminatedStringLiteral))
+            }
+        } else {
+            None
+        }
     }
 
     fn chomp_any_keyword(&mut self) -> Option<Token> {
@@ -134,11 +165,16 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
             return None;
         }
 
+        println!("NEXT {}", self.index);
+
         if let Some(token) = self.chomp_any_keyword() {
             Some(Ok(token))
         } else if self.chomp_newline() {
             Some(Ok(Token::Newline))
+        } else if let Some(result) = self.chomp_string() {
+            Some(result)
         } else {
+            println!("ILLEGAL CHARACTER AT {}", self.index);
             self.index = self.bytes().len();
             Some(Err(SyntaxError::IllegalCharacter))
         }
@@ -171,6 +207,40 @@ mod tests {
         for value in ["PRINT", "print", "p r i N t", "PR INT"] {
             assert_eq!(get_tokens(value), vec![Token::Print]);
         }
+    }
+
+    #[test]
+    fn parsing_multiple_tokens_works() {
+        for value in ["PRINT GOTO", "PRINTGOTO", "  P R I N T G O T O  "] {
+            assert_eq!(get_tokens(value), vec![Token::Print, Token::Goto,]);
+        }
+    }
+
+    #[test]
+    fn parsing_single_string_literal_works() {
+        assert_eq!(
+            get_tokens("\"Hello there\""),
+            vec![Token::StringLiteral(String::from("Hello there"))]
+        );
+    }
+
+    #[test]
+    fn parsing_print_with_string_literal_works() {
+        assert_eq!(
+            get_tokens("print \"Hello there\""),
+            vec![
+                Token::Print,
+                Token::StringLiteral(String::from("Hello there"))
+            ]
+        );
+
+        assert_eq!(
+            get_tokens("\"Hello there 😊\"PRINT"),
+            vec![
+                Token::StringLiteral(String::from("Hello there 😊")),
+                Token::Print
+            ]
+        );
     }
 
     #[test]
