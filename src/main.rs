@@ -18,6 +18,12 @@ enum Token {
     Print,
 }
 
+/// First-generation BASIC dialects completely ignored spaces
+/// and tabs. This is part of what made it possible to write
+/// either "GO TO" or "GOTO", for instance.
+/// 
+/// This struct allows clients to iterate through the bytes
+/// of an array, skipping all such whitespace.
 struct LineCruncher<'a> {
     bytes: &'a [u8],
     index: usize,
@@ -28,6 +34,8 @@ impl<'a> LineCruncher<'a> {
         LineCruncher { bytes, index: 0 }
     }
 
+    /// Returns the number of bytes that have been consumed
+    /// so far, including whitespace.
     pub fn pos(&self) -> usize {
         self.index
     }
