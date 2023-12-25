@@ -18,6 +18,37 @@ enum Token {
     Print,
 }
 
+struct LineCruncher<'a> {
+    bytes: &'a [u8],
+    index: usize,
+}
+
+impl<'a> LineCruncher<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        LineCruncher { bytes, index: 0 }
+    }
+
+    pub fn pos(&self) -> usize {
+        self.index
+    }
+}
+
+impl<'a> Iterator for LineCruncher<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.bytes.len() {
+            let byte = self.bytes[self.index];
+            self.index += 1;
+            if !byte.is_ascii_whitespace() {
+                return Some(byte);
+            }
+        }
+
+        None
+    }
+}
+
 struct Tokenizer<T: AsRef<str>> {
     string: T,
     index: usize,
@@ -37,9 +68,9 @@ impl<T: AsRef<str>> Tokenizer<T> {
     }
 
     fn chomp_remaining_whitespace(&mut self) -> bool {
-        let bytes = self.remaining_bytes();
-        if bytes.iter().all(|byte| byte.is_ascii_whitespace()) {
-            self.index += bytes.len();
+        let mut cruncher = LineCruncher::new(self.remaining_bytes());
+        if cruncher.next().is_none() {
+            self.index += cruncher.pos();
             true
         } else {
             false
