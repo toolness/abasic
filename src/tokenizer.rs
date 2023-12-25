@@ -3,6 +3,7 @@ use crate::syntax_error::SyntaxError;
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Print,
+    Goto,
     Newline,
 }
 
@@ -92,6 +93,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
         false
     }
 
+    fn chomp_any_keyword(&mut self) -> Option<Token> {
+        if self.chomp_keyword("PRINT") {
+            Some(Token::Print)
+        } else if self.chomp_keyword("GOTO") {
+            Some(Token::Goto)
+        } else {
+            None
+        }
+    }
+
     fn chomp_keyword(&mut self, keyword: &str) -> bool {
         let keyword_bytes = keyword.as_bytes();
         let mut keyword_idx = 0;
@@ -122,8 +133,8 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
             return None;
         }
 
-        if self.chomp_keyword("PRINT") {
-            Some(Ok(Token::Print))
+        if let Some(token) = self.chomp_any_keyword() {
+            Some(Ok(token))
         } else if self.chomp_remaining_whitespace() {
             None
         } else if self.chomp_newline() {
