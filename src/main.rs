@@ -17,22 +17,22 @@ enum Token {
     Print,
 }
 
-struct Tokenizer {
-    string: String
+struct Tokenizer<T: AsRef<str>> {
+    string: T
 }
 
-impl Tokenizer {
-    pub fn new(string: String) -> Self {
-        assert!(string.is_ascii());
+impl<T: AsRef<str>> Tokenizer<T> {
+    pub fn new(string: T) -> Self {
+        assert!(string.as_ref().is_ascii());
         Tokenizer { string }
     }
 }
 
-impl Iterator for Tokenizer {
+impl<T: AsRef<str>> Iterator for Tokenizer<T> {
     type Item = Result<Token, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.string.contains("PRINT") {
+        if self.string.as_ref().contains("PRINT") {
             Some(Ok(Token::Print))
         } else {
             None
@@ -41,6 +41,6 @@ impl Iterator for Tokenizer {
 }
 
 fn main() {
-    let mut tok = Tokenizer::new(String::from("PRINT \"HELLO WORLD\""));
+    let mut tok = Tokenizer::new("PRINT \"HELLO WORLD\"");
     println!("First token: {:?}", tok.next());
 }
