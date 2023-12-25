@@ -1,13 +1,15 @@
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug, PartialEq)]
-struct SyntaxError {}
+enum SyntaxError {
+    IllegalCharacter,
+}
 
 impl Error for SyntaxError {}
 
 impl Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SYNTAX ERROR")
+        write!(f, "SYNTAX ERROR ({:?})", self)
     }
 }
 
@@ -23,7 +25,6 @@ struct Tokenizer<T: AsRef<str>> {
 
 impl<T: AsRef<str>> Tokenizer<T> {
     pub fn new(string: T) -> Self {
-        assert!(string.as_ref().is_ascii());
         Tokenizer { string, index: 0 }
     }
 
@@ -84,7 +85,7 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
             None
         } else {
             self.index = self.bytes().len();
-            Some(Err(SyntaxError {}))
+            Some(Err(SyntaxError::IllegalCharacter))
         }
     }
 }
@@ -114,10 +115,10 @@ mod tests {
     }
 
     #[test]
-    fn parsing_single_syntax_error_works() {
-        for value in ["PRING", "b l a r g"] {
+    fn parsing_single_illegal_character_works() {
+        for value in ["?", " %", "😊"] {
             let mut tokenizer = Tokenizer::new(value);
-            assert_eq!(tokenizer.next(), Some(Err(SyntaxError {})));
+            assert_eq!(tokenizer.next(), Some(Err(SyntaxError::IllegalCharacter)));
             assert_eq!(tokenizer.next(), None);
         }
     }
