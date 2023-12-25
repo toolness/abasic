@@ -25,3 +25,7 @@ Right now there's just a test suite, really:
 ```
 cargo test
 ```
+
+## License
+
+Everything in this repository not expressly attributed to other sources is licensed under [CC0 1.0 Universal](./LICENSE.md) (public domain).
