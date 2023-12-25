@@ -133,7 +133,8 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
 mod tests {
     use crate::{SyntaxError, Token, Tokenizer};
 
-    fn get_tokens(tokenizer: Tokenizer<&str>) -> Vec<Token> {
+    fn get_tokens(value: &str) -> Vec<Token> {
+        let tokenizer = Tokenizer::new(value);
         tokenizer
             .into_iter()
             .map(|t| t.unwrap())
@@ -143,16 +144,14 @@ mod tests {
     #[test]
     fn parsing_empty_string_works() {
         for value in ["", " ", "    "] {
-            let tokenizer = Tokenizer::new(value);
-            assert_eq!(get_tokens(tokenizer), vec![]);
+            assert_eq!(get_tokens(value), vec![]);
         }
     }
 
     #[test]
     fn parsing_single_print_statement_works() {
         for value in ["PRINT", "print", "p r i N t", "PR INT"] {
-            let tokenizer = Tokenizer::new(value);
-            assert_eq!(get_tokens(tokenizer), vec![Token::Print]);
+            assert_eq!(get_tokens(value), vec![Token::Print]);
         }
     }
 
