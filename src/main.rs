@@ -16,6 +16,7 @@ impl Display for SyntaxError {
 #[derive(Debug, PartialEq)]
 enum Token {
     Print,
+    Newline,
 }
 
 /// First-generation BASIC dialects completely ignored spaces
@@ -50,7 +51,7 @@ impl<'a> Iterator for LineCruncher<'a> {
         while self.index < self.bytes.len() {
             let byte = self.bytes[self.index];
             self.index += 1;
-            if !byte.is_ascii_whitespace() {
+            if !(byte.is_ascii_whitespace() && byte != b'\n') {
                 return Some((byte, self.index));
             }
         }
@@ -77,6 +78,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
         &self.bytes()[self.index..]
     }
 
+    fn crunch_remaining_bytes(&self) -> LineCruncher {
+        LineCruncher::new(self.remaining_bytes())
+    }
+
     fn chomp_remaining_whitespace(&mut self) -> bool {
         let mut cruncher = LineCruncher::new(self.remaining_bytes());
         if cruncher.next().is_none() {
@@ -87,14 +92,26 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
+    fn chomp_newline(&mut self) -> bool {
+        for (byte, pos) in self.crunch_remaining_bytes() {
+            if byte == b'\n' {
+                self.index += pos;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        false
+    }
+
     fn chomp_keyword(&mut self, keyword: &str) -> bool {
-        let cruncher = LineCruncher::new(self.remaining_bytes());
         let keyword_bytes = keyword.as_bytes();
         let mut keyword_idx = 0;
 
         assert_ne!(keyword_bytes.len(), 0, "keyword must be non-empty");
 
-        for (byte, pos) in cruncher {
+        for (byte, pos) in self.crunch_remaining_bytes() {
             if byte.to_ascii_uppercase() == keyword_bytes[keyword_idx] {
                 keyword_idx += 1;
                 if keyword_idx == keyword_bytes.len() {
@@ -122,6 +139,8 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
             Some(Ok(Token::Print))
         } else if self.chomp_remaining_whitespace() {
             None
+        } else if self.chomp_newline() {
+            Some(Ok(Token::Newline))
         } else {
             self.index = self.bytes().len();
             Some(Err(SyntaxError::IllegalCharacter))
@@ -152,6 +171,13 @@ mod tests {
     fn parsing_single_print_statement_works() {
         for value in ["PRINT", "print", "p r i N t", "PR INT"] {
             assert_eq!(get_tokens(value), vec![Token::Print]);
+        }
+    }
+
+    #[test]
+    fn parsing_single_newline_works() {
+        for value in ["\n", " \n", "  \n  "] {
+            assert_eq!(get_tokens(value), vec![Token::Newline]);
         }
     }
 
