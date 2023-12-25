@@ -60,10 +60,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 keyword_idx += 1;
                 if keyword_idx == keyword_bytes.len() {
                     self.index += i;
-                    return true
+                    return true;
                 }
             } else if !byte.is_ascii_whitespace() {
-                return false
+                return false;
             }
         }
 
@@ -92,10 +92,13 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Tokenizer, Token, SyntaxError};
+    use crate::{SyntaxError, Token, Tokenizer};
 
     fn get_tokens(tokenizer: Tokenizer<&str>) -> Vec<Token> {
-        tokenizer.into_iter().map(|t| t.unwrap()).collect::<Vec<_>>()
+        tokenizer
+            .into_iter()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
     }
 
     #[test]
