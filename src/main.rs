@@ -1,8 +1,7 @@
 use std::{error::Error, fmt::Display};
 
-#[derive(Debug)]
-struct SyntaxError {
-}
+#[derive(Debug, PartialEq)]
+struct SyntaxError {}
 
 impl Error for SyntaxError {}
 
@@ -12,7 +11,7 @@ impl Display for SyntaxError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Token {
     Print,
 }
@@ -34,6 +33,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
     fn remaining_bytes(&self) -> &[u8] {
         &self.bytes()[self.index..]
+    }
+
+    fn chomp_remaining_whitespace(&mut self) -> bool {
+        let bytes = self.remaining_bytes();
+        if bytes.iter().all(|byte| byte.is_ascii_whitespace()) {
+            self.index += bytes.len();
+            true
+        } else {
+            false
+        }
     }
 
     fn chomp_keyword(&mut self, keyword: &str) -> bool {
@@ -71,9 +80,45 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
 
         if self.chomp_keyword("PRINT") {
             Some(Ok(Token::Print))
+        } else if self.chomp_remaining_whitespace() {
+            None
         } else {
             self.index = self.bytes().len();
             Some(Err(SyntaxError {}))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Tokenizer, Token, SyntaxError};
+
+    fn get_tokens(tokenizer: Tokenizer<&str>) -> Vec<Token> {
+        tokenizer.into_iter().map(|t| t.unwrap()).collect::<Vec<_>>()
+    }
+
+    #[test]
+    fn parsing_empty_string_works() {
+        for value in ["", " ", "    "] {
+            let tokenizer = Tokenizer::new(value);
+            assert_eq!(get_tokens(tokenizer), vec![]);
+        }
+    }
+
+    #[test]
+    fn parsing_single_print_statement_works() {
+        for value in ["PRINT", "print", "p r i N t", "PR INT"] {
+            let tokenizer = Tokenizer::new(value);
+            assert_eq!(get_tokens(tokenizer), vec![Token::Print]);
+        }
+    }
+
+    #[test]
+    fn parsing_single_syntax_error_works() {
+        for value in ["PRING", "b l a r g"] {
+            let mut tokenizer = Tokenizer::new(value);
+            assert_eq!(tokenizer.next(), Some(Err(SyntaxError {})));
+            assert_eq!(tokenizer.next(), None);
         }
     }
 }
