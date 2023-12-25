@@ -189,6 +189,13 @@ mod tests {
             assert_eq!(tokenizer.next(), None);
         }
     }
+
+    #[test]
+    fn parsing_borrowed_str_works() {
+        let value = String::from("one\ntwo\nthree");
+        let first_line = value.split('\n').next().unwrap();
+        Tokenizer::new(first_line);
+    }
 }
 
 fn main() {
