@@ -20,8 +20,8 @@ enum Token {
 
 /// First-generation BASIC dialects completely ignored spaces
 /// and tabs. This is part of what made it possible to write
-/// either "GO TO" or "GOTO", for instance.
-/// 
+/// either `GO TO` or `GOTO`, for instance.
+///
 /// This struct allows clients to iterate through the bytes
 /// of an array, skipping all such whitespace.
 struct LineCruncher<'a> {
@@ -34,7 +34,7 @@ impl<'a> LineCruncher<'a> {
         LineCruncher { bytes, index: 0 }
     }
 
-    /// Returns the number of bytes that have been consumed
+    /// Returns the total number of bytes that have been consumed
     /// so far, including whitespace.
     pub fn pos(&self) -> usize {
         self.index
@@ -42,14 +42,16 @@ impl<'a> LineCruncher<'a> {
 }
 
 impl<'a> Iterator for LineCruncher<'a> {
-    type Item = u8;
+    /// A tuple of the byte and the total number of bytes consumed
+    /// so far, including the given byte and any prior whitespace.
+    type Item = (u8, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.index < self.bytes.len() {
             let byte = self.bytes[self.index];
             self.index += 1;
             if !byte.is_ascii_whitespace() {
-                return Some(byte);
+                return Some((byte, self.index));
             }
         }
 
@@ -86,22 +88,20 @@ impl<T: AsRef<str>> Tokenizer<T> {
     }
 
     fn chomp_keyword(&mut self, keyword: &str) -> bool {
-        let bytes = self.remaining_bytes();
+        let cruncher = LineCruncher::new(self.remaining_bytes());
         let keyword_bytes = keyword.as_bytes();
-        let mut i = 0;
         let mut keyword_idx = 0;
 
-        while i < bytes.len() {
-            let byte = bytes[i];
+        assert_ne!(keyword_bytes.len(), 0, "keyword must be non-empty");
 
-            i += 1;
+        for (byte, pos) in cruncher {
             if byte.to_ascii_uppercase() == keyword_bytes[keyword_idx] {
                 keyword_idx += 1;
                 if keyword_idx == keyword_bytes.len() {
-                    self.index += i;
+                    self.index += pos;
                     return true;
                 }
-            } else if !byte.is_ascii_whitespace() {
+            } else {
                 return false;
             }
         }
