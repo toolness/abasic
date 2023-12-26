@@ -4,6 +4,7 @@ use std::{error::Error, fmt::Display};
 pub enum SyntaxError {
     IllegalCharacter,
     UnterminatedStringLiteral,
+    InvalidNumber,
 }
 
 impl Error for SyntaxError {}

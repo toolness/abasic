@@ -6,6 +6,7 @@ pub enum Token {
     Goto,
     Newline,
     StringLiteral(String),
+    NumericLiteral(f64),
 }
 
 /// First-generation BASIC dialects completely ignored spaces
@@ -102,6 +103,32 @@ impl<T: AsRef<str>> Tokenizer<T> {
         false
     }
 
+    fn chomp_number(&mut self) -> Option<Result<Token, SyntaxError>> {
+        let mut digits = String::new();
+        let mut latest_pos: Option<usize> = None;
+
+        for (byte, pos) in self.crunch_remaining_bytes() {
+            // TODO: We should support decimals too.
+            if byte.is_ascii_digit() {
+                latest_pos = Some(pos);
+                digits.push(byte as char);
+            } else {
+                break;
+            }
+        }
+
+        if let Some(pos) = latest_pos {
+            if let Ok(number) = digits.parse::<f64>() {
+                self.index += pos;
+                Some(Ok(Token::NumericLiteral(number)))
+            } else {
+                Some(Err(SyntaxError::InvalidNumber))
+            }
+        } else {
+            None
+        }
+    }
+
     fn chomp_string(&mut self) -> Option<Result<Token, SyntaxError>> {
         let bytes = self.remaining_bytes();
 
@@ -170,6 +197,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
         } else if self.chomp_newline() {
             Ok(Token::Newline)
         } else if let Some(result) = self.chomp_string() {
+            result
+        } else if let Some(result) = self.chomp_number() {
             result
         } else {
             Err(SyntaxError::IllegalCharacter)
@@ -265,6 +294,21 @@ mod tests {
                 Token::StringLiteral(String::from("Hello there 😊")),
                 Token::Print
             ]
+        );
+    }
+
+    #[test]
+    fn parsing_single_numeric_literal_works() {
+        for value in ["1234", "  1234 ", "01234"] {
+            assert_eq!(get_tokens(value), vec![Token::NumericLiteral(1234.0)]);
+        }
+    }
+
+    #[test]
+    fn parsing_single_numeric_literal_and_print_works() {
+        assert_eq!(
+            get_tokens("1234 PRINT"),
+            vec![Token::NumericLiteral(1234.0), Token::Print]
         );
     }
 
