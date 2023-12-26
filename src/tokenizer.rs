@@ -115,7 +115,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
         );
 
         if first_byte == b'"' {
+            // Technically this isn't very efficient because it's re-validating that
+            // the rest of the string is valid UTF-8, which it *should* be based on
+            // how we've been processing the bytes that came before, but better
+            // safe than sorry I guess.
             let remaining_str = std::str::from_utf8(&bytes[1..]).unwrap();
+
             if let Some(end_quote_index) = remaining_str.find('"') {
                 let string = String::from(&remaining_str[..end_quote_index]);
                 self.index += 1 + end_quote_index + 1;
