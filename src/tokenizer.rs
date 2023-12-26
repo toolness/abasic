@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn parsing_single_numeric_literal_works() {
-        for value in ["1234", "  1234 ", "01234"] {
+        for value in ["1234", "  1234 ", "01234", "1 2 3 4"] {
             assert_eq!(get_tokens(value), vec![Token::NumericLiteral(1234.0)]);
         }
     }
