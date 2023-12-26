@@ -56,11 +56,16 @@ impl<'a> Iterator for LineCruncher<'a> {
 pub struct Tokenizer<T: AsRef<str>> {
     string: T,
     index: usize,
+    errored: bool,
 }
 
 impl<T: AsRef<str>> Tokenizer<T> {
     pub fn new(string: T) -> Self {
-        Tokenizer { string, index: 0 }
+        Tokenizer {
+            string,
+            index: 0,
+            errored: false,
+        }
     }
 
     fn bytes(&self) -> &[u8] {
@@ -153,31 +158,41 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
         false
     }
+
+    fn chomp_next_token(&mut self) -> Result<Token, SyntaxError> {
+        if let Some(token) = self.chomp_any_keyword() {
+            Ok(token)
+        } else if self.chomp_newline() {
+            Ok(Token::Newline)
+        } else if let Some(result) = self.chomp_string() {
+            result
+        } else {
+            Err(SyntaxError::IllegalCharacter)
+        }
+    }
 }
 
 impl<T: AsRef<str>> Iterator for Tokenizer<T> {
     type Item = Result<Token, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.errored {
+            return None;
+        }
+
         self.chomp_leading_whitespace();
 
         if self.index == self.bytes().len() {
             return None;
         }
 
-        println!("NEXT {}", self.index);
+        let result = self.chomp_next_token();
 
-        if let Some(token) = self.chomp_any_keyword() {
-            Some(Ok(token))
-        } else if self.chomp_newline() {
-            Some(Ok(Token::Newline))
-        } else if let Some(result) = self.chomp_string() {
-            Some(result)
-        } else {
-            println!("ILLEGAL CHARACTER AT {}", self.index);
-            self.index = self.bytes().len();
-            Some(Err(SyntaxError::IllegalCharacter))
+        if result.is_err() {
+            self.errored = true;
         }
+
+        Some(result)
     }
 }
 
@@ -186,6 +201,11 @@ mod tests {
     use crate::syntax_error::SyntaxError;
 
     use super::{Token, Tokenizer};
+
+    fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
+        let tokenizer = Tokenizer::new(value);
+        tokenizer.into_iter().collect::<Vec<_>>()
+    }
 
     fn get_tokens(value: &str) -> Vec<Token> {
         let tokenizer = Tokenizer::new(value);
@@ -251,11 +271,22 @@ mod tests {
     }
 
     #[test]
-    fn parsing_single_illegal_character_works() {
+    fn parsing_single_illegal_character_returns_error() {
         for value in ["?", " %", "😊"] {
-            let mut tokenizer = Tokenizer::new(value);
-            assert_eq!(tokenizer.next(), Some(Err(SyntaxError::IllegalCharacter)));
-            assert_eq!(tokenizer.next(), None);
+            assert_eq!(
+                get_tokens_wrapped(value),
+                vec![Err(SyntaxError::IllegalCharacter)]
+            );
+        }
+    }
+
+    #[test]
+    fn parsing_unterminated_string_literal_returns_error() {
+        for value in ["\"", " \"blarg"] {
+            assert_eq!(
+                get_tokens_wrapped(value),
+                vec![Err(SyntaxError::UnterminatedStringLiteral)]
+            );
         }
     }
 
