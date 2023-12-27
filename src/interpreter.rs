@@ -135,9 +135,9 @@ impl Interpreter {
 mod tests {
     use super::Interpreter;
 
-    fn get_eval_output(line: &'static str) -> String {
+    fn assert_eval_output(line: &'static str, expected: &'static str) {
         let mut interpreter = Interpreter::new();
-        match interpreter.evaluate(line) {
+        let output = match interpreter.evaluate(line) {
             Ok(_) => interpreter
                 .get_and_clear_output_buffer()
                 .unwrap_or_default(),
@@ -147,24 +147,23 @@ mod tests {
                     line, err
                 )
             }
-        }
+        };
+
+        assert_eq!(output, expected, "evaluating '{}'", line);
     }
 
     #[test]
     fn empty_line_works() {
-        assert_eq!(&get_eval_output(""), "");
-        assert_eq!(&get_eval_output(" "), "");
+        assert_eval_output("", "");
+        assert_eval_output(" ", "");
     }
 
     #[test]
     fn print_works() {
-        assert_eq!(&get_eval_output("print"), "\n");
-        assert_eq!(&get_eval_output("print \"\""), "\n");
-        assert_eq!(&get_eval_output("print \"hello 😊\""), "hello 😊\n");
-        assert_eq!(&get_eval_output("print \"hello 😊\" 5"), "hello 😊5\n");
-        assert_eq!(
-            &get_eval_output("print \"hello 😊\" 5 \"there\""),
-            "hello 😊5there\n"
-        );
+        assert_eval_output("print", "\n");
+        assert_eval_output("print \"\"", "\n");
+        assert_eval_output("print \"hello 😊\"", "hello 😊\n");
+        assert_eval_output("print \"hello 😊\" 5", "hello 😊5\n");
+        assert_eval_output("print \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
     }
 }
