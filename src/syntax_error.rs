@@ -5,6 +5,8 @@ pub enum SyntaxError {
     IllegalCharacter,
     UnterminatedStringLiteral,
     InvalidNumber,
+    UnexpectedToken,
+    UnexpectedEndOfInput,
 }
 
 impl Error for SyntaxError {}
