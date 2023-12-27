@@ -277,6 +277,21 @@ mod tests {
         }
     }
 
+    fn assert_values_parse_to_tokens_wrapped(
+        values: &[&str],
+        tokens: &[Result<Token, SyntaxError>],
+    ) {
+        for value in values {
+            assert_eq!(
+                get_tokens_wrapped(value),
+                tokens.to_owned(),
+                "parsing '{}' == {:?}",
+                value,
+                tokens
+            );
+        }
+    }
+
     #[test]
     fn parsing_empty_string_works() {
         assert_values_parse_to_tokens(&["", " ", "    "], &[]);
@@ -315,9 +330,10 @@ mod tests {
 
     #[test]
     fn parsing_single_numeric_literal_works() {
-        for value in ["1234", "  1234 ", "01234", "1 2 3 4"] {
-            assert_eq!(get_tokens(value), vec![Token::NumericLiteral(1234.0)]);
-        }
+        assert_values_parse_to_tokens(
+            &["1234", "  1234 ", "01234", "1 2 3 4"],
+            &[Token::NumericLiteral(1234.0)],
+        );
     }
 
     #[test]
@@ -330,32 +346,23 @@ mod tests {
 
     #[test]
     fn parsing_single_newline_works() {
-        for value in ["\n", " \n", "  \n  "] {
-            assert_eq!(get_tokens(value), vec![Token::Newline]);
-        }
+        assert_values_parse_to_tokens(&["\n", " \n", "  \n  "], &[Token::Newline]);
     }
 
     #[test]
     fn parsing_single_illegal_character_returns_error() {
-        for value in ["?", " %", "😊"] {
-            assert_eq!(
-                get_tokens_wrapped(value),
-                vec![Err(SyntaxError::IllegalCharacter)],
-                "parsing '{}'",
-                value
-            );
-        }
+        assert_values_parse_to_tokens_wrapped(
+            &["?", " %", "😊"],
+            &[Err(SyntaxError::IllegalCharacter)],
+        );
     }
 
     #[test]
     fn parsing_unterminated_string_literal_returns_error() {
-        for value in ["\"", " \"blarg"] {
-            assert_eq!(
-                get_tokens_wrapped(value),
-                vec![Err(SyntaxError::UnterminatedStringLiteral)],
-                ""
-            );
-        }
+        assert_values_parse_to_tokens_wrapped(
+            &["\"", " \"blarg"],
+            &[Err(SyntaxError::UnterminatedStringLiteral)],
+        );
     }
 
     #[test]
