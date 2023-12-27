@@ -58,19 +58,19 @@ impl Interpreter {
         self.peek_next_token().is_some()
     }
 
-    fn peek_next_token(&self) -> Option<&Token> {
-        self.tokens.get(self.tokens_index)
+    fn peek_next_token(&self) -> Option<Token> {
+        self.tokens.get(self.tokens_index).cloned()
     }
 
-    fn next_token(&mut self) -> Option<&Token> {
-        let next = self.tokens.get(self.tokens_index);
+    fn next_token(&mut self) -> Option<Token> {
+        let next = self.peek_next_token();
         if next.is_some() {
             self.tokens_index += 1;
         }
         next
     }
 
-    fn next_unwrapped_token(&mut self) -> Result<&Token, InterpreterError> {
+    fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
         match self.next_token() {
             Some(token) => Ok(token),
             None => Err(InterpreterError::SyntaxError(
@@ -81,8 +81,8 @@ impl Interpreter {
 
     fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
         match self.next_unwrapped_token()? {
-            Token::StringLiteral(string) => Ok(Value::String(string.clone())),
-            Token::NumericLiteral(number) => Ok(Value::Number(*number)),
+            Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
+            Token::NumericLiteral(number) => Ok(Value::Number(number)),
             _ => InterpreterError::unexpected_token(),
         }
     }
@@ -104,7 +104,7 @@ impl Interpreter {
 
     fn evaluate_statement(&mut self) -> Result<(), InterpreterError> {
         match self.next_unwrapped_token()? {
-            &Token::Print => self.evaluate_print_statement(),
+            Token::Print => self.evaluate_print_statement(),
             _ => InterpreterError::unexpected_token(),
         }
     }

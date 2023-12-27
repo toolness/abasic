@@ -1,11 +1,13 @@
+use std::rc::Rc;
+
 use crate::syntax_error::SyntaxError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Print,
     Goto,
     Newline,
-    StringLiteral(String),
+    StringLiteral(Rc<String>),
     NumericLiteral(f64),
 }
 
@@ -149,7 +151,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             let remaining_str = std::str::from_utf8(&bytes[1..]).unwrap();
 
             if let Some(end_quote_index) = remaining_str.find('"') {
-                let string = String::from(&remaining_str[..end_quote_index]);
+                let string = Rc::new(String::from(&remaining_str[..end_quote_index]));
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
@@ -232,9 +234,15 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::syntax_error::SyntaxError;
 
     use super::{Token, Tokenizer};
+
+    fn string_literal(value: &'static str) -> Token {
+        Token::StringLiteral(Rc::new(String::from(value)))
+    }
 
     fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
         let tokenizer = Tokenizer::new(value);
@@ -274,7 +282,7 @@ mod tests {
     fn parsing_single_string_literal_works() {
         assert_eq!(
             get_tokens("\"Hello there\""),
-            vec![Token::StringLiteral(String::from("Hello there"))]
+            vec![string_literal("Hello there")]
         );
     }
 
@@ -282,18 +290,12 @@ mod tests {
     fn parsing_print_with_string_literal_works() {
         assert_eq!(
             get_tokens("print \"Hello there\""),
-            vec![
-                Token::Print,
-                Token::StringLiteral(String::from("Hello there"))
-            ]
+            vec![Token::Print, string_literal("Hello there")]
         );
 
         assert_eq!(
             get_tokens("\"Hello there 😊\"PRINT"),
-            vec![
-                Token::StringLiteral(String::from("Hello there 😊")),
-                Token::Print
-            ]
+            vec![string_literal("Hello there 😊"), Token::Print]
         );
     }
 
