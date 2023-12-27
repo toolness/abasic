@@ -130,3 +130,41 @@ impl Interpreter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Interpreter;
+
+    fn get_eval_output(line: &'static str) -> String {
+        let mut interpreter = Interpreter::new();
+        match interpreter.evaluate(line) {
+            Ok(_) => interpreter
+                .get_and_clear_output_buffer()
+                .unwrap_or_default(),
+            Err(err) => {
+                panic!(
+                    "expected '{}' to evaluate successfully but got {:?}",
+                    line, err
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn empty_line_works() {
+        assert_eq!(&get_eval_output(""), "");
+        assert_eq!(&get_eval_output(" "), "");
+    }
+
+    #[test]
+    fn print_works() {
+        assert_eq!(&get_eval_output("print"), "\n");
+        assert_eq!(&get_eval_output("print \"\""), "\n");
+        assert_eq!(&get_eval_output("print \"hello 😊\""), "hello 😊\n");
+        assert_eq!(&get_eval_output("print \"hello 😊\" 5"), "hello 😊5\n");
+        assert_eq!(
+            &get_eval_output("print \"hello 😊\" 5 \"there\""),
+            "hello 😊5there\n"
+        );
+    }
+}
