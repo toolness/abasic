@@ -253,49 +253,63 @@ mod tests {
         let tokenizer = Tokenizer::new(value);
         tokenizer
             .into_iter()
-            .map(|t| t.unwrap())
+            .map(|t| match t {
+                Ok(token) => token,
+                Err(err) => {
+                    panic!(
+                        "expected '{}' to tokenize without error, but got {:?}",
+                        value, err
+                    )
+                }
+            })
             .collect::<Vec<_>>()
+    }
+
+    fn assert_values_parse_to_tokens(values: &[&str], tokens: &[Token]) {
+        for value in values {
+            assert_eq!(
+                get_tokens(value),
+                tokens.to_owned(),
+                "parsing '{}' == {:?}",
+                value,
+                tokens
+            );
+        }
     }
 
     #[test]
     fn parsing_empty_string_works() {
-        for value in ["", " ", "    "] {
-            assert_eq!(get_tokens(value), vec![]);
-        }
+        assert_values_parse_to_tokens(&["", " ", "    "], &[]);
     }
 
     #[test]
     fn parsing_single_print_statement_works() {
-        for value in ["PRINT", "print", "p r i N t", "PR INT"] {
-            assert_eq!(get_tokens(value), vec![Token::Print]);
-        }
+        assert_values_parse_to_tokens(&["PRINT", "print", "p r i N t", "PR INT"], &[Token::Print]);
     }
 
     #[test]
     fn parsing_multiple_tokens_works() {
-        for value in ["PRINT GOTO", "PRINTGOTO", "  P R I N T G O T O  "] {
-            assert_eq!(get_tokens(value), vec![Token::Print, Token::Goto,]);
-        }
+        assert_values_parse_to_tokens(
+            &["PRINT GOTO", "PRINTGOTO", "  P R I N T G O T O  "],
+            &[Token::Print, Token::Goto],
+        );
     }
 
     #[test]
     fn parsing_single_string_literal_works() {
-        assert_eq!(
-            get_tokens("\"Hello there\""),
-            vec![string_literal("Hello there")]
-        );
+        assert_values_parse_to_tokens(&["\"Hello there\""], &[string_literal("Hello there")]);
     }
 
     #[test]
     fn parsing_print_with_string_literal_works() {
-        assert_eq!(
-            get_tokens("print \"Hello there\""),
-            vec![Token::Print, string_literal("Hello there")]
+        assert_values_parse_to_tokens(
+            &["print \"Hello there\""],
+            &[Token::Print, string_literal("Hello there")],
         );
 
-        assert_eq!(
-            get_tokens("\"Hello there 😊\"PRINT"),
-            vec![string_literal("Hello there 😊"), Token::Print]
+        assert_values_parse_to_tokens(
+            &["\"Hello there 😊\"PRINT"],
+            &[string_literal("Hello there 😊"), Token::Print],
         );
     }
 
@@ -326,7 +340,9 @@ mod tests {
         for value in ["?", " %", "😊"] {
             assert_eq!(
                 get_tokens_wrapped(value),
-                vec![Err(SyntaxError::IllegalCharacter)]
+                vec![Err(SyntaxError::IllegalCharacter)],
+                "parsing '{}'",
+                value
             );
         }
     }
@@ -336,7 +352,8 @@ mod tests {
         for value in ["\"", " \"blarg"] {
             assert_eq!(
                 get_tokens_wrapped(value),
-                vec![Err(SyntaxError::UnterminatedStringLiteral)]
+                vec![Err(SyntaxError::UnterminatedStringLiteral)],
+                ""
             );
         }
     }
