@@ -100,9 +100,22 @@ impl Interpreter {
         if unary_plus_or_minus.is_some() {
             self.next_unwrapped_token()?;
         }
-        let value = self.evaluate_expression_term()?;
 
-        maybe_apply_unary_plus_or_minus(unary_plus_or_minus, value)
+        let value =
+            maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
+        if let Some(next_token) = self.peek_next_token() {
+            if let Some(binary_plus_or_minus) = parse_plus_or_minus(&next_token) {
+                self.next_unwrapped_token()?;
+                let second_operand = self.evaluate_expression_term()?;
+                Ok(Value::Number(
+                    unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
+                ))
+            } else {
+                Ok(value)
+            }
+        } else {
+            Ok(value)
+        }
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), InterpreterError> {
@@ -162,13 +175,17 @@ fn maybe_apply_unary_plus_or_minus(
     value: Value,
 ) -> Result<Value, InterpreterError> {
     if let Some(unary_sign) = unary_sign {
-        if let Value::Number(number) = value {
-            Ok(Value::Number(number * unary_sign))
-        } else {
-            Err(InterpreterError::TypeMismatch)
-        }
+        Ok(Value::Number(unwrap_number(value)? * unary_sign))
     } else {
         Ok(value)
+    }
+}
+
+fn unwrap_number(value: Value) -> Result<f64, InterpreterError> {
+    if let Value::Number(number) = value {
+        Ok(number)
+    } else {
+        Err(InterpreterError::TypeMismatch)
     }
 }
 
@@ -227,12 +244,21 @@ mod tests {
         assert_eval_output("print \"hello 😊\"", "hello 😊\n");
         assert_eval_output("print \"hello 😊\" 5", "hello 😊5\n");
         assert_eval_output("print \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
+    }
+
+    #[test]
+    fn print_works_with_math() {
         assert_eval_output("print +4", "4\n");
         assert_eval_output("print -4", "-4\n");
+        assert_eval_output("print -4 - 4", "-8\n");
+        assert_eval_output("print -4 + 4", "0\n");
+        assert_eval_output("print 1 + 1", "2\n");
     }
 
     #[test]
     fn type_mismatch_error_works() {
         assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
+        assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
+        assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
     }
 }
