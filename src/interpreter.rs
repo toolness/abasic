@@ -1,4 +1,8 @@
-use std::{error::Error, fmt::Display};
+use std::{
+    backtrace::{Backtrace, BacktraceStatus},
+    error::Error,
+    fmt::Display,
+};
 
 use crate::{
     syntax_error::SyntaxError,
@@ -10,15 +14,39 @@ enum Value {
     Number(f64),
 }
 
+#[derive(Debug)]
+pub struct InterpreterError {
+    error_type: InterpreterErrorType,
+    backtrace: Backtrace,
+}
+
 #[derive(Debug, PartialEq)]
-pub enum InterpreterError {
+pub enum InterpreterErrorType {
     SyntaxError(SyntaxError),
     TypeMismatch,
 }
 
 impl InterpreterError {
     pub fn unexpected_token<T>() -> Result<T, InterpreterError> {
-        Err(InterpreterError::SyntaxError(SyntaxError::UnexpectedToken))
+        Err(SyntaxError::UnexpectedToken.into())
+    }
+}
+
+impl From<SyntaxError> for InterpreterError {
+    fn from(value: SyntaxError) -> Self {
+        InterpreterError {
+            error_type: InterpreterErrorType::SyntaxError(value),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl From<InterpreterErrorType> for InterpreterError {
+    fn from(value: InterpreterErrorType) -> Self {
+        InterpreterError {
+            error_type: value,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
@@ -26,14 +54,18 @@ impl Error for InterpreterError {}
 
 impl Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InterpreterError::SyntaxError(err) => {
-                write!(f, "SYNTAX ERROR ({:?})", err)
+        match &self.error_type {
+            InterpreterErrorType::SyntaxError(err) => {
+                write!(f, "SYNTAX ERROR ({:?})", err)?;
             }
-            InterpreterError::TypeMismatch => {
-                write!(f, "TYPE MISMATCH")
+            InterpreterErrorType::TypeMismatch => {
+                write!(f, "TYPE MISMATCH")?;
             }
         }
+        if self.backtrace.status() == BacktraceStatus::Captured {
+            write!(f, "\nBacktrace:\n{}", self.backtrace)?;
+        }
+        Ok(())
     }
 }
 
@@ -164,7 +196,7 @@ impl Interpreter {
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
         self.tokens = Tokenizer::new(line)
             .remaining_tokens()
-            .map_err(|err| InterpreterError::SyntaxError(err))?;
+            .map_err(|err| InterpreterError::from(err))?;
         self.tokens_index = 0;
 
         while self.has_next_token() {
@@ -197,31 +229,29 @@ fn unwrap_number(value: Value) -> Result<f64, InterpreterError> {
     if let Value::Number(number) = value {
         Ok(number)
     } else {
-        Err(InterpreterError::TypeMismatch)
+        Err(InterpreterErrorType::TypeMismatch.into())
     }
 }
 
 fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
     match token {
         Some(token) => Ok(token),
-        None => Err(InterpreterError::SyntaxError(
-            SyntaxError::UnexpectedEndOfInput,
-        )),
+        None => Err(SyntaxError::UnexpectedEndOfInput.into()),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Interpreter, InterpreterError};
+    use super::{Interpreter, InterpreterErrorType};
 
-    fn assert_eval_error(line: &'static str, expected: InterpreterError) {
+    fn assert_eval_error(line: &'static str, expected: InterpreterErrorType) {
         let mut interpreter = Interpreter::new();
         match interpreter.evaluate(line) {
             Ok(_) => {
                 panic!("expected '{}' to error but it didn't", line);
             }
             Err(err) => {
-                assert_eq!(err, expected, "evaluating '{}'", line);
+                assert_eq!(err.error_type, expected, "evaluating '{}'", line);
             }
         }
     }
@@ -234,7 +264,7 @@ mod tests {
                 .unwrap_or_default(),
             Err(err) => {
                 panic!(
-                    "expected '{}' to evaluate successfully but got {:?} ({:?})",
+                    "expected '{}' to evaluate successfully but got {}\nIntepreter state is: {:?}",
                     line, err, interpreter
                 )
             }
@@ -276,8 +306,8 @@ mod tests {
 
     #[test]
     fn type_mismatch_error_works() {
-        assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
-        assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
-        assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
+        assert_eval_error("print -\"hi\"", InterpreterErrorType::TypeMismatch);
+        assert_eval_error("print \"hi\" - 4", InterpreterErrorType::TypeMismatch);
+        assert_eval_error("print 4 + \"hi\"", InterpreterErrorType::TypeMismatch);
     }
 }
