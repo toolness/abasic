@@ -1,4 +1,5 @@
 mod interpreter;
+mod interpreter_error;
 mod syntax_error;
 mod tokenizer;
 
