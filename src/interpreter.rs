@@ -124,7 +124,7 @@ impl Interpreter {
         let value =
             maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
         if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
-            let second_operand = self.evaluate_expression_term()?;
+            let second_operand = self.evaluate_expression()?;
             Ok(Value::Number(
                 unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
             ))
@@ -268,6 +268,7 @@ mod tests {
         assert_eval_output("print -4 - 4", "-8\n");
         assert_eval_output("print -4 + 4", "0\n");
         assert_eval_output("print 1 + 1", "2\n");
+        assert_eval_output("print 1 + 1 - 3", "-1\n");
     }
 
     #[test]
