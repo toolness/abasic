@@ -156,21 +156,7 @@ impl Interpreter {
     }
 
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
-        let tokenizer = Tokenizer::new(line);
-        let mut statements: Vec<Vec<Token>> = vec![];
-        let mut tokens: Vec<Token> = vec![];
-        for token_result in tokenizer {
-            match token_result {
-                Ok(Token::Colon) => {
-                    statements.push(tokens.drain(..).collect::<Vec<_>>());
-                }
-                Ok(token) => tokens.push(token),
-                Err(err) => {
-                    return Err(InterpreterError::SyntaxError(err));
-                }
-            }
-        }
-        statements.push(tokens);
+        let statements = parse_statements(line)?;
         for tokens in statements {
             self.tokens = tokens;
             self.tokens_index = 0;
@@ -216,6 +202,25 @@ fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
             SyntaxError::UnexpectedEndOfInput,
         )),
     }
+}
+
+fn parse_statements<T: AsRef<str>>(line: T) -> Result<Vec<Vec<Token>>, InterpreterError> {
+    let tokenizer = Tokenizer::new(line);
+    let mut statements: Vec<Vec<Token>> = vec![];
+    let mut tokens: Vec<Token> = vec![];
+    for token_result in tokenizer {
+        match token_result {
+            Ok(Token::Colon) => {
+                statements.push(tokens.drain(..).collect::<Vec<_>>());
+            }
+            Ok(token) => tokens.push(token),
+            Err(err) => {
+                return Err(InterpreterError::SyntaxError(err));
+            }
+        }
+    }
+    statements.push(tokens);
+    Ok(statements)
 }
 
 #[cfg(test)]
