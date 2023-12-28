@@ -96,13 +96,13 @@ impl Interpreter {
 
     fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
         let next = self.peek_next_unwrapped_token()?;
-        let unary_sign = parse_unary_plus_or_minus(&next);
-        if unary_sign.is_some() {
+        let unary_plus_or_minus = parse_plus_or_minus(&next);
+        if unary_plus_or_minus.is_some() {
             self.next_unwrapped_token()?;
         }
         let value = self.evaluate_expression_term()?;
 
-        maybe_apply_unary_sign(unary_sign, value)
+        maybe_apply_unary_plus_or_minus(unary_plus_or_minus, value)
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), InterpreterError> {
@@ -149,7 +149,7 @@ impl Interpreter {
     }
 }
 
-fn parse_unary_plus_or_minus(token: &Token) -> Option<f64> {
+fn parse_plus_or_minus(token: &Token) -> Option<f64> {
     match &token {
         Token::Plus => Some(1.0),
         Token::Minus => Some(-1.0),
@@ -157,7 +157,7 @@ fn parse_unary_plus_or_minus(token: &Token) -> Option<f64> {
     }
 }
 
-fn maybe_apply_unary_sign(
+fn maybe_apply_unary_plus_or_minus(
     unary_sign: Option<f64>,
     value: Value,
 ) -> Result<Value, InterpreterError> {
