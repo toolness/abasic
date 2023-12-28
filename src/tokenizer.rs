@@ -10,6 +10,8 @@ pub enum Token {
     Plus,
     Minus,
     Equals,
+    If,
+    Then,
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
@@ -161,6 +163,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Print)
         } else if self.chomp_keyword("GOTO") {
             Some(Token::Goto)
+        } else if self.chomp_keyword("IF") {
+            Some(Token::If)
+        } else if self.chomp_keyword("THEN") {
+            Some(Token::Then)
         } else {
             None
         }

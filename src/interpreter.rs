@@ -129,6 +129,12 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let _conditional_value = self.evaluate_expression()?;
+        self.expect_next_token(Token::Then)?;
+        todo!("IMPLEMENT THIS");
+    }
+
     fn evaluate_assignment_statement(
         &mut self,
         variable: Rc<String>,
@@ -162,6 +168,7 @@ impl Interpreter {
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
+            Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
