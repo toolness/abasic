@@ -102,15 +102,7 @@ impl Interpreter {
         }
         let value = self.evaluate_expression_term()?;
 
-        if let Some(unary_sign) = unary_sign {
-            if let Value::Number(number) = value {
-                Ok(Value::Number(number * unary_sign))
-            } else {
-                Err(InterpreterError::TypeMismatch)
-            }
-        } else {
-            Ok(value)
-        }
+        maybe_apply_unary_sign(unary_sign, value)
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), InterpreterError> {
@@ -162,6 +154,21 @@ fn parse_unary_plus_or_minus(token: &Token) -> Option<f64> {
         Token::Plus => Some(1.0),
         Token::Minus => Some(-1.0),
         _ => None,
+    }
+}
+
+fn maybe_apply_unary_sign(
+    unary_sign: Option<f64>,
+    value: Value,
+) -> Result<Value, InterpreterError> {
+    if let Some(unary_sign) = unary_sign {
+        if let Value::Number(number) = value {
+            Ok(Value::Number(number * unary_sign))
+        } else {
+            Err(InterpreterError::TypeMismatch)
+        }
+    } else {
+        Ok(value)
     }
 }
 
