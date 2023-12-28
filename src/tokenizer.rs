@@ -7,6 +7,7 @@ pub enum Token {
     Print,
     Goto,
     Newline,
+    Plus,
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
 }
@@ -92,17 +93,18 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
-    fn chomp_newline(&mut self) -> bool {
+    fn chomp_single_character(&mut self) -> Option<Result<Token, SyntaxError>> {
         for (byte, pos) in self.crunch_remaining_bytes() {
-            if byte == b'\n' {
-                self.index += pos;
-                return true;
-            } else {
-                return false;
-            }
+            let token: Token = match byte {
+                b'\n' => Token::Newline,
+                b'+' => Token::Plus,
+                _ => return None,
+            };
+            self.index += pos;
+            return Some(Ok(token));
         }
 
-        false
+        None
     }
 
     fn chomp_number(&mut self) -> Option<Result<Token, SyntaxError>> {
@@ -196,8 +198,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_next_token(&mut self) -> Result<Token, SyntaxError> {
         if let Some(token) = self.chomp_any_keyword() {
             Ok(token)
-        } else if self.chomp_newline() {
-            Ok(Token::Newline)
+        } else if let Some(result) = self.chomp_single_character() {
+            result
         } else if let Some(result) = self.chomp_string() {
             result
         } else if let Some(result) = self.chomp_number() {
