@@ -8,7 +8,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 enum Value {
-    String(String),
+    String(Rc<String>),
     Number(f64),
 }
 
@@ -90,7 +90,7 @@ impl Interpreter {
 
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.next_unwrapped_token()? {
-            Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
+            Token::StringLiteral(string) => Ok(Value::String(string.clone())),
             Token::NumericLiteral(number) => Ok(Value::Number(number)),
             Token::Symbol(variable) => {
                 if let Some(value) = self.variables.get(&variable) {
@@ -168,7 +168,7 @@ impl Interpreter {
                 Token::Colon => break,
                 _ => match self.evaluate_expression()? {
                     Value::String(string) => {
-                        self.output.push(string);
+                        self.output.push(string.to_string());
                     }
                     Value::Number(number) => {
                         self.output.push(format!("{}", number));
