@@ -78,30 +78,29 @@ impl Interpreter {
         next
     }
 
-    fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
-        match self.next_token() {
-            Some(token) => Ok(token),
-            None => Err(InterpreterError::SyntaxError(
-                SyntaxError::UnexpectedEndOfInput,
-            )),
-        }
+    fn peek_next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
+        unwrap_token(self.peek_next_token())
     }
 
-    fn evaluate_expression_term(&self, token: &Token) -> Result<Value, InterpreterError> {
-        match token {
+    fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
+        unwrap_token(self.next_token())
+    }
+
+    fn evaluate_expression_term(&mut self) -> Result<Value, InterpreterError> {
+        match self.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
-            Token::NumericLiteral(number) => Ok(Value::Number(*number)),
+            Token::NumericLiteral(number) => Ok(Value::Number(number)),
             _ => InterpreterError::unexpected_token(),
         }
     }
 
     fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
-        let mut next = self.next_unwrapped_token()?;
+        let next = self.peek_next_unwrapped_token()?;
         let unary_sign = parse_unary_plus_or_minus(&next);
         if unary_sign.is_some() {
-            next = self.next_unwrapped_token()?;
+            self.next_unwrapped_token()?;
         }
-        let value = self.evaluate_expression_term(&next)?;
+        let value = self.evaluate_expression_term()?;
 
         if let Some(unary_sign) = unary_sign {
             if let Value::Number(number) = value {
@@ -163,6 +162,15 @@ fn parse_unary_plus_or_minus(token: &Token) -> Option<f64> {
         Token::Plus => Some(1.0),
         Token::Minus => Some(-1.0),
         _ => None,
+    }
+}
+
+fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
+    match token {
+        Some(token) => Ok(token),
+        None => Err(InterpreterError::SyntaxError(
+            SyntaxError::UnexpectedEndOfInput,
+        )),
     }
 }
 
