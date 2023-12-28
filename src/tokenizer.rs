@@ -9,6 +9,7 @@ pub enum Token {
     Colon,
     Plus,
     Minus,
+    Equals,
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
@@ -56,6 +57,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 b':' => Token::Colon,
                 b'+' => Token::Plus,
                 b'-' => Token::Minus,
+                b'=' => Token::Equals,
                 _ => return None,
             };
             self.index += pos;

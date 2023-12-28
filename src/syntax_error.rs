@@ -1,11 +1,14 @@
 use std::{error::Error, fmt::Display};
 
+use crate::tokenizer::Token;
+
 #[derive(Debug, PartialEq)]
 pub enum SyntaxError {
     IllegalCharacter,
     UnterminatedStringLiteral,
     InvalidNumber,
     UnexpectedToken,
+    ExpectedToken(Token),
     UnexpectedEndOfInput,
 }
 

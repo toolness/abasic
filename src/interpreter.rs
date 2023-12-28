@@ -1,9 +1,12 @@
+use std::{collections::HashMap, rc::Rc};
+
 use crate::{
     interpreter_error::{InterpreterError, TracedInterpreterError},
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
 };
 
+#[derive(Debug, Clone)]
 enum Value {
     String(String),
     Number(f64),
@@ -14,6 +17,7 @@ pub struct Interpreter {
     output: Vec<String>,
     tokens: Vec<Token>,
     tokens_index: usize,
+    variables: HashMap<Rc<String>, Value>,
 }
 
 impl Interpreter {
@@ -22,6 +26,7 @@ impl Interpreter {
             output: vec![],
             tokens: vec![],
             tokens_index: 0,
+            variables: HashMap::new(),
         }
     }
 
@@ -61,6 +66,14 @@ impl Interpreter {
         unwrap_token(self.next_token())
     }
 
+    fn expect_next_token(&mut self, expected: Token) -> Result<(), TracedInterpreterError> {
+        if self.next_unwrapped_token()? == expected {
+            Ok(())
+        } else {
+            Err(SyntaxError::ExpectedToken(expected).into())
+        }
+    }
+
     /// Advance to the next token in the stream, panicking if there are
     /// no more tokens. This should only be used after e.g. calling
     /// `peek_next_token` and verifying that the next token actually
@@ -74,6 +87,16 @@ impl Interpreter {
         match self.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
             Token::NumericLiteral(number) => Ok(Value::Number(number)),
+            Token::Symbol(variable) => {
+                if let Some(value) = self.variables.get(&variable) {
+                    Ok(value.clone())
+                } else {
+                    // TODO: It'd be nice to at least log a warning or something here, since
+                    //       this can be a notorious source of bugs.
+                    // TODO: If the variable ends with `$` we should return an empty string.
+                    Ok(Value::Number(0.0))
+                }
+            }
             _ => TracedInterpreterError::unexpected_token(),
         }
     }
@@ -106,6 +129,18 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_assignment_statement(
+        &mut self,
+        variable: Rc<String>,
+    ) -> Result<(), TracedInterpreterError> {
+        self.expect_next_token(Token::Equals)?;
+        let value = self.evaluate_expression()?;
+        // TODO: We should only allow assigning numbers to variables that don't end
+        // with `$`, and only allow assigning strings to ones that end with `$`.
+        self.variables.insert(variable, value);
+        Ok(())
+    }
+
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         while let Some(token) = self.peek_next_token() {
             match token {
@@ -128,6 +163,7 @@ impl Interpreter {
         match self.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::Colon) => Ok(()),
+            Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
             None => Ok(()),
         }
@@ -242,6 +278,16 @@ mod tests {
     fn colon_works() {
         assert_eval_output(":::", "");
         assert_eval_output("print 4:print \"hi\"", "4\nhi\n");
+    }
+
+    #[test]
+    fn assignment_works() {
+        assert_eval_output("x=1:print x", "1\n");
+        assert_eval_output("X=1:print x", "1\n");
+        assert_eval_output("x5=1:print x5", "1\n");
+        assert_eval_output("x=1+1:print x", "2\n");
+        assert_eval_output("x=1:print x + 2", "3\n");
+        assert_eval_output("x=1:print x:x = x + 1:print x", "1\n2\n");
     }
 
     #[test]
