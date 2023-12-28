@@ -322,6 +322,7 @@ mod tests {
     #[test]
     fn if_statement_works_with_numbers() {
         assert_eval_output("if 0 then print \"THIS SHOULD NOT APPEAR\"", "");
+        assert_eval_output("x = 0:if x then print \"THIS SHOULD NOT APPEAR\"", "");
         assert_eval_output("if 1 then print \"YO\"", "YO\n");
         assert_eval_output("if 0+0 then print \"THIS SHOULD NOT APPEAR\"", "");
     }

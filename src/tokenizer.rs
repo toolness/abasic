@@ -70,35 +70,49 @@ impl<T: AsRef<str>> Tokenizer<T> {
     }
 
     fn chomp_symbol(&mut self) -> Option<Result<Token, SyntaxError>> {
-        let mut remaining = self.crunch_remaining_bytes();
-        let Some((first_char, mut latest_pos)) = remaining.next() else {
-            return None;
-        };
+        let mut chars: Vec<u8> = vec![];
 
-        if !first_char.is_ascii_alphabetic() {
-            return None;
-        }
+        loop {
+            let mut remaining = self.crunch_remaining_bytes();
+            let Some((char, pos)) = remaining.next() else {
+                break;
+            };
 
-        let mut chars: Vec<u8> = vec![first_char.to_ascii_uppercase()];
-
-        for (char, pos) in remaining {
-            if char.is_ascii_alphanumeric() {
-                chars.push(char.to_ascii_uppercase());
-                latest_pos = pos;
+            // TODO: Symbols can end with `$`, we should support it.
+            let is_valid = if chars.is_empty() {
+                char.is_ascii_alphabetic()
             } else {
+                char.is_ascii_alphanumeric()
+            };
+
+            if !is_valid {
+                break;
+            }
+
+            chars.push(char.to_ascii_uppercase());
+            self.index += pos;
+
+            // Because of line crunching, it's possible that we have a
+            // keyword immediately following a symbol. If this happens,
+            // we need to give precedence to the keyword, rather than
+            // extend the name of the symbol, e.g. `if x then y` should
+            // never be parsed as `if` followed by a `xtheny` symbol.
+            let prev_index = self.index;
+            if self.chomp_any_keyword().is_some() {
+                self.index = prev_index;
                 break;
             }
         }
 
-        // TODO: Symbols can end with `$`, we should support it.
+        if chars.is_empty() {
+            None
+        } else {
+            // We can technically do this using String::from_utf8_unchecked(),
+            // but better safe (and slightly inefficient) than sorry for now.
+            let string = String::from_utf8(chars).unwrap();
 
-        self.index += latest_pos;
-
-        // We can technically do this using String::from_utf8_unchecked(),
-        // but better safe (and slightly inefficient) than sorry for now.
-        let string = String::from_utf8(chars).unwrap();
-
-        Some(Ok(Token::Symbol(Rc::new(string))))
+            Some(Ok(Token::Symbol(Rc::new(string))))
+        }
     }
 
     fn chomp_number(&mut self) -> Option<Result<Token, SyntaxError>> {
@@ -347,6 +361,14 @@ mod tests {
         assert_values_parse_to_tokens(
             &["1234", "  1234 ", "01234", "1 2 3 4"],
             &[Token::NumericLiteral(1234.0)],
+        );
+    }
+
+    #[test]
+    fn parsing_if_statement_works() {
+        assert_values_parse_to_tokens(
+            &["if x then print"],
+            &[Token::If, symbol("X"), Token::Then, Token::Print],
         );
     }
 
