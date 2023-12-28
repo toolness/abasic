@@ -66,10 +66,14 @@ impl Interpreter {
         self.peek_next_token().is_some()
     }
 
+    /// Return the next token in the stream, if it exists,
+    /// but don't advance our position in it.
     fn peek_next_token(&self) -> Option<Token> {
         self.tokens.get(self.tokens_index).cloned()
     }
 
+    /// Return the next token in the stream, if it exists,
+    /// and advance our position in it.
     fn next_token(&mut self) -> Option<Token> {
         let next = self.peek_next_token();
         if next.is_some() {
@@ -78,12 +82,19 @@ impl Interpreter {
         next
     }
 
+    /// Return the next token in the stream, advancing our
+    /// position in it.  If there are no more tokens, return an error.
     fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
         unwrap_token(self.next_token())
     }
 
+    /// Advance to the next token in the stream, panicking if there are
+    /// no more tokens. This should only be used after e.g. calling
+    /// `peek_next_token` and verifying that the next token actually
+    /// exists.
     fn consume_next_token(&mut self) {
-        self.next_token().unwrap();
+        self.tokens.get(self.tokens_index).unwrap();
+        self.tokens_index += 1;
     }
 
     fn evaluate_expression_term(&mut self) -> Result<Value, InterpreterError> {
