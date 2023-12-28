@@ -4,7 +4,7 @@ mod tokenizer;
 
 use std::io::{stdin, IsTerminal};
 
-use interpreter::{Interpreter, InterpreterError};
+use interpreter::Interpreter;
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
@@ -28,11 +28,7 @@ fn run_interpreter() -> i32 {
                     eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                 }
                 if let Err(err) = interpreter.evaluate(line) {
-                    match err {
-                        InterpreterError::SyntaxError(err) => {
-                            println!("SYNTAX ERROR ({:?})", err);
-                        }
-                    }
+                    println!("{}", err);
                     // If we're not interactive, treat errors as fatal.
                     if !stdin().is_terminal() {
                         return 1;

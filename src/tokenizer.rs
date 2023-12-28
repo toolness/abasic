@@ -8,6 +8,7 @@ pub enum Token {
     Goto,
     Newline,
     Plus,
+    Minus,
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
 }
@@ -98,6 +99,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             let token: Token = match byte {
                 b'\n' => Token::Newline,
                 b'+' => Token::Plus,
+                b'-' => Token::Minus,
                 _ => return None,
             };
             self.index += pos;

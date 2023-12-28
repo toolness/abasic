@@ -13,6 +13,7 @@ enum Value {
 #[derive(Debug, PartialEq)]
 pub enum InterpreterError {
     SyntaxError(SyntaxError),
+    TypeMismatch,
 }
 
 impl InterpreterError {
@@ -25,7 +26,14 @@ impl Error for InterpreterError {}
 
 impl Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "INTERPRETER ERROR ({:?})", self)
+        match self {
+            InterpreterError::SyntaxError(err) => {
+                write!(f, "SYNTAX ERROR ({:?})", err)
+            }
+            InterpreterError::TypeMismatch => {
+                write!(f, "TYPE MISMATCH")
+            }
+        }
     }
 }
 
@@ -79,11 +87,30 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
-        match self.next_unwrapped_token()? {
+    fn evaluate_expression_term(&self, token: &Token) -> Result<Value, InterpreterError> {
+        match token {
             Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
-            Token::NumericLiteral(number) => Ok(Value::Number(number)),
+            Token::NumericLiteral(number) => Ok(Value::Number(*number)),
             _ => InterpreterError::unexpected_token(),
+        }
+    }
+
+    fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
+        let mut next = self.next_unwrapped_token()?;
+        let unary_sign = parse_unary_plus_or_minus(&next);
+        if unary_sign.is_some() {
+            next = self.next_unwrapped_token()?;
+        }
+        let value = self.evaluate_expression_term(&next)?;
+
+        if let Some(unary_sign) = unary_sign {
+            if let Value::Number(number) = value {
+                Ok(Value::Number(number * unary_sign))
+            } else {
+                Err(InterpreterError::TypeMismatch)
+            }
+        } else {
+            Ok(value)
         }
     }
 
@@ -131,9 +158,29 @@ impl Interpreter {
     }
 }
 
+fn parse_unary_plus_or_minus(token: &Token) -> Option<f64> {
+    match &token {
+        Token::Plus => Some(1.0),
+        Token::Minus => Some(-1.0),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Interpreter;
+    use super::{Interpreter, InterpreterError};
+
+    fn assert_eval_error(line: &'static str, expected: InterpreterError) {
+        let mut interpreter = Interpreter::new();
+        match interpreter.evaluate(line) {
+            Ok(_) => {
+                panic!("expected '{}' to error but it didn't", line);
+            }
+            Err(err) => {
+                assert_eq!(err, expected, "evaluating '{}'", line);
+            }
+        }
+    }
 
     fn assert_eval_output(line: &'static str, expected: &'static str) {
         let mut interpreter = Interpreter::new();
@@ -165,5 +212,12 @@ mod tests {
         assert_eval_output("print \"hello 😊\"", "hello 😊\n");
         assert_eval_output("print \"hello 😊\" 5", "hello 😊5\n");
         assert_eval_output("print \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
+        assert_eval_output("print +4", "4\n");
+        assert_eval_output("print -4", "-4\n");
+    }
+
+    #[test]
+    fn type_mismatch_error_works() {
+        assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
     }
 }
