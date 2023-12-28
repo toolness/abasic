@@ -156,7 +156,8 @@ impl Interpreter {
     }
 
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
-        let statements = parse_statements(line)?;
+        let statements =
+            parse_statements(line).map_err(|err| InterpreterError::SyntaxError(err))?;
         for tokens in statements {
             self.tokens = tokens;
             self.tokens_index = 0;
@@ -204,19 +205,16 @@ fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
     }
 }
 
-fn parse_statements<T: AsRef<str>>(line: T) -> Result<Vec<Vec<Token>>, InterpreterError> {
+fn parse_statements<T: AsRef<str>>(line: T) -> Result<Vec<Vec<Token>>, SyntaxError> {
     let tokenizer = Tokenizer::new(line);
     let mut statements: Vec<Vec<Token>> = vec![];
     let mut tokens: Vec<Token> = vec![];
     for token_result in tokenizer {
-        match token_result {
-            Ok(Token::Colon) => {
+        match token_result? {
+            Token::Colon => {
                 statements.push(std::mem::take(&mut tokens));
             }
-            Ok(token) => tokens.push(token),
-            Err(err) => {
-                return Err(InterpreterError::SyntaxError(err));
-            }
+            token => tokens.push(token),
         }
     }
     statements.push(tokens);
