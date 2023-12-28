@@ -9,6 +9,7 @@ pub enum Token {
     Colon,
     Plus,
     Minus,
+    Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
 }
@@ -109,6 +110,38 @@ impl<T: AsRef<str>> Tokenizer<T> {
         None
     }
 
+    fn chomp_symbol(&mut self) -> Option<Result<Token, SyntaxError>> {
+        let mut remaining = self.crunch_remaining_bytes();
+        let Some((first_char, mut latest_pos)) = remaining.next() else {
+            return None;
+        };
+
+        if !first_char.is_ascii_alphabetic() {
+            return None;
+        }
+
+        let mut chars: Vec<u8> = vec![first_char.to_ascii_uppercase()];
+
+        for (char, pos) in remaining {
+            if char.is_ascii_alphanumeric() {
+                chars.push(char.to_ascii_uppercase());
+                latest_pos = pos;
+            } else {
+                break;
+            }
+        }
+
+        // TODO: Symbols can end with `$`, we should support it.
+
+        self.index += latest_pos;
+
+        // We can technically do this using String::from_utf8_unchecked(),
+        // but better safe (and slightly inefficient) than sorry for now.
+        let string = String::from_utf8(chars).unwrap();
+
+        Some(Ok(Token::Symbol(Rc::new(string))))
+    }
+
     fn chomp_number(&mut self) -> Option<Result<Token, SyntaxError>> {
         let mut digits = String::new();
         let mut latest_pos: Option<usize> = None;
@@ -206,6 +239,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             result
         } else if let Some(result) = self.chomp_number() {
             result
+        } else if let Some(result) = self.chomp_symbol() {
+            result
         } else {
             Err(SyntaxError::IllegalCharacter)
         }
@@ -254,6 +289,10 @@ mod tests {
 
     fn string_literal(value: &'static str) -> Token {
         Token::StringLiteral(Rc::new(String::from(value)))
+    }
+
+    fn symbol(value: &'static str) -> Token {
+        Token::Symbol(Rc::new(String::from(value)))
     }
 
     fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
@@ -359,6 +398,16 @@ mod tests {
     #[test]
     fn parsing_single_colon_works() {
         assert_values_parse_to_tokens(&[":", " :", "  :  "], &[Token::Colon]);
+    }
+
+    #[test]
+    fn parsing_symbol_works() {
+        assert_values_parse_to_tokens(&["x", " x", "  x  "], &[symbol("X")]);
+        assert_values_parse_to_tokens(&["x 1", " x1", "  X1  "], &[symbol("X1")]);
+        assert_values_parse_to_tokens(
+            &["1 x 1", " 1x1", "  1X1  "],
+            &[Token::NumericLiteral(1.0), symbol("X1")],
+        );
     }
 
     #[test]
