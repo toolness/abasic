@@ -83,6 +83,11 @@ impl Interpreter {
         self.tokens_index += 1;
     }
 
+    /// Throw away any remaining tokens.
+    fn discard_remaining_tokens(&mut self) {
+        self.tokens_index = self.tokens.len();
+    }
+
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
@@ -130,9 +135,19 @@ impl Interpreter {
     }
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        let _conditional_value = self.evaluate_expression()?;
+        let conditional_value = self.evaluate_expression()?;
         self.expect_next_token(Token::Then)?;
-        todo!("IMPLEMENT THIS");
+        // TODO: It would be nice to support ELSE somehow, even though
+        // AppleSoft basic doesn't really seem to. Tim Hartnell's
+        // book seems to include ELSE clauses only in the form of line
+        // numbers, e.g. `IF X THEN 100 ELSE 200`, which seems like a
+        // reasonable compromise.
+        if value_to_bool(&conditional_value) {
+            self.evaluate_statement()
+        } else {
+            self.discard_remaining_tokens();
+            Ok(())
+        }
     }
 
     fn evaluate_assignment_statement(
@@ -176,6 +191,10 @@ impl Interpreter {
         }
     }
 
+    /// Evaluate the given line of code.
+    ///
+    /// Note that this is expected to be a *line*, i.e. it shouldn't contain
+    /// any newlines (if it does, a syntax error will be raised).
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         self.tokens = Tokenizer::new(line)
             .remaining_tokens()
@@ -213,6 +232,13 @@ fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
         Ok(number)
     } else {
         Err(InterpreterError::TypeMismatch.into())
+    }
+}
+
+fn value_to_bool(value: &Value) -> bool {
+    match value {
+        Value::String(string) => !string.is_empty(),
+        Value::Number(number) => *number != 0.0,
     }
 }
 
@@ -285,6 +311,25 @@ mod tests {
     fn colon_works() {
         assert_eval_output(":::", "");
         assert_eval_output("print 4:print \"hi\"", "4\nhi\n");
+    }
+
+    #[test]
+    fn if_statement_works_with_strings() {
+        assert_eval_output("if \"\" then print \"THIS SHOULD NOT APPEAR\"", "");
+        assert_eval_output("if \"hi\" then print \"YO\"", "YO\n");
+    }
+
+    #[test]
+    fn if_statement_works_with_numbers() {
+        assert_eval_output("if 0 then print \"THIS SHOULD NOT APPEAR\"", "");
+        assert_eval_output("if 1 then print \"YO\"", "YO\n");
+        assert_eval_output("if 0+0 then print \"THIS SHOULD NOT APPEAR\"", "");
+    }
+
+    #[test]
+    fn if_statement_processes_multiple_statements() {
+        assert_eval_output("if 1 then print \"hi\":print", "hi\n\n");
+        assert_eval_output("if 0 then print \"hi\":print:kaboom", "");
     }
 
     #[test]
