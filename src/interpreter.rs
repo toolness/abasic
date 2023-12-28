@@ -157,23 +157,28 @@ impl Interpreter {
 
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
         let tokenizer = Tokenizer::new(line);
-        self.tokens.clear();
-        self.tokens_index = 0;
+        let mut statements: Vec<Vec<Token>> = vec![];
+        let mut tokens: Vec<Token> = vec![];
         for token_result in tokenizer {
             match token_result {
-                Ok(token) => {
-                    self.tokens.push(token);
+                Ok(Token::Colon) => {
+                    statements.push(tokens.drain(..).collect::<Vec<_>>());
                 }
+                Ok(token) => tokens.push(token),
                 Err(err) => {
                     return Err(InterpreterError::SyntaxError(err));
                 }
             }
         }
-        if self.has_next_token() {
-            self.evaluate_statement()
-        } else {
-            Ok(())
+        statements.push(tokens);
+        for tokens in statements {
+            self.tokens = tokens;
+            self.tokens_index = 0;
+            if self.has_next_token() {
+                self.evaluate_statement()?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -269,6 +274,12 @@ mod tests {
         assert_eval_output("print -4 + 4", "0\n");
         assert_eval_output("print 1 + 1", "2\n");
         assert_eval_output("print 1 + 1 - 3", "-1\n");
+    }
+
+    #[test]
+    fn colon_works() {
+        assert_eval_output(":::", "");
+        assert_eval_output("print 4:print \"hi\"", "4\nhi\n");
     }
 
     #[test]

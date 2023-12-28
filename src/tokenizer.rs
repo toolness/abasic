@@ -6,7 +6,7 @@ use crate::syntax_error::SyntaxError;
 pub enum Token {
     Print,
     Goto,
-    Newline,
+    Colon,
     Plus,
     Minus,
     StringLiteral(Rc<String>),
@@ -97,7 +97,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_single_character(&mut self) -> Option<Result<Token, SyntaxError>> {
         for (byte, pos) in self.crunch_remaining_bytes() {
             let token: Token = match byte {
-                b'\n' => Token::Newline,
+                b':' => Token::Colon,
                 b'+' => Token::Plus,
                 b'-' => Token::Minus,
                 _ => return None,
@@ -349,8 +349,8 @@ mod tests {
     }
 
     #[test]
-    fn parsing_single_newline_works() {
-        assert_values_parse_to_tokens(&["\n", " \n", "  \n  "], &[Token::Newline]);
+    fn parsing_single_colon_works() {
+        assert_values_parse_to_tokens(&[":", " :", "  :  "], &[Token::Colon]);
     }
 
     #[test]
