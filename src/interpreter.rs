@@ -149,9 +149,10 @@ impl Interpreter {
     }
 
     fn evaluate_statement(&mut self) -> Result<(), InterpreterError> {
-        match self.next_unwrapped_token()? {
-            Token::Print => self.evaluate_print_statement(),
-            _ => InterpreterError::unexpected_token(),
+        match self.next_token() {
+            Some(Token::Print) => self.evaluate_print_statement(),
+            Some(_) => InterpreterError::unexpected_token(),
+            None => Ok(()),
         }
     }
 
@@ -161,9 +162,7 @@ impl Interpreter {
         for tokens in statements {
             self.tokens = tokens;
             self.tokens_index = 0;
-            if self.has_next_token() {
-                self.evaluate_statement()?;
-            }
+            self.evaluate_statement()?;
         }
         Ok(())
     }
