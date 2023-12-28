@@ -211,7 +211,7 @@ fn parse_statements<T: AsRef<str>>(line: T) -> Result<Vec<Vec<Token>>, Interpret
     for token_result in tokenizer {
         match token_result {
             Ok(Token::Colon) => {
-                statements.push(tokens.drain(..).collect::<Vec<_>>());
+                statements.push(std::mem::take(&mut tokens));
             }
             Ok(token) => tokens.push(token),
             Err(err) => {
