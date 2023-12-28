@@ -37,6 +37,7 @@ impl Display for InterpreterError {
     }
 }
 
+#[derive(Debug)]
 pub struct Interpreter {
     output: Vec<String>,
     tokens: Vec<Token>,
@@ -134,14 +135,17 @@ impl Interpreter {
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), InterpreterError> {
-        while self.has_next_token() {
-            match self.evaluate_expression()? {
-                Value::String(string) => {
-                    self.output.push(string);
-                }
-                Value::Number(number) => {
-                    self.output.push(format!("{}", number));
-                }
+        while let Some(token) = self.peek_next_token() {
+            match token {
+                Token::Colon => break,
+                _ => match self.evaluate_expression()? {
+                    Value::String(string) => {
+                        self.output.push(string);
+                    }
+                    Value::Number(number) => {
+                        self.output.push(format!("{}", number));
+                    }
+                },
             }
         }
         self.output.push(String::from("\n"));
@@ -151,17 +155,19 @@ impl Interpreter {
     fn evaluate_statement(&mut self) -> Result<(), InterpreterError> {
         match self.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
+            Some(Token::Colon) => Ok(()),
             Some(_) => InterpreterError::unexpected_token(),
             None => Ok(()),
         }
     }
 
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
-        let statements =
-            parse_statements(line).map_err(|err| InterpreterError::SyntaxError(err))?;
-        for tokens in statements {
-            self.tokens = tokens;
-            self.tokens_index = 0;
+        self.tokens = Tokenizer::new(line)
+            .remaining_tokens()
+            .map_err(|err| InterpreterError::SyntaxError(err))?;
+        self.tokens_index = 0;
+
+        while self.has_next_token() {
             self.evaluate_statement()?;
         }
         Ok(())
@@ -204,22 +210,6 @@ fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
     }
 }
 
-fn parse_statements<T: AsRef<str>>(line: T) -> Result<Vec<Vec<Token>>, SyntaxError> {
-    let tokenizer = Tokenizer::new(line);
-    let mut statements: Vec<Vec<Token>> = vec![];
-    let mut tokens: Vec<Token> = vec![];
-    for token_result in tokenizer {
-        match token_result? {
-            Token::Colon => {
-                statements.push(std::mem::take(&mut tokens));
-            }
-            token => tokens.push(token),
-        }
-    }
-    statements.push(tokens);
-    Ok(statements)
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Interpreter, InterpreterError};
@@ -244,8 +234,8 @@ mod tests {
                 .unwrap_or_default(),
             Err(err) => {
                 panic!(
-                    "expected '{}' to evaluate successfully but got {:?}",
-                    line, err
+                    "expected '{}' to evaluate successfully but got {:?} ({:?})",
+                    line, err, interpreter
                 )
             }
         };

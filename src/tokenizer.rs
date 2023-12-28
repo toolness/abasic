@@ -210,6 +210,14 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Err(SyntaxError::IllegalCharacter)
         }
     }
+
+    pub fn remaining_tokens(self) -> Result<Vec<Token>, SyntaxError> {
+        let mut tokens: Vec<Token> = vec![];
+        for token in self {
+            tokens.push(token?);
+        }
+        Ok(tokens)
+    }
 }
 
 impl<T: AsRef<str>> Iterator for Tokenizer<T> {
