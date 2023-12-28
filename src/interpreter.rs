@@ -15,50 +15,50 @@ enum Value {
 }
 
 #[derive(Debug)]
-pub struct InterpreterError {
-    error_type: InterpreterErrorType,
+pub struct TracedInterpreterError {
+    error: InterpreterError,
     backtrace: Backtrace,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum InterpreterErrorType {
+pub enum InterpreterError {
     SyntaxError(SyntaxError),
     TypeMismatch,
 }
 
-impl InterpreterError {
-    pub fn unexpected_token<T>() -> Result<T, InterpreterError> {
+impl TracedInterpreterError {
+    pub fn unexpected_token<T>() -> Result<T, TracedInterpreterError> {
         Err(SyntaxError::UnexpectedToken.into())
     }
 }
 
-impl From<SyntaxError> for InterpreterError {
+impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
-        InterpreterError {
-            error_type: InterpreterErrorType::SyntaxError(value),
+        TracedInterpreterError {
+            error: InterpreterError::SyntaxError(value),
             backtrace: Backtrace::capture(),
         }
     }
 }
 
-impl From<InterpreterErrorType> for InterpreterError {
-    fn from(value: InterpreterErrorType) -> Self {
-        InterpreterError {
-            error_type: value,
+impl From<InterpreterError> for TracedInterpreterError {
+    fn from(value: InterpreterError) -> Self {
+        TracedInterpreterError {
+            error: value,
             backtrace: Backtrace::capture(),
         }
     }
 }
 
-impl Error for InterpreterError {}
+impl Error for TracedInterpreterError {}
 
-impl Display for InterpreterError {
+impl Display for TracedInterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.error_type {
-            InterpreterErrorType::SyntaxError(err) => {
+        match &self.error {
+            InterpreterError::SyntaxError(err) => {
                 write!(f, "SYNTAX ERROR ({:?})", err)?;
             }
-            InterpreterErrorType::TypeMismatch => {
+            InterpreterError::TypeMismatch => {
                 write!(f, "TYPE MISMATCH")?;
             }
         }
@@ -117,7 +117,7 @@ impl Interpreter {
 
     /// Return the next token in the stream, advancing our
     /// position in it.  If there are no more tokens, return an error.
-    fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
+    fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {
         unwrap_token(self.next_token())
     }
 
@@ -130,11 +130,11 @@ impl Interpreter {
         self.tokens_index += 1;
     }
 
-    fn evaluate_expression_term(&mut self) -> Result<Value, InterpreterError> {
+    fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(Value::String(string.to_string())),
             Token::NumericLiteral(number) => Ok(Value::Number(number)),
-            _ => InterpreterError::unexpected_token(),
+            _ => TracedInterpreterError::unexpected_token(),
         }
     }
 
@@ -151,7 +151,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
+    fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let unary_plus_or_minus = self.evaluate_plus_or_minus();
 
         let value =
@@ -166,7 +166,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_print_statement(&mut self) -> Result<(), InterpreterError> {
+    fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         while let Some(token) = self.peek_next_token() {
             match token {
                 Token::Colon => break,
@@ -184,19 +184,19 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate_statement(&mut self) -> Result<(), InterpreterError> {
+    fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::Colon) => Ok(()),
-            Some(_) => InterpreterError::unexpected_token(),
+            Some(_) => TracedInterpreterError::unexpected_token(),
             None => Ok(()),
         }
     }
 
-    pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), InterpreterError> {
+    pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         self.tokens = Tokenizer::new(line)
             .remaining_tokens()
-            .map_err(|err| InterpreterError::from(err))?;
+            .map_err(|err| TracedInterpreterError::from(err))?;
         self.tokens_index = 0;
 
         while self.has_next_token() {
@@ -217,7 +217,7 @@ fn parse_plus_or_minus(token: &Token) -> Option<f64> {
 fn maybe_apply_unary_plus_or_minus(
     unary_sign: Option<f64>,
     value: Value,
-) -> Result<Value, InterpreterError> {
+) -> Result<Value, TracedInterpreterError> {
     if let Some(unary_sign) = unary_sign {
         Ok(Value::Number(unwrap_number(value)? * unary_sign))
     } else {
@@ -225,15 +225,15 @@ fn maybe_apply_unary_plus_or_minus(
     }
 }
 
-fn unwrap_number(value: Value) -> Result<f64, InterpreterError> {
+fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
     if let Value::Number(number) = value {
         Ok(number)
     } else {
-        Err(InterpreterErrorType::TypeMismatch.into())
+        Err(InterpreterError::TypeMismatch.into())
     }
 }
 
-fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
+fn unwrap_token(token: Option<Token>) -> Result<Token, TracedInterpreterError> {
     match token {
         Some(token) => Ok(token),
         None => Err(SyntaxError::UnexpectedEndOfInput.into()),
@@ -242,16 +242,16 @@ fn unwrap_token(token: Option<Token>) -> Result<Token, InterpreterError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Interpreter, InterpreterErrorType};
+    use super::{Interpreter, InterpreterError};
 
-    fn assert_eval_error(line: &'static str, expected: InterpreterErrorType) {
+    fn assert_eval_error(line: &'static str, expected: InterpreterError) {
         let mut interpreter = Interpreter::new();
         match interpreter.evaluate(line) {
             Ok(_) => {
                 panic!("expected '{}' to error but it didn't", line);
             }
             Err(err) => {
-                assert_eq!(err.error_type, expected, "evaluating '{}'", line);
+                assert_eq!(err.error, expected, "evaluating '{}'", line);
             }
         }
     }
@@ -306,8 +306,8 @@ mod tests {
 
     #[test]
     fn type_mismatch_error_works() {
-        assert_eval_error("print -\"hi\"", InterpreterErrorType::TypeMismatch);
-        assert_eval_error("print \"hi\" - 4", InterpreterErrorType::TypeMismatch);
-        assert_eval_error("print 4 + \"hi\"", InterpreterErrorType::TypeMismatch);
+        assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
+        assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
+        assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
     }
 }
