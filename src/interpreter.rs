@@ -78,12 +78,12 @@ impl Interpreter {
         next
     }
 
-    fn peek_next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
-        unwrap_token(self.peek_next_token())
-    }
-
     fn next_unwrapped_token(&mut self) -> Result<Token, InterpreterError> {
         unwrap_token(self.next_token())
+    }
+
+    fn consume_next_token(&mut self) {
+        self.next_token().unwrap();
     }
 
     fn evaluate_expression_term(&mut self) -> Result<Value, InterpreterError> {
@@ -94,25 +94,29 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
-        let next = self.peek_next_unwrapped_token()?;
-        let unary_plus_or_minus = parse_plus_or_minus(&next);
-        if unary_plus_or_minus.is_some() {
-            self.next_unwrapped_token()?;
+    fn evaluate_plus_or_minus(&mut self) -> Option<f64> {
+        if let Some(next_token) = self.peek_next_token() {
+            if let Some(unary_plus_or_minus) = parse_plus_or_minus(&next_token) {
+                self.consume_next_token();
+                Some(unary_plus_or_minus)
+            } else {
+                None
+            }
+        } else {
+            None
         }
+    }
+
+    fn evaluate_expression(&mut self) -> Result<Value, InterpreterError> {
+        let unary_plus_or_minus = self.evaluate_plus_or_minus();
 
         let value =
             maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
-        if let Some(next_token) = self.peek_next_token() {
-            if let Some(binary_plus_or_minus) = parse_plus_or_minus(&next_token) {
-                self.next_unwrapped_token()?;
-                let second_operand = self.evaluate_expression_term()?;
-                Ok(Value::Number(
-                    unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
-                ))
-            } else {
-                Ok(value)
-            }
+        if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
+            let second_operand = self.evaluate_expression_term()?;
+            Ok(Value::Number(
+                unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
+            ))
         } else {
             Ok(value)
         }
