@@ -130,10 +130,19 @@ impl Interpreter {
         Ok(())
     }
 
+    fn evaluate_goto_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(Token::NumericLiteral(line_number)) = self.program.next_token() else {
+            return Err(InterpreterError::UndefinedStatementError.into());
+        };
+        self.program.goto_line_number(line_number as u64)?;
+        Ok(())
+    }
+
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
+            Some(Token::Goto) => self.evaluate_goto_statement(),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
@@ -377,11 +386,44 @@ mod tests {
     }
 
     #[test]
+    fn undefined_statement_error_works() {
+        assert_eval_error("goto 30", InterpreterError::UndefinedStatementError);
+        assert_eval_error("goto x", InterpreterError::UndefinedStatementError);
+    }
+
+    #[test]
     fn line_numbers_work() {
         assert_program_output(
             r#"
             10 print "sup"
             20 print "dog"
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn goto_works() {
+        assert_program_output(
+            r#"
+            10 print "sup"
+            20 goto 40
+            30 print "THIS SHOULD NOT PRINT"
+            40 print "dog"
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn conditional_goto_works() {
+        assert_program_output(
+            r#"
+            10 print "sup"
+            15 x = 1
+            20 if x then goto 40
+            30 print "THIS SHOULD NOT PRINT"
+            40 print "dog"
             "#,
             "sup\ndog\n",
         );

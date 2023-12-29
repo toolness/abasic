@@ -17,6 +17,7 @@ pub struct TracedInterpreterError {
 pub enum InterpreterError {
     SyntaxError(SyntaxError),
     TypeMismatch,
+    UndefinedStatementError,
 }
 
 impl TracedInterpreterError {
@@ -59,6 +60,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::TypeMismatch => {
                 write!(f, "TYPE MISMATCH")?;
+            }
+            InterpreterError::UndefinedStatementError => {
+                write!(f, "UNDEF'D STATEMENT ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

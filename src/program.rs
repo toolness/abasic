@@ -1,7 +1,9 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
-    interpreter_error::TracedInterpreterError, syntax_error::SyntaxError, tokenizer::Token,
+    interpreter_error::{InterpreterError, TracedInterpreterError},
+    syntax_error::SyntaxError,
+    tokenizer::Token,
 };
 
 #[derive(Debug, Default)]
@@ -38,8 +40,22 @@ impl Program {
                 token_index: 0,
             };
         } else {
+            // Applesoft basic just does nothing when RUN is executed
+            // in an empty program, so we'll do that too.
             self.set_and_goto_immediate_line(vec![]);
         };
+    }
+
+    pub fn goto_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
+        if self.sorted_line_numbers.contains(&line_number) {
+            self.location = ProgramLocation {
+                line: ProgramLine::Line(line_number),
+                token_index: 0,
+            };
+            Ok(())
+        } else {
+            Err(InterpreterError::UndefinedStatementError.into())
+        }
     }
 
     pub fn get_line_number(&self) -> Option<u64> {
