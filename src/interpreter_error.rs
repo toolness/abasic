@@ -9,6 +9,7 @@ use crate::syntax_error::SyntaxError;
 #[derive(Debug)]
 pub struct TracedInterpreterError {
     pub error: InterpreterError,
+    // TODO: Add line number so we can show that when errors occur!
     backtrace: Backtrace,
 }
 
