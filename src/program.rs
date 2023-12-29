@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::{
     interpreter_error::TracedInterpreterError, syntax_error::SyntaxError, tokenizer::Token,
@@ -21,6 +21,7 @@ struct ProgramLocation {
 pub struct Program {
     numbered_lines: HashMap<u64, Vec<Token>>,
     immediate_line: Vec<Token>,
+    sorted_line_numbers: BTreeSet<u64>,
     location: ProgramLocation,
 }
 
@@ -30,7 +31,53 @@ impl Program {
         self.location = Default::default();
     }
 
+    pub fn goto_first_numbered_line(&mut self) {
+        if let Some(&first_line) = self.sorted_line_numbers.first() {
+            self.location = ProgramLocation {
+                line: ProgramLine::Line(first_line),
+                token_index: 0,
+            };
+        } else {
+            self.set_and_goto_immediate_line(vec![]);
+        };
+    }
+
+    pub fn next_line(&mut self) -> bool {
+        match self.location.line {
+            ProgramLine::Immediate => {
+                // There is nowhere to go, don't do anything.
+                false
+            }
+            ProgramLine::Line(current_line) => {
+                if let Some(&next_line) = self.sorted_line_numbers.range(current_line + 1..).next()
+                {
+                    self.location = ProgramLocation {
+                        line: ProgramLine::Line(next_line),
+                        token_index: 0,
+                    };
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    pub fn list(&self) -> Vec<String> {
+        let mut lines: Vec<String> = Vec::with_capacity(self.numbered_lines.len());
+
+        for line_number in &self.sorted_line_numbers {
+            let line = self.numbered_lines.get(line_number).unwrap();
+            // TODO: Actually show the source code, not a debug list of tokens!
+            let line_source = format!("{} {:?}\n", line_number, line);
+            lines.push(line_source);
+        }
+
+        lines
+    }
+
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
+        self.sorted_line_numbers.insert(line_number);
         self.numbered_lines.insert(line_number, tokens);
     }
 

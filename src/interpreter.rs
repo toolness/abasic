@@ -141,20 +141,72 @@ impl Interpreter {
         }
     }
 
+    fn run(&mut self) -> Result<(), TracedInterpreterError> {
+        loop {
+            while self.program.has_next_token() {
+                self.evaluate_statement()?;
+            }
+            if !self.program.next_line() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn maybe_process_command(
+        &mut self,
+        maybe_command: &str,
+    ) -> Result<bool, TracedInterpreterError> {
+        match maybe_command {
+            "RUN" => {
+                self.program.goto_first_numbered_line();
+                self.run()?;
+            }
+            "LIST" => {
+                self.output.extend(self.program.list());
+            }
+            _ => {
+                return Ok(false);
+            }
+        };
+        return Ok(true);
+    }
+
     /// Evaluate the given line of code.
     ///
     /// Note that this is expected to be a *line*, i.e. it shouldn't contain
     /// any newlines (if it does, a syntax error will be raised).
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
-        let tokens = Tokenizer::new(line)
-            .remaining_tokens()
-            .map_err(|err| TracedInterpreterError::from(err))?;
-
-        self.program.set_and_goto_immediate_line(tokens);
-
-        while self.program.has_next_token() {
-            self.evaluate_statement()?;
+        let Some(char) = line.as_ref().chars().next() else {
+            return Ok(());
+        };
+        let mut tokenizer = Tokenizer::new(line);
+        let mut line_number: Option<u64> = None;
+        if char.is_numeric() {
+            let Some(num_result) = tokenizer.next() else {
+                panic!("Expected numbered line to tokenize");
+            };
+            let Token::NumericLiteral(number) = num_result? else {
+                panic!("Expected numbered line to start with numeric literal");
+            };
+            line_number = Some(number as u64);
         }
+
+        let tokens = tokenizer.remaining_tokens()?;
+
+        if let Some(line_number) = line_number {
+            self.program.set_numbered_line(line_number, tokens);
+        } else {
+            if let Some(Token::Symbol(maybe_command)) = tokens.first() {
+                if self.maybe_process_command(maybe_command.as_str())? {
+                    return Ok(());
+                }
+            }
+
+            self.program.set_and_goto_immediate_line(tokens);
+            self.run()?;
+        }
+
         Ok(())
     }
 }
