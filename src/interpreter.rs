@@ -151,6 +151,11 @@ impl Interpreter {
     }
 
     fn run(&mut self) -> Result<(), TracedInterpreterError> {
+        // TODO: We can't just run the program indefinitely, or else
+        // our output will never be displayed for infinite loops, and
+        // if we're run in JS we'll cause the browser to hang.  We should
+        // probably just run one statement, then yield control to the caller
+        // and rely on it to continue execution at its convenience.
         loop {
             while self.program.has_next_token() {
                 self.evaluate_statement()?;
