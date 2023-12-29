@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use crate::{line_cruncher::LineCruncher, syntax_error::SyntaxError};
 
@@ -15,6 +15,24 @@ pub enum Token {
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::Print => write!(f, "PRINT"),
+            Token::Goto => write!(f, "GOTO"),
+            Token::Colon => write!(f, ":"),
+            Token::Plus => write!(f, "+"),
+            Token::Minus => write!(f, "-"),
+            Token::Equals => write!(f, "="),
+            Token::If => write!(f, "IF"),
+            Token::Then => write!(f, "THEN"),
+            Token::Symbol(name) => write!(f, "{}", name),
+            Token::StringLiteral(string) => write!(f, "\"{}\"", string),
+            Token::NumericLiteral(number) => write!(f, "{}", number),
+        }
+    }
 }
 
 pub struct Tokenizer<T: AsRef<str>> {

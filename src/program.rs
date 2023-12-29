@@ -75,9 +75,16 @@ impl Program {
         let mut lines: Vec<String> = Vec::with_capacity(self.numbered_lines.len());
 
         for line_number in &self.sorted_line_numbers {
-            let line = self.numbered_lines.get(line_number).unwrap();
-            // TODO: Actually show the source code, not a debug list of tokens!
-            let line_source = format!("{} {:?}\n", line_number, line);
+            let line = self
+                .numbered_lines
+                .get(line_number)
+                .unwrap()
+                .iter()
+                .map(|token| token.to_string())
+                .collect::<Vec<String>>()
+                .join(" ");
+
+            let line_source = format!("{} {}\n", line_number, line);
             lines.push(line_source);
         }
 
