@@ -408,6 +408,17 @@ mod tests {
     }
 
     #[test]
+    fn out_of_order_line_numbers_work() {
+        assert_program_output(
+            r#"
+            20 print "dog"
+            10 print "sup"
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
     fn goto_works() {
         assert_program_output(
             r#"
