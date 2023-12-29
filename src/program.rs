@@ -31,13 +31,20 @@ pub struct Program {
 }
 
 impl Program {
+    /// Set the content of the "immediate" line (i.e., the line that is being
+    /// evaluated by the interpreter and has no line number) and go there.
+    ///
+    /// Resets the stack.
     pub fn set_and_goto_immediate_line(&mut self, tokens: Vec<Token>) {
+        self.stack.clear();
         self.immediate_line = tokens;
         self.location = Default::default();
     }
 
+    /// Go to the first numbered line. Resets the stack.
     pub fn goto_first_numbered_line(&mut self) {
         if let Some(&first_line) = self.sorted_line_numbers.first() {
+            self.stack.clear();
             self.location = ProgramLocation {
                 line: ProgramLine::Line(first_line),
                 token_index: 0,
@@ -79,6 +86,7 @@ impl Program {
         Ok(())
     }
 
+    /// Returns the line number currently being evaluated.
     pub fn get_line_number(&self) -> Option<u64> {
         if let ProgramLine::Line(line_number) = self.location.line {
             Some(line_number)
@@ -87,6 +95,9 @@ impl Program {
         }
     }
 
+    /// Attempt to move to the next line of the program. Returns false
+    /// if we're at the end of the program and there's nothing left
+    /// to execute.
     pub fn next_line(&mut self) -> bool {
         match self.location.line {
             ProgramLine::Immediate => {
