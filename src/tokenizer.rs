@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn parsing_single_illegal_character_returns_error() {
         assert_values_parse_to_tokens_wrapped(
-            &["?", " %", "😊"],
+            &["?", " %", "😊", "\n"],
             &[Err(SyntaxError::IllegalCharacter)],
         );
     }
