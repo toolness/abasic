@@ -177,6 +177,18 @@ impl Interpreter {
     /// Note that this is expected to be a *line*, i.e. it shouldn't contain
     /// any newlines (if it does, a syntax error will be raised).
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
+        let result = self.evaluate_impl(line);
+        if let Err(mut err) = result {
+            if let Some(line_number) = self.program.get_line_number() {
+                err.set_line_number(line_number);
+            }
+            Err(err)
+        } else {
+            result
+        }
+    }
+
+    pub fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         let Some(char) = line.as_ref().chars().next() else {
             return Ok(());
         };

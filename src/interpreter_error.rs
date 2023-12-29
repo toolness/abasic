@@ -9,7 +9,7 @@ use crate::syntax_error::SyntaxError;
 #[derive(Debug)]
 pub struct TracedInterpreterError {
     pub error: InterpreterError,
-    // TODO: Add line number so we can show that when errors occur!
+    line_number: Option<u64>,
     backtrace: Backtrace,
 }
 
@@ -23,12 +23,17 @@ impl TracedInterpreterError {
     pub fn unexpected_token<T>() -> Result<T, TracedInterpreterError> {
         Err(SyntaxError::UnexpectedToken.into())
     }
+
+    pub fn set_line_number(&mut self, line_number: u64) {
+        self.line_number = Some(line_number);
+    }
 }
 
 impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
         TracedInterpreterError {
             error: InterpreterError::SyntaxError(value),
+            line_number: None,
             backtrace: Backtrace::capture(),
         }
     }
@@ -38,6 +43,7 @@ impl From<InterpreterError> for TracedInterpreterError {
     fn from(value: InterpreterError) -> Self {
         TracedInterpreterError {
             error: value,
+            line_number: None,
             backtrace: Backtrace::capture(),
         }
     }
@@ -54,6 +60,9 @@ impl Display for TracedInterpreterError {
             InterpreterError::TypeMismatch => {
                 write!(f, "TYPE MISMATCH")?;
             }
+        }
+        if let Some(line) = self.line_number {
+            write!(f, " IN {}", line)?;
         }
         if self.backtrace.status() == BacktraceStatus::Captured {
             write!(f, "\nBacktrace:\n{}", self.backtrace)?;

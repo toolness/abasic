@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-enum ProgramLine {
+pub enum ProgramLine {
     #[default]
     Immediate,
     Line(u64),
@@ -40,6 +40,14 @@ impl Program {
         } else {
             self.set_and_goto_immediate_line(vec![]);
         };
+    }
+
+    pub fn get_line_number(&self) -> Option<u64> {
+        if let ProgramLine::Line(line_number) = self.location.line {
+            Some(line_number)
+        } else {
+            None
+        }
     }
 
     pub fn next_line(&mut self) -> bool {
