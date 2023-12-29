@@ -15,9 +15,17 @@ pub struct TracedInterpreterError {
 
 #[derive(Debug, PartialEq)]
 pub enum InterpreterError {
+    // TODO: Remove 'Error' from the end of these enum names, it's redundant.
     SyntaxError(SyntaxError),
     TypeMismatch,
     UndefinedStatementError,
+    OutOfMemoryError(OutOfMemoryError),
+    ReturnWithoutGosubError,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum OutOfMemoryError {
+    StackOverflow,
 }
 
 impl TracedInterpreterError {
@@ -63,6 +71,12 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::UndefinedStatementError => {
                 write!(f, "UNDEF'D STATEMENT ERROR")?;
+            }
+            InterpreterError::OutOfMemoryError(err) => {
+                write!(f, "OUT OF MEMORY ERROR ({:?})", err)?;
+            }
+            InterpreterError::ReturnWithoutGosubError => {
+                write!(f, "RETURN WITHOUT GOSUB ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

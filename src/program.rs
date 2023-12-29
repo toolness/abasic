@@ -1,19 +1,21 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
-    interpreter_error::{InterpreterError, TracedInterpreterError},
+    interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     syntax_error::SyntaxError,
     tokenizer::Token,
 };
 
-#[derive(Debug, Default)]
+const STACK_LIMIT: usize = 256;
+
+#[derive(Debug, Default, Copy, Clone)]
 pub enum ProgramLine {
     #[default]
     Immediate,
     Line(u64),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 struct ProgramLocation {
     line: ProgramLine,
     token_index: usize,
@@ -25,6 +27,7 @@ pub struct Program {
     immediate_line: Vec<Token>,
     sorted_line_numbers: BTreeSet<u64>,
     location: ProgramLocation,
+    stack: Vec<ProgramLocation>,
 }
 
 impl Program {
@@ -56,6 +59,24 @@ impl Program {
         } else {
             Err(InterpreterError::UndefinedStatementError.into())
         }
+    }
+
+    pub fn gosub_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
+        if self.stack.len() == STACK_LIMIT {
+            return Err(InterpreterError::OutOfMemoryError(OutOfMemoryError::StackOverflow).into());
+        }
+        let return_location = self.location;
+        self.goto_line_number(line_number)?;
+        self.stack.push(return_location);
+        Ok(())
+    }
+
+    pub fn return_to_last_gosub(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(return_location) = self.stack.pop() else {
+            return Err(InterpreterError::ReturnWithoutGosubError.into());
+        };
+        self.location = return_location;
+        Ok(())
     }
 
     pub fn get_line_number(&self) -> Option<u64> {

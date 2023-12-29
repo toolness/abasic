@@ -6,6 +6,8 @@ use crate::{line_cruncher::LineCruncher, syntax_error::SyntaxError};
 pub enum Token {
     Print,
     Goto,
+    Gosub,
+    Return,
     Colon,
     Plus,
     Minus,
@@ -22,6 +24,8 @@ impl Display for Token {
         match self {
             Token::Print => write!(f, "PRINT"),
             Token::Goto => write!(f, "GOTO"),
+            Token::Gosub => write!(f, "GOSUB"),
+            Token::Return => write!(f, "RETURN"),
             Token::Colon => write!(f, ":"),
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
@@ -195,6 +199,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Print)
         } else if self.chomp_keyword("GOTO") {
             Some(Token::Goto)
+        } else if self.chomp_keyword("GOSUB") {
+            Some(Token::Gosub)
+        } else if self.chomp_keyword("RETURN") {
+            Some(Token::Return)
         } else if self.chomp_keyword("IF") {
             Some(Token::If)
         } else if self.chomp_keyword("THEN") {

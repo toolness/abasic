@@ -138,11 +138,26 @@ impl Interpreter {
         Ok(())
     }
 
+    fn evaluate_gosub_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(Token::NumericLiteral(line_number)) = self.program.next_token() else {
+            return Err(InterpreterError::UndefinedStatementError.into());
+        };
+        self.program.gosub_line_number(line_number as u64)?;
+        Ok(())
+    }
+
+    fn evaluate_return_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        self.program.return_to_last_gosub()?;
+        Ok(())
+    }
+
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Goto) => self.evaluate_goto_statement(),
+            Some(Token::Gosub) => self.evaluate_gosub_statement(),
+            Some(Token::Return) => self.evaluate_return_statement(),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
@@ -273,6 +288,8 @@ fn value_to_bool(value: &Value) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use crate::interpreter_error::OutOfMemoryError;
+
     use super::{Interpreter, InterpreterError};
 
     fn assert_eval_error(line: &'static str, expected: InterpreterError) {
@@ -300,7 +317,23 @@ mod tests {
             eval_line_and_expect_success(&mut interpreter, line);
         }
         let output = eval_line_and_expect_success(&mut interpreter, "run");
-        assert_eq!(output, expected, "running program '{}'", program);
+        assert_eq!(output, expected, "running program: {}", program);
+    }
+
+    fn assert_program_error(program: &'static str, expected: InterpreterError) {
+        let mut interpreter = Interpreter::new();
+        let lines = program.split("\n").map(|line| line.trim_start());
+        for line in lines {
+            eval_line_and_expect_success(&mut interpreter, line);
+        }
+        match interpreter.evaluate("run") {
+            Ok(_) => {
+                panic!("expected program to error but it didn't: {}", program);
+            }
+            Err(err) => {
+                assert_eq!(err.error, expected, "running program: {}", program);
+            }
+        }
     }
 
     fn eval_line_and_expect_success<T: AsRef<str>>(
@@ -394,6 +427,13 @@ mod tests {
     fn undefined_statement_error_works() {
         assert_eval_error("goto 30", InterpreterError::UndefinedStatementError);
         assert_eval_error("goto x", InterpreterError::UndefinedStatementError);
+        assert_eval_error("gosub 30", InterpreterError::UndefinedStatementError);
+        assert_eval_error("gosub x", InterpreterError::UndefinedStatementError);
+    }
+
+    #[test]
+    fn return_without_gosub_error_works() {
+        assert_eval_error("return", InterpreterError::ReturnWithoutGosubError);
     }
 
     #[test]
@@ -428,6 +468,32 @@ mod tests {
             40 print "dog"
             "#,
             "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn gosub_works() {
+        assert_program_output(
+            r#"
+            10 gosub 40
+            20 print "dog"
+            30 goto 60
+            40 print "sup"
+            50 return
+            60
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn stack_overflow_works() {
+        assert_program_error(
+            r#"
+            10 print "hi"
+            20 gosub 10
+            "#,
+            InterpreterError::OutOfMemoryError(OutOfMemoryError::StackOverflow),
         );
     }
 
