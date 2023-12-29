@@ -2,7 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     interpreter_error::{InterpreterError, TracedInterpreterError},
-    syntax_error::SyntaxError,
+    program::Program,
     tokenizer::{Token, Tokenizer},
 };
 
@@ -15,8 +15,7 @@ enum Value {
 #[derive(Debug)]
 pub struct Interpreter {
     output: Vec<String>,
-    tokens: Vec<Token>,
-    tokens_index: usize,
+    program: Program,
     variables: HashMap<Rc<String>, Value>,
 }
 
@@ -24,8 +23,7 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             output: vec![],
-            tokens: vec![],
-            tokens_index: 0,
+            program: Default::default(),
             variables: HashMap::new(),
         }
     }
@@ -40,56 +38,8 @@ impl Interpreter {
         }
     }
 
-    fn has_next_token(&self) -> bool {
-        self.peek_next_token().is_some()
-    }
-
-    /// Return the next token in the stream, if it exists,
-    /// but don't advance our position in it.
-    fn peek_next_token(&self) -> Option<Token> {
-        self.tokens.get(self.tokens_index).cloned()
-    }
-
-    /// Return the next token in the stream, if it exists,
-    /// and advance our position in it.
-    fn next_token(&mut self) -> Option<Token> {
-        let next = self.peek_next_token();
-        if next.is_some() {
-            self.tokens_index += 1;
-        }
-        next
-    }
-
-    /// Return the next token in the stream, advancing our
-    /// position in it.  If there are no more tokens, return an error.
-    fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {
-        unwrap_token(self.next_token())
-    }
-
-    fn expect_next_token(&mut self, expected: Token) -> Result<(), TracedInterpreterError> {
-        if self.next_unwrapped_token()? == expected {
-            Ok(())
-        } else {
-            Err(SyntaxError::ExpectedToken(expected).into())
-        }
-    }
-
-    /// Advance to the next token in the stream, panicking if there are
-    /// no more tokens. This should only be used after e.g. calling
-    /// `peek_next_token` and verifying that the next token actually
-    /// exists.
-    fn consume_next_token(&mut self) {
-        self.tokens.get(self.tokens_index).unwrap();
-        self.tokens_index += 1;
-    }
-
-    /// Throw away any remaining tokens.
-    fn discard_remaining_tokens(&mut self) {
-        self.tokens_index = self.tokens.len();
-    }
-
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
-        match self.next_unwrapped_token()? {
+        match self.program.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(Value::String(string.clone())),
             Token::NumericLiteral(number) => Ok(Value::Number(number)),
             Token::Symbol(variable) => {
@@ -107,9 +57,9 @@ impl Interpreter {
     }
 
     fn evaluate_plus_or_minus(&mut self) -> Option<f64> {
-        if let Some(next_token) = self.peek_next_token() {
+        if let Some(next_token) = self.program.peek_next_token() {
             if let Some(unary_plus_or_minus) = parse_plus_or_minus(&next_token) {
-                self.consume_next_token();
+                self.program.consume_next_token();
                 Some(unary_plus_or_minus)
             } else {
                 None
@@ -136,7 +86,7 @@ impl Interpreter {
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let conditional_value = self.evaluate_expression()?;
-        self.expect_next_token(Token::Then)?;
+        self.program.expect_next_token(Token::Then)?;
         // TODO: It would be nice to support ELSE somehow, even though
         // AppleSoft basic doesn't really seem to. Tim Hartnell's
         // book seems to include ELSE clauses only in the form of line
@@ -145,7 +95,7 @@ impl Interpreter {
         if value_to_bool(&conditional_value) {
             self.evaluate_statement()
         } else {
-            self.discard_remaining_tokens();
+            self.program.discard_remaining_tokens();
             Ok(())
         }
     }
@@ -154,7 +104,7 @@ impl Interpreter {
         &mut self,
         variable: Rc<String>,
     ) -> Result<(), TracedInterpreterError> {
-        self.expect_next_token(Token::Equals)?;
+        self.program.expect_next_token(Token::Equals)?;
         let value = self.evaluate_expression()?;
         // TODO: We should only allow assigning numbers to variables that don't end
         // with `$`, and only allow assigning strings to ones that end with `$`.
@@ -163,7 +113,7 @@ impl Interpreter {
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        while let Some(token) = self.peek_next_token() {
+        while let Some(token) = self.program.peek_next_token() {
             match token {
                 Token::Colon => break,
                 _ => match self.evaluate_expression()? {
@@ -181,7 +131,7 @@ impl Interpreter {
     }
 
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        match self.next_token() {
+        match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Colon) => Ok(()),
@@ -196,12 +146,13 @@ impl Interpreter {
     /// Note that this is expected to be a *line*, i.e. it shouldn't contain
     /// any newlines (if it does, a syntax error will be raised).
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
-        self.tokens = Tokenizer::new(line)
-            .remaining_tokens()
-            .map_err(|err| TracedInterpreterError::from(err))?;
-        self.tokens_index = 0;
+        self.program.set_tokens(
+            Tokenizer::new(line)
+                .remaining_tokens()
+                .map_err(|err| TracedInterpreterError::from(err))?,
+        );
 
-        while self.has_next_token() {
+        while self.program.has_next_token() {
             self.evaluate_statement()?;
         }
         Ok(())
@@ -239,13 +190,6 @@ fn value_to_bool(value: &Value) -> bool {
     match value {
         Value::String(string) => !string.is_empty(),
         Value::Number(number) => *number != 0.0,
-    }
-}
-
-fn unwrap_token(token: Option<Token>) -> Result<Token, TracedInterpreterError> {
-    match token {
-        Some(token) => Ok(token),
-        None => Err(SyntaxError::UnexpectedEndOfInput.into()),
     }
 }
 

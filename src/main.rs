@@ -1,6 +1,7 @@
 mod interpreter;
 mod interpreter_error;
 mod line_cruncher;
+mod program;
 mod syntax_error;
 mod tokenizer;
 
