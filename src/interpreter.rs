@@ -146,11 +146,11 @@ impl Interpreter {
     /// Note that this is expected to be a *line*, i.e. it shouldn't contain
     /// any newlines (if it does, a syntax error will be raised).
     pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
-        self.program.set_tokens(
-            Tokenizer::new(line)
-                .remaining_tokens()
-                .map_err(|err| TracedInterpreterError::from(err))?,
-        );
+        let tokens = Tokenizer::new(line)
+            .remaining_tokens()
+            .map_err(|err| TracedInterpreterError::from(err))?;
+
+        self.program.set_and_goto_immediate_line(tokens);
 
         while self.program.has_next_token() {
             self.evaluate_statement()?;

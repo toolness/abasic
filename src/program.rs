@@ -1,17 +1,44 @@
+use std::collections::HashMap;
+
 use crate::{
     interpreter_error::TracedInterpreterError, syntax_error::SyntaxError, tokenizer::Token,
 };
 
 #[derive(Debug, Default)]
+enum ProgramLine {
+    #[default]
+    Immediate,
+    Line(u64),
+}
+
+#[derive(Debug, Default)]
+struct ProgramLocation {
+    line: ProgramLine,
+    token_index: usize,
+}
+
+#[derive(Debug, Default)]
 pub struct Program {
-    tokens: Vec<Token>,
-    tokens_index: usize,
+    numbered_lines: HashMap<u64, Vec<Token>>,
+    immediate_line: Vec<Token>,
+    location: ProgramLocation,
 }
 
 impl Program {
-    pub fn set_tokens(&mut self, tokens: Vec<Token>) {
-        self.tokens = tokens;
-        self.tokens_index = 0;
+    pub fn set_and_goto_immediate_line(&mut self, tokens: Vec<Token>) {
+        self.immediate_line = tokens;
+        self.location = Default::default();
+    }
+
+    pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
+        self.numbered_lines.insert(line_number, tokens);
+    }
+
+    fn tokens(&self) -> &Vec<Token> {
+        match self.location.line {
+            ProgramLine::Immediate => &self.immediate_line,
+            ProgramLine::Line(number) => self.numbered_lines.get(&number).unwrap(),
+        }
     }
 
     /// Returns whether we have any more tokens in the stream.
@@ -22,7 +49,7 @@ impl Program {
     /// Return the next token in the stream, if it exists,
     /// but don't advance our position in it.
     pub fn peek_next_token(&self) -> Option<Token> {
-        self.tokens.get(self.tokens_index).cloned()
+        self.tokens().get(self.location.token_index).cloned()
     }
 
     /// Return the next token in the stream, if it exists,
@@ -30,7 +57,7 @@ impl Program {
     pub fn next_token(&mut self) -> Option<Token> {
         let next = self.peek_next_token();
         if next.is_some() {
-            self.tokens_index += 1;
+            self.location.token_index += 1;
         }
         next
     }
@@ -57,13 +84,13 @@ impl Program {
     /// `peek_next_token` and verifying that the next token actually
     /// exists.
     pub fn consume_next_token(&mut self) {
-        self.tokens.get(self.tokens_index).unwrap();
-        self.tokens_index += 1;
+        self.tokens().get(self.location.token_index).unwrap();
+        self.location.token_index += 1;
     }
 
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
-        self.tokens_index = self.tokens.len();
+        self.location.token_index = self.tokens().len();
     }
 }
 
