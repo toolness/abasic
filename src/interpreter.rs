@@ -487,6 +487,21 @@ mod tests {
     }
 
     #[test]
+    fn gosub_works_in_line_with_colons() {
+        assert_program_output(
+            r#"
+            10 print "calling":gosub 40:print "returned"
+            20 print "dog"
+            30 goto 60
+            40 print "sup"
+            50 return
+            60
+            "#,
+            "calling\nsup\nreturned\ndog\n",
+        );
+    }
+
+    #[test]
     fn stack_overflow_works() {
         assert_program_error(
             r#"
