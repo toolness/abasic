@@ -275,19 +275,37 @@ mod tests {
 
     fn assert_eval_output(line: &'static str, expected: &'static str) {
         let mut interpreter = Interpreter::new();
-        let output = match interpreter.evaluate(line) {
+        let output = eval_line_and_expect_success(&mut interpreter, line);
+        assert_eq!(output, expected, "evaluating '{}'", line);
+    }
+
+    fn assert_program_output(program: &'static str, expected: &'static str) {
+        let mut interpreter = Interpreter::new();
+        let lines = program.split("\n").map(|line| line.trim_start());
+        for line in lines {
+            eval_line_and_expect_success(&mut interpreter, line);
+        }
+        let output = eval_line_and_expect_success(&mut interpreter, "run");
+        assert_eq!(output, expected, "running program '{}'", program);
+    }
+
+    fn eval_line_and_expect_success<T: AsRef<str>>(
+        interpreter: &mut Interpreter,
+        line: T,
+    ) -> String {
+        match interpreter.evaluate(line.as_ref()) {
             Ok(_) => interpreter
                 .get_and_clear_output_buffer()
                 .unwrap_or_default(),
             Err(err) => {
                 panic!(
                     "expected '{}' to evaluate successfully but got {}\nIntepreter state is: {:?}",
-                    line, err, interpreter
+                    line.as_ref(),
+                    err,
+                    interpreter
                 )
             }
-        };
-
-        assert_eq!(output, expected, "evaluating '{}'", line);
+        }
     }
 
     #[test]
@@ -356,5 +374,16 @@ mod tests {
         assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
         assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
         assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
+    }
+
+    #[test]
+    fn line_numbers_work() {
+        assert_program_output(
+            r#"
+            10 print "sup"
+            20 print "dog"
+            "#,
+            "sup\ndog\n",
+        );
     }
 }
