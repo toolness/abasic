@@ -30,15 +30,19 @@ fn run_interpreter() -> i32 {
                 if let Err(err) = rl.add_history_entry(line.as_str()) {
                     eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                 }
-                if let Err(err) = interpreter.evaluate(line) {
+                let result = interpreter.evaluate(line);
+
+                // Regardless of whether an error occurred, show any buffered output.
+                if let Some(output) = interpreter.get_and_clear_output_buffer() {
+                    print!("{}", output);
+                }
+
+                if let Err(err) = result {
                     println!("{}", err);
                     // If we're not interactive, treat errors as fatal.
                     if !stdin().is_terminal() {
                         return 1;
                     }
-                }
-                if let Some(output) = interpreter.get_and_clear_output_buffer() {
-                    print!("{}", output);
                 }
             }
             Err(ReadlineError::Interrupted) => {
