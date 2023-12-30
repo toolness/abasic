@@ -297,6 +297,15 @@ impl Interpreter {
         self.postprocess_result(result)
     }
 
+    /// Stop any evaluation and return the line number we
+    /// were evaluating at the time of stopping, if any.
+    pub fn stop_evaluating(&mut self) -> Option<u64> {
+        let line_number = self.program.get_line_number();
+        self.program.set_and_goto_immediate_line(vec![]);
+        self.run().unwrap();
+        line_number
+    }
+
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
         let Some(char) = line.as_ref().chars().next() else {

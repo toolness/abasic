@@ -6,6 +6,7 @@ version = 3
 name = "basic-interpreter"
 version = "0.1.0"
 dependencies = [
+ "ctrlc",
  "rustyline",
 ]
 
@@ -28,6 +29,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c57002a5d9be777c1ef967e33674dac9ebd310d8893e4e3437b14d5f0f6372cc"
 dependencies = [
  "error-code",
+]
+
+[[package]]
+name = "ctrlc"
+version = "3.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b467862cc8610ca6fc9a1532d7777cee0804e678ab45410897b9396495994a0b"
+dependencies = [
+ "nix",
+ "windows-sys",
 ]
 
 [[package]]

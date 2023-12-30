@@ -6,13 +6,20 @@ mod syntax_error;
 mod tokenizer;
 
 use std::io::{stdin, IsTerminal};
+use std::sync::mpsc::channel;
 
+use ctrlc;
 use interpreter::{Interpreter, InterpreterState};
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
 
 fn run_interpreter() -> i32 {
+    let (tx, rx) = channel();
+
+    ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler.");
+
     let Ok(mut rl) = DefaultEditor::new() else {
         eprintln!("Initializing DefaultEditor failed!");
         return 1;
@@ -38,6 +45,15 @@ fn run_interpreter() -> i32 {
                         InterpreterState::Idle => interpreter.start_evaluating(&line),
                         InterpreterState::Running => interpreter.continue_evaluating(),
                     };
+
+                    if rx.try_recv().is_ok() {
+                        if let Some(line_number) = interpreter.stop_evaluating() {
+                            println!("BREAK IN {}", line_number);
+                        } else {
+                            println!("BREAK");
+                        }
+                        break;
+                    }
 
                     // Regardless of whether an error occurred, show any buffered output.
                     if let Some(output) = interpreter.get_and_clear_output_buffer() {
