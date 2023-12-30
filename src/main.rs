@@ -31,6 +31,9 @@ fn run_interpreter() -> i32 {
                     eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                 }
                 loop {
+                    // TODO: It'd be nice to set up an interrupt handler here, so that
+                    // if the user presses CTRL-C, we abort the current evaluation (e.g.
+                    // an infinite loop), rather than exiting the entire program.
                     let result = match interpreter.get_state() {
                         InterpreterState::Idle => interpreter.start_evaluating(&line),
                         InterpreterState::Running => interpreter.continue_evaluating(),
