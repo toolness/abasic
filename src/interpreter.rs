@@ -153,12 +153,14 @@ impl Interpreter {
         };
         self.program.expect_next_token(Token::Equals)?;
         let from_value = self.evaluate_expression()?;
+        let from_number = unwrap_number(from_value)?;
         self.program.expect_next_token(Token::To)?;
         let to_value = self.evaluate_expression()?;
+        let to_number = unwrap_number(to_value)?;
 
         println!(
             "TODO: Do something with {:?}, {:?}, and {:?}!",
-            symbol, from_value, to_value
+            symbol, from_number, to_number
         );
         Ok(())
     }
