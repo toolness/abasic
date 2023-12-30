@@ -70,7 +70,7 @@ impl Program {
 
     pub fn gosub_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
         if self.stack.len() == STACK_LIMIT {
-            return Err(InterpreterError::OutOfMemoryError(OutOfMemoryError::StackOverflow).into());
+            return Err(OutOfMemoryError::StackOverflow.into());
         }
         let return_location = self.location;
         self.goto_line_number(line_number)?;

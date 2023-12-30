@@ -44,6 +44,16 @@ impl From<SyntaxError> for TracedInterpreterError {
     }
 }
 
+impl From<OutOfMemoryError> for TracedInterpreterError {
+    fn from(value: OutOfMemoryError) -> Self {
+        TracedInterpreterError {
+            error: InterpreterError::OutOfMemoryError(value),
+            line_number: None,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
 impl From<InterpreterError> for TracedInterpreterError {
     fn from(value: InterpreterError) -> Self {
         TracedInterpreterError {
