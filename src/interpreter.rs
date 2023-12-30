@@ -148,14 +148,27 @@ impl Interpreter {
     }
 
     fn evaluate_for_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        todo!("Do something!");
+        let Some(Token::Symbol(symbol)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        self.program.expect_next_token(Token::Equals)?;
+        let from_value = self.evaluate_expression()?;
+        self.program.expect_next_token(Token::To)?;
+        let to_value = self.evaluate_expression()?;
+
+        println!(
+            "TODO: Do something with {:?}, {:?}, and {:?}!",
+            symbol, from_value, to_value
+        );
+        Ok(())
     }
 
     fn evaluate_next_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let Some(Token::Symbol(symbol)) = self.program.next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
-        todo!("Do something with {}!", symbol);
+        println!("TODO: Do something with {:?}!", symbol);
+        Ok(())
     }
 
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
