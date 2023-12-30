@@ -157,11 +157,8 @@ impl Interpreter {
         self.program.expect_next_token(Token::To)?;
         let to_value = self.evaluate_expression()?;
         let to_number = unwrap_number(to_value)?;
-
-        println!(
-            "TODO: Do something with {:?}, {:?}, and {:?}!",
-            symbol, from_number, to_number
-        );
+        self.program.start_loop(symbol.clone(), to_number);
+        self.variables.insert(symbol, Value::Number(from_number));
         Ok(())
     }
 
@@ -169,7 +166,12 @@ impl Interpreter {
         let Some(Token::Symbol(symbol)) = self.program.next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
-        println!("TODO: Do something with {:?}!", symbol);
+        let Some(current_value) = self.variables.get(&symbol) else {
+            return Err(InterpreterError::NextWithoutForError.into());
+        };
+        let current_number = unwrap_number(current_value.clone())?;
+        let new_number = self.program.end_loop(symbol.clone(), current_number)?;
+        self.variables.insert(symbol, Value::Number(new_number));
         Ok(())
     }
 
@@ -439,6 +441,37 @@ mod tests {
         assert_eval_output("x=1+1:print x", "2\n");
         assert_eval_output("x=1:print x + 2", "3\n");
         assert_eval_output("x=1:print x:x = x + 1:print x", "1\n2\n");
+    }
+
+    #[test]
+    fn looping_works() {
+        assert_eval_output(
+            "for i = 1 to 3: print i:next i:print \"DONE\" i",
+            "1\n2\n3\nDONE4\n",
+        );
+
+        assert_eval_output("for i = 4 to 6: print i:next i", "4\n5\n6\n");
+    }
+
+    #[test]
+    fn nested_looping_works() {
+        assert_eval_output(
+            "for i = 1 to 2: print \"i = \" i:for j = 1 to 2:print \"j = \" j:next j:next i",
+            "i = 1\nj = 1\nj = 2\ni = 2\nj = 1\nj = 2\n",
+        );
+    }
+
+    #[test]
+    fn next_without_for_error_works() {
+        assert_eval_error("next i", InterpreterError::NextWithoutForError);
+        assert_eval_error(
+            "for i = 1 to 3:next j",
+            InterpreterError::NextWithoutForError,
+        );
+        assert_eval_error(
+            "for j = 1 to 3:for i = 1 to 3:next j:next i",
+            InterpreterError::NextWithoutForError,
+        );
     }
 
     #[test]

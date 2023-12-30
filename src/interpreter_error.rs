@@ -21,6 +21,7 @@ pub enum InterpreterError {
     UndefinedStatementError,
     OutOfMemoryError(OutOfMemoryError),
     ReturnWithoutGosubError,
+    NextWithoutForError,
 }
 
 #[derive(Debug, PartialEq)]
@@ -83,6 +84,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::ReturnWithoutGosubError => {
                 write!(f, "RETURN WITHOUT GOSUB ERROR")?;
+            }
+            InterpreterError::NextWithoutForError => {
+                write!(f, "NEXT WITHOUT FOR ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

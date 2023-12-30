@@ -1,4 +1,7 @@
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    rc::Rc,
+};
 
 use crate::{
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
@@ -22,12 +25,20 @@ struct ProgramLocation {
 }
 
 #[derive(Debug, Default)]
+struct LoopInfo {
+    location: ProgramLocation,
+    symbol: Rc<String>,
+    to_value: f64,
+}
+
+#[derive(Debug, Default)]
 pub struct Program {
     numbered_lines: HashMap<u64, Vec<Token>>,
     immediate_line: Vec<Token>,
     sorted_line_numbers: BTreeSet<u64>,
     location: ProgramLocation,
     stack: Vec<ProgramLocation>,
+    loop_stack: Vec<LoopInfo>,
 }
 
 impl Program {
@@ -39,6 +50,37 @@ impl Program {
         self.stack.clear();
         self.immediate_line = tokens;
         self.location = Default::default();
+    }
+
+    pub fn start_loop(&mut self, symbol: Rc<String>, to_value: f64) {
+        self.loop_stack.push(LoopInfo {
+            location: self.location,
+            symbol,
+            to_value,
+        })
+    }
+
+    pub fn end_loop(
+        &mut self,
+        symbol: Rc<String>,
+        current_value: f64,
+    ) -> Result<f64, TracedInterpreterError> {
+        let Some(loop_info) = self.loop_stack.pop() else {
+            return Err(InterpreterError::NextWithoutForError.into());
+        };
+
+        if loop_info.symbol != symbol {
+            return Err(InterpreterError::NextWithoutForError.into());
+        }
+
+        let new_value = current_value + 1.0;
+
+        if new_value <= loop_info.to_value {
+            self.location = loop_info.location;
+            self.loop_stack.push(loop_info);
+        }
+
+        Ok(new_value)
     }
 
     /// Go to the first numbered line. Resets the stack.
