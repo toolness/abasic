@@ -18,6 +18,7 @@ pub enum Token {
     For,
     To,
     Next,
+    Remark(Rc<String>),
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
@@ -40,6 +41,7 @@ impl Display for Token {
             Token::For => write!(f, "FOR"),
             Token::To => write!(f, "TO"),
             Token::Next => write!(f, "NEXT"),
+            Token::Remark(comment) => write!(f, "REM {}", comment),
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
@@ -202,6 +204,21 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
+    fn chomp_remark(&mut self) -> Option<Result<Token, SyntaxError>> {
+        if self.chomp_keyword("REM") {
+            let bytes = self.remaining_bytes();
+
+            // We can technically do this using from_utf8_unchecked(),
+            // but better safe (and slightly inefficient) than sorry for now.
+            let comment = std::str::from_utf8(bytes).unwrap().to_string();
+
+            self.index += comment.len();
+            Some(Ok(Token::Remark(Rc::new(comment))))
+        } else {
+            None
+        }
+    }
+
     fn chomp_any_keyword(&mut self) -> Option<Token> {
         if self.chomp_keyword("PRINT") {
             Some(Token::Print)
@@ -258,6 +275,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             result
         } else if let Some(result) = self.chomp_number() {
             result
+        } else if let Some(result) = self.chomp_remark() {
+            result
         } else if let Some(result) = self.chomp_symbol() {
             result
         } else {
@@ -312,6 +331,10 @@ mod tests {
 
     fn symbol(value: &'static str) -> Token {
         Token::Symbol(Rc::new(String::from(value)))
+    }
+
+    fn remark(value: &'static str) -> Token {
+        Token::Remark(Rc::new(String::from(value)))
     }
 
     fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
@@ -378,6 +401,13 @@ mod tests {
             &["PRINT GOTO", "PRINTGOTO", "  P R I N T G O T O  "],
             &[Token::Print, Token::Goto],
         );
+    }
+
+    #[test]
+    fn parsing_single_remark_works() {
+        assert_values_parse_to_tokens(&["REM hi"], &[remark(" hi")]);
+        assert_values_parse_to_tokens(&["REM hi:print"], &[remark(" hi:print")]);
+        assert_values_parse_to_tokens(&["REM hi 😊"], &[remark(" hi 😊")]);
     }
 
     #[test]

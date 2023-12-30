@@ -188,6 +188,7 @@ impl Interpreter {
             Some(Token::End) => Ok(self.program.end()),
             Some(Token::For) => self.evaluate_for_statement(),
             Some(Token::Next) => self.evaluate_next_statement(),
+            Some(Token::Remark(_)) => Ok(()),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => Err(SyntaxError::UnexpectedToken.into()),
@@ -444,6 +445,14 @@ mod tests {
         assert_eval_output("x=1+1:print x", "2\n");
         assert_eval_output("x=1:print x + 2", "3\n");
         assert_eval_output("x=1:print x:x = x + 1:print x", "1\n2\n");
+    }
+
+    #[test]
+    fn remark_works() {
+        assert_eval_output("REM hi", "");
+        assert_eval_output("rem hi 😊", "");
+        assert_eval_output("REM:PRINT \"THIS SHOULD NOT APPEAR\"", "");
+        assert_eval_output("PRINT \"hi\":REM:PRINT \"THIS SHOULD NOT APPEAR\"", "hi\n");
     }
 
     #[test]
