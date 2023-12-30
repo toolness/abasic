@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn loop_with_goto_works() {
+    fn loop_with_goto_after_next_works() {
         assert_program_output(
             r#"
             10 for i = 1 to 3
@@ -608,6 +608,21 @@ mod tests {
             60 print "TWO":goto 40
             "#,
             "1\nTWO\n3\n",
+        );
+    }
+
+    #[test]
+    fn loop_with_goto_before_for_works() {
+        assert_program_output(
+            r#"
+            10 goto 30
+            20 next i
+            30 for i = 1 to 3
+            40 print i
+            50 if i = 3  then end
+            60 goto 20
+            "#,
+            "1\n2\n3\n",
         );
     }
 
