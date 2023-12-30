@@ -1,12 +1,10 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::{line_cruncher::LineCruncher, syntax_error::SyntaxError};
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum DataElement {
-    String(Rc<String>),
-    Number(f64),
-}
+use crate::{
+    data::{data_elements_to_string, parse_data_until_colon, DataElement},
+    line_cruncher::LineCruncher,
+    syntax_error::SyntaxError,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
@@ -52,20 +50,9 @@ impl Display for Token {
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
-            Token::Data(elements) => write!(f, "{}", data_to_string(elements)),
+            Token::Data(elements) => write!(f, "{}", data_elements_to_string(elements)),
         }
     }
-}
-
-fn data_to_string(elements: &Vec<DataElement>) -> String {
-    elements
-        .iter()
-        .map(|element| match element {
-            DataElement::String(string) => format!("\"{}\"", string),
-            DataElement::Number(number) => number.to_string(),
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 pub struct Tokenizer<T: AsRef<str>> {
@@ -211,6 +198,9 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // safe than sorry I guess.
             let remaining_str = std::str::from_utf8(&bytes[1..]).unwrap();
 
+            // TODO: There doesn't seem to be any way to escape a double-quote,
+            // and I'm not sure what BASIC conventions for this are, if any. It'd
+            // be nice to somehow support this.
             if let Some(end_quote_index) = remaining_str.find('"') {
                 let string = Rc::new(String::from(&remaining_str[..end_quote_index]));
                 self.index += 1 + end_quote_index + 1;
@@ -266,8 +256,15 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
     fn chomp_data(&mut self) -> Option<Token> {
         if self.chomp_keyword("DATA") {
-            // TODO: Finish this
-            Some(Token::Data(Rc::new(vec![])))
+            // We can technically do this using String::from_utf8_unchecked(),
+            // but better safe (and slightly inefficient) than sorry for now.
+            let remaining = std::str::from_utf8(self.remaining_bytes()).unwrap();
+
+            let (elements, bytes_chomped) = parse_data_until_colon(remaining);
+
+            self.index += bytes_chomped;
+
+            Some(Token::Data(Rc::new(elements)))
         } else {
             None
         }
