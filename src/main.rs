@@ -32,7 +32,7 @@ fn run_interpreter() -> i32 {
                 }
                 loop {
                     let result = match interpreter.get_state() {
-                        InterpreterState::Idle => interpreter.evaluate(&line),
+                        InterpreterState::Idle => interpreter.start_evaluating(&line),
                         InterpreterState::Running => interpreter.continue_evaluating(),
                     };
 

@@ -281,11 +281,18 @@ impl Interpreter {
         self.postprocess_result(result)
     }
 
-    /// Evaluate the given line of code.
+    /// Start evaluating the given line of code.
     ///
     /// Note that this is expected to be a *line*, i.e. it shouldn't contain
     /// any newlines (if it does, a syntax error will be raised).
-    pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
+    ///
+    /// This only *starts* evaluation. In order to keep running it to completion,
+    /// the caller must also call `continue_evaluating` for as long as the
+    /// interpreter's state is `InterpreterState::Running`.
+    pub fn start_evaluating<T: AsRef<str>>(
+        &mut self,
+        line: T,
+    ) -> Result<(), TracedInterpreterError> {
         let result = self.evaluate_impl(line);
         self.postprocess_result(result)
     }
@@ -370,7 +377,7 @@ mod tests {
         interpreter: &mut Interpreter,
         line: &str,
     ) -> Result<(), TracedInterpreterError> {
-        interpreter.evaluate(line)?;
+        interpreter.start_evaluating(line)?;
         while interpreter.get_state() == InterpreterState::Running {
             interpreter.continue_evaluating()?;
         }
