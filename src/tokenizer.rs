@@ -15,6 +15,9 @@ pub enum Token {
     If,
     Then,
     End,
+    For,
+    To,
+    Next,
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
@@ -34,6 +37,9 @@ impl Display for Token {
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
             Token::End => write!(f, "END"),
+            Token::For => write!(f, "FOR"),
+            Token::To => write!(f, "TO"),
+            Token::Next => write!(f, "NEXT"),
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
@@ -211,6 +217,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Then)
         } else if self.chomp_keyword("END") {
             Some(Token::End)
+        } else if self.chomp_keyword("FOR") {
+            Some(Token::For)
+        } else if self.chomp_keyword("TO") {
+            Some(Token::To)
+        } else if self.chomp_keyword("NEXT") {
+            Some(Token::Next)
         } else {
             None
         }
