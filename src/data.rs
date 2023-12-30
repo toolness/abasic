@@ -124,20 +124,28 @@ pub fn parse_data_until_colon(value: &str) -> (Vec<DataElement>, usize) {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod test_util {
     use std::rc::Rc;
-
-    use crate::data::parse_data_until_colon;
 
     use super::DataElement;
 
-    fn string(value: &'static str) -> DataElement {
+    pub fn string(value: &'static str) -> DataElement {
         DataElement::String(Rc::new(value.to_string()))
     }
 
-    fn number(value: f64) -> DataElement {
+    pub fn number(value: f64) -> DataElement {
         DataElement::Number(value)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::data::parse_data_until_colon;
+
+    use super::{
+        test_util::{number, string},
+        DataElement,
+    };
 
     fn assert_parse_all_data(value: &'static str, expect: &[DataElement]) {
         assert_eq!(

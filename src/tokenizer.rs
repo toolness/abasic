@@ -302,10 +302,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
             result
         } else if let Some(result) = self.chomp_remark() {
             result
-        } else if let Some(result) = self.chomp_symbol() {
-            result
         } else if let Some(result) = self.chomp_data() {
             Ok(result)
+        } else if let Some(result) = self.chomp_symbol() {
+            result
         } else {
             Err(SyntaxError::IllegalCharacter)
         }
@@ -491,6 +491,25 @@ mod tests {
         assert_values_parse_to_tokens(
             &["1 x 1", " 1x1", "  1X1  "],
             &[Token::NumericLiteral(1.0), symbol("X1")],
+        );
+    }
+
+    #[test]
+    fn parsing_data_works() {
+        use crate::data::test_util::{number, string};
+
+        assert_values_parse_to_tokens(
+            &["DATA A, b, C, 4:print", "DATA    A, \"b\", C, 4 : print"],
+            &[
+                Token::Data(Rc::new(vec![
+                    string("A"),
+                    string("b"),
+                    string("C"),
+                    number(4.0),
+                ])),
+                Token::Colon,
+                Token::Print,
+            ],
         );
     }
 
