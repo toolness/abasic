@@ -3,6 +3,12 @@ use std::{fmt::Display, rc::Rc};
 use crate::{line_cruncher::LineCruncher, syntax_error::SyntaxError};
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum DataElement {
+    String(Rc<String>),
+    Number(f64),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Print,
     Goto,
@@ -22,6 +28,7 @@ pub enum Token {
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
+    Data(Rc<Vec<DataElement>>),
 }
 
 impl Display for Token {
@@ -45,8 +52,20 @@ impl Display for Token {
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
+            Token::Data(elements) => write!(f, "{}", data_to_string(elements)),
         }
     }
+}
+
+fn data_to_string(elements: &Vec<DataElement>) -> String {
+    elements
+        .iter()
+        .map(|element| match element {
+            DataElement::String(string) => format!("\"{}\"", string),
+            DataElement::Number(number) => number.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub struct Tokenizer<T: AsRef<str>> {
@@ -245,6 +264,15 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
+    fn chomp_data(&mut self) -> Option<Token> {
+        if self.chomp_keyword("DATA") {
+            // TODO: Finish this
+            Some(Token::Data(Rc::new(vec![])))
+        } else {
+            None
+        }
+    }
+
     fn chomp_keyword(&mut self, keyword: &str) -> bool {
         let keyword_bytes = keyword.as_bytes();
         let mut keyword_idx = 0;
@@ -279,6 +307,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             result
         } else if let Some(result) = self.chomp_symbol() {
             result
+        } else if let Some(result) = self.chomp_data() {
+            Ok(result)
         } else {
             Err(SyntaxError::IllegalCharacter)
         }
