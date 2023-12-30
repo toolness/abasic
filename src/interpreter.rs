@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use crate::{
     interpreter_error::{InterpreterError, TracedInterpreterError},
     program::Program,
+    syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
 };
 
@@ -146,6 +147,17 @@ impl Interpreter {
         Ok(())
     }
 
+    fn evaluate_for_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        todo!("Do something!");
+    }
+
+    fn evaluate_next_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(Token::Symbol(symbol)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        todo!("Do something with {}!", symbol);
+    }
+
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
@@ -154,6 +166,8 @@ impl Interpreter {
             Some(Token::Gosub) => self.evaluate_gosub_statement(),
             Some(Token::Return) => self.program.return_to_last_gosub(),
             Some(Token::End) => Ok(self.program.end()),
+            Some(Token::For) => self.evaluate_for_statement(),
+            Some(Token::Next) => self.evaluate_next_statement(),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
