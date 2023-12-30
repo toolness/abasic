@@ -619,7 +619,7 @@ mod tests {
             20 next i
             30 for i = 1 to 3
             40 print i
-            50 if i = 3  then end
+            50 if i = 3 then end
             60 goto 20
             "#,
             "1\n2\n3\n",
