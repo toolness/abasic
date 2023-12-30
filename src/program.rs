@@ -53,6 +53,31 @@ impl Program {
     }
 
     pub fn start_loop(&mut self, symbol: Rc<String>, to_value: f64) {
+        // TODO: We might want to check the loop stack to see if there's already
+        // a loop with the same symbol in-progress, and if so, delete everything
+        // from that point to the top of the stack. This might be necessary because
+        // loops in basic don't have any kind of "break" statement, and we don't want
+        // to memory leak if the inside of a loop uses a goto.
+        //
+        // Other notes...
+        //
+        // The following works in Applesoft BASIC (it doesn't in our implementation):
+        //
+        //   10 for i = 1 to 3
+        //   20 for j = 1 to 4
+        //   30 print "i" i "j" j
+        //   40 next i
+        //
+        // It will print "i1j1", "i2j1", "i3j1" and then exit.
+        //
+        // However, adding a "50 next j" at the end of the program *will* fail in
+        // Applesoft BASIC, with a "NEXT WITHOUT FOR ERROR IN 50".
+        //
+        // The following doesn't run out of memory in Applesoft BASIC--it just
+        // loops infinitely--while it will leak memory in our implementation:
+        //
+        //   10 for i = 1 to 3
+        //   20 goto 10
         self.loop_stack.push(LoopInfo {
             location: self.location,
             symbol,
