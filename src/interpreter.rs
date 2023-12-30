@@ -597,6 +597,21 @@ mod tests {
     }
 
     #[test]
+    fn loop_with_goto_works() {
+        assert_program_output(
+            r#"
+            10 for i = 1 to 3
+            20 if i = 2 then goto 60
+            30 print i
+            40 next i
+            50 end
+            60 print "TWO":goto 40
+            "#,
+            "1\nTWO\n3\n",
+        );
+    }
+
+    #[test]
     fn gosub_works_in_line_with_colons() {
         assert_program_output(
             r#"
