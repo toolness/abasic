@@ -53,7 +53,7 @@ impl Interpreter {
                     Ok(Value::Number(0.0))
                 }
             }
-            _ => TracedInterpreterError::unexpected_token(),
+            _ => Err(SyntaxError::UnexpectedToken.into()),
         }
     }
 
@@ -170,7 +170,7 @@ impl Interpreter {
             Some(Token::Next) => self.evaluate_next_statement(),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
-            Some(_) => TracedInterpreterError::unexpected_token(),
+            Some(_) => Err(SyntaxError::UnexpectedToken.into()),
             None => Ok(()),
         }
     }

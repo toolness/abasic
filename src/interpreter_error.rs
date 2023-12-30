@@ -29,10 +29,6 @@ pub enum OutOfMemoryError {
 }
 
 impl TracedInterpreterError {
-    pub fn unexpected_token<T>() -> Result<T, TracedInterpreterError> {
-        Err(SyntaxError::UnexpectedToken.into())
-    }
-
     pub fn set_line_number(&mut self, line_number: u64) {
         self.line_number = Some(line_number);
     }
