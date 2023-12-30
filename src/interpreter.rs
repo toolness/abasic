@@ -7,7 +7,7 @@ use crate::{
     tokenizer::{Token, Tokenizer},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Value {
     String(Rc<String>),
     Number(f64),
@@ -70,19 +70,38 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+    fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let unary_plus_or_minus = self.evaluate_plus_or_minus();
 
         let value =
             maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
         if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
-            let second_operand = self.evaluate_expression()?;
+            let second_operand = self.evaluate_plus_or_minus_expression()?;
             Ok(Value::Number(
                 unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
             ))
         } else {
             Ok(value)
         }
+    }
+
+    fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let value = self.evaluate_plus_or_minus_expression()?;
+
+        if let Some(next_token) = self.program.peek_next_token() {
+            // TODO: Add support for other boolean operators.
+            if next_token == Token::Equals {
+                self.program.consume_next_token();
+                let second_operand = self.evaluate_expression()?;
+                return if value == second_operand {
+                    Ok(Value::Number(1.0))
+                } else {
+                    Ok(Value::Number(0.0))
+                };
+            }
+        }
+
+        Ok(value)
     }
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -409,6 +428,17 @@ mod tests {
         assert_eval_output("print -4 + 4", "0\n");
         assert_eval_output("print 1 + 1", "2\n");
         assert_eval_output("print 1 + 1 - 3", "-1\n");
+    }
+
+    #[test]
+    fn print_works_with_boolean_expressions() {
+        assert_eval_output("print 1 = 2", "0\n");
+        assert_eval_output("print 1 = 1", "1\n");
+        assert_eval_output("print 2 = 2", "1\n");
+        assert_eval_output("print 1 + 1 = 3 - 1", "1\n");
+        assert_eval_output("print 1 + 1 = 4 - 1", "0\n");
+        assert_eval_output("print -1 = 1", "0\n");
+        assert_eval_output("print 1 = -1", "0\n");
     }
 
     #[test]
