@@ -7,7 +7,7 @@ mod tokenizer;
 
 use std::io::{stdin, IsTerminal};
 
-use interpreter::Interpreter;
+use interpreter::{Interpreter, InterpreterState};
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
@@ -30,18 +30,30 @@ fn run_interpreter() -> i32 {
                 if let Err(err) = rl.add_history_entry(line.as_str()) {
                     eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                 }
-                let result = interpreter.evaluate(line);
+                loop {
+                    let result = match interpreter.get_state() {
+                        InterpreterState::Idle => interpreter.evaluate(&line),
+                        InterpreterState::Running => interpreter.continue_evaluating(),
+                    };
 
-                // Regardless of whether an error occurred, show any buffered output.
-                if let Some(output) = interpreter.get_and_clear_output_buffer() {
-                    print!("{}", output);
-                }
+                    // Regardless of whether an error occurred, show any buffered output.
+                    if let Some(output) = interpreter.get_and_clear_output_buffer() {
+                        print!("{}", output);
+                    }
 
-                if let Err(err) = result {
-                    println!("{}", err);
-                    // If we're not interactive, treat errors as fatal.
-                    if !stdin().is_terminal() {
-                        return 1;
+                    if let Err(err) = result {
+                        println!("{}", err);
+                        if stdin().is_terminal() {
+                            break;
+                        } else {
+                            // If we're not interactive, treat errors as fatal.
+                            return 1;
+                        }
+                    }
+
+                    match interpreter.get_state() {
+                        InterpreterState::Idle => break,
+                        InterpreterState::Running => {}
                     }
                 }
             }

@@ -7,6 +7,12 @@ use crate::{
     tokenizer::{Token, Tokenizer},
 };
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum InterpreterState {
+    Idle,
+    Running,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     String(Rc<String>),
@@ -18,6 +24,7 @@ pub struct Interpreter {
     output: Vec<String>,
     program: Program,
     variables: HashMap<Rc<String>, Value>,
+    state: InterpreterState,
 }
 
 impl Interpreter {
@@ -26,6 +33,7 @@ impl Interpreter {
             output: vec![],
             program: Default::default(),
             variables: HashMap::new(),
+            state: InterpreterState::Idle,
         }
     }
 
@@ -216,20 +224,21 @@ impl Interpreter {
     }
 
     fn run(&mut self) -> Result<(), TracedInterpreterError> {
-        // TODO: We can't just run the program indefinitely, or else
-        // our output will never be displayed for infinite loops, and
-        // if we're run in JS we'll cause the browser to hang.  We should
-        // probably just run one statement, then yield control to the caller
-        // and rely on it to continue execution at its convenience.
-        loop {
-            while self.program.has_next_token() {
-                self.evaluate_statement()?;
-            }
+        self.state = InterpreterState::Running;
+        if self.program.has_next_token() {
+            self.evaluate_statement()?;
+        }
+        if !self.program.has_next_token() {
             if !self.program.next_line() {
-                break;
+                self.state = InterpreterState::Idle;
             }
         }
+
         Ok(())
+    }
+
+    pub fn get_state(&self) -> InterpreterState {
+        self.state
     }
 
     fn maybe_process_command(
@@ -251,23 +260,38 @@ impl Interpreter {
         return Ok(true);
     }
 
-    /// Evaluate the given line of code.
-    ///
-    /// Note that this is expected to be a *line*, i.e. it shouldn't contain
-    /// any newlines (if it does, a syntax error will be raised).
-    pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
-        let result = self.evaluate_impl(line);
+    fn postprocess_result<T>(
+        &mut self,
+        result: Result<T, TracedInterpreterError>,
+    ) -> Result<T, TracedInterpreterError> {
         if let Err(mut err) = result {
             if let Some(line_number) = self.program.get_line_number() {
                 err.set_line_number(line_number);
             }
+            self.state = InterpreterState::Idle;
             Err(err)
         } else {
             result
         }
     }
 
-    pub fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
+    pub fn continue_evaluating(&mut self) -> Result<(), TracedInterpreterError> {
+        assert_eq!(self.state, InterpreterState::Running);
+        let result = self.run();
+        self.postprocess_result(result)
+    }
+
+    /// Evaluate the given line of code.
+    ///
+    /// Note that this is expected to be a *line*, i.e. it shouldn't contain
+    /// any newlines (if it does, a syntax error will be raised).
+    pub fn evaluate<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
+        let result = self.evaluate_impl(line);
+        self.postprocess_result(result)
+    }
+
+    fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
+        assert_eq!(self.state, InterpreterState::Idle);
         let Some(char) = line.as_ref().chars().next() else {
             return Ok(());
         };
@@ -338,13 +362,24 @@ fn value_to_bool(value: &Value) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::interpreter_error::OutOfMemoryError;
+    use crate::interpreter_error::{OutOfMemoryError, TracedInterpreterError};
 
-    use super::{Interpreter, InterpreterError};
+    use super::{Interpreter, InterpreterError, InterpreterState};
+
+    fn evaluate_until_idle(
+        interpreter: &mut Interpreter,
+        line: &str,
+    ) -> Result<(), TracedInterpreterError> {
+        interpreter.evaluate(line)?;
+        while interpreter.get_state() == InterpreterState::Running {
+            interpreter.continue_evaluating()?;
+        }
+        Ok(())
+    }
 
     fn assert_eval_error(line: &'static str, expected: InterpreterError) {
         let mut interpreter = Interpreter::new();
-        match interpreter.evaluate(line) {
+        match evaluate_until_idle(&mut interpreter, line) {
             Ok(_) => {
                 panic!("expected '{}' to error but it didn't", line);
             }
@@ -376,7 +411,7 @@ mod tests {
         for line in lines {
             eval_line_and_expect_success(&mut interpreter, line);
         }
-        match interpreter.evaluate("run") {
+        match evaluate_until_idle(&mut interpreter, "run") {
             Ok(_) => {
                 panic!("expected program to error but it didn't: {}", program);
             }
@@ -390,7 +425,7 @@ mod tests {
         interpreter: &mut Interpreter,
         line: T,
     ) -> String {
-        match interpreter.evaluate(line.as_ref()) {
+        match evaluate_until_idle(interpreter, line.as_ref()) {
             Ok(_) => interpreter
                 .get_and_clear_output_buffer()
                 .unwrap_or_default(),
