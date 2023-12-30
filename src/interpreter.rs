@@ -146,18 +146,14 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate_return_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        self.program.return_to_last_gosub()?;
-        Ok(())
-    }
-
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Goto) => self.evaluate_goto_statement(),
             Some(Token::Gosub) => self.evaluate_gosub_statement(),
-            Some(Token::Return) => self.evaluate_return_statement(),
+            Some(Token::Return) => self.program.return_to_last_gosub(),
+            Some(Token::End) => Ok(self.program.end()),
             Some(Token::Colon) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => TracedInterpreterError::unexpected_token(),
@@ -466,6 +462,19 @@ mod tests {
             20 goto 40
             30 print "THIS SHOULD NOT PRINT"
             40 print "dog"
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn end_works() {
+        assert_program_output(
+            r#"
+            10 print "sup"
+            20 print "dog"
+            30 end
+            40 print "THIS SHOULD NOT PRINT"
             "#,
             "sup\ndog\n",
         );

@@ -52,7 +52,7 @@ impl Program {
         } else {
             // Applesoft basic just does nothing when RUN is executed
             // in an empty program, so we'll do that too.
-            self.set_and_goto_immediate_line(vec![]);
+            self.end();
         };
     }
 
@@ -84,6 +84,10 @@ impl Program {
         };
         self.location = return_location;
         Ok(())
+    }
+
+    pub fn end(&mut self) {
+        self.set_and_goto_immediate_line(vec![]);
     }
 
     /// Returns the line number currently being evaluated.
