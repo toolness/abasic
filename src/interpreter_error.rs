@@ -15,13 +15,12 @@ pub struct TracedInterpreterError {
 
 #[derive(Debug, PartialEq)]
 pub enum InterpreterError {
-    // TODO: Remove 'Error' from the end of these enum names, it's redundant.
-    SyntaxError(SyntaxError),
+    Syntax(SyntaxError),
     TypeMismatch,
-    UndefinedStatementError,
-    OutOfMemoryError(OutOfMemoryError),
-    ReturnWithoutGosubError,
-    NextWithoutForError,
+    UndefinedStatement,
+    OutOfMemory(OutOfMemoryError),
+    ReturnWithoutGosub,
+    NextWithoutFor,
 }
 
 #[derive(Debug, PartialEq)]
@@ -38,7 +37,7 @@ impl TracedInterpreterError {
 impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
         TracedInterpreterError {
-            error: InterpreterError::SyntaxError(value),
+            error: InterpreterError::Syntax(value),
             line_number: None,
             backtrace: Backtrace::capture(),
         }
@@ -48,7 +47,7 @@ impl From<SyntaxError> for TracedInterpreterError {
 impl From<OutOfMemoryError> for TracedInterpreterError {
     fn from(value: OutOfMemoryError) -> Self {
         TracedInterpreterError {
-            error: InterpreterError::OutOfMemoryError(value),
+            error: InterpreterError::OutOfMemory(value),
             line_number: None,
             backtrace: Backtrace::capture(),
         }
@@ -70,22 +69,22 @@ impl Error for TracedInterpreterError {}
 impl Display for TracedInterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.error {
-            InterpreterError::SyntaxError(err) => {
+            InterpreterError::Syntax(err) => {
                 write!(f, "{}", err)?;
             }
             InterpreterError::TypeMismatch => {
                 write!(f, "TYPE MISMATCH")?;
             }
-            InterpreterError::UndefinedStatementError => {
+            InterpreterError::UndefinedStatement => {
                 write!(f, "UNDEF'D STATEMENT ERROR")?;
             }
-            InterpreterError::OutOfMemoryError(err) => {
+            InterpreterError::OutOfMemory(err) => {
                 write!(f, "OUT OF MEMORY ERROR ({:?})", err)?;
             }
-            InterpreterError::ReturnWithoutGosubError => {
+            InterpreterError::ReturnWithoutGosub => {
                 write!(f, "RETURN WITHOUT GOSUB ERROR")?;
             }
-            InterpreterError::NextWithoutForError => {
+            InterpreterError::NextWithoutFor => {
                 write!(f, "NEXT WITHOUT FOR ERROR")?;
             }
         }

@@ -133,7 +133,7 @@ impl Interpreter {
 
     fn evaluate_goto_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let Some(Token::NumericLiteral(line_number)) = self.program.next_token() else {
-            return Err(InterpreterError::UndefinedStatementError.into());
+            return Err(InterpreterError::UndefinedStatement.into());
         };
         self.program.goto_line_number(line_number as u64)?;
         Ok(())
@@ -141,7 +141,7 @@ impl Interpreter {
 
     fn evaluate_gosub_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let Some(Token::NumericLiteral(line_number)) = self.program.next_token() else {
-            return Err(InterpreterError::UndefinedStatementError.into());
+            return Err(InterpreterError::UndefinedStatement.into());
         };
         self.program.gosub_line_number(line_number as u64)?;
         Ok(())
@@ -170,7 +170,7 @@ impl Interpreter {
             return Err(SyntaxError::UnexpectedToken.into());
         };
         let Some(current_value) = self.variables.get(&symbol) else {
-            return Err(InterpreterError::NextWithoutForError.into());
+            return Err(InterpreterError::NextWithoutFor.into());
         };
         let current_number = unwrap_number(current_value.clone())?;
         let new_number = self.program.end_loop(symbol.clone(), current_number)?;
@@ -466,14 +466,11 @@ mod tests {
 
     #[test]
     fn next_without_for_error_works() {
-        assert_eval_error("next i", InterpreterError::NextWithoutForError);
-        assert_eval_error(
-            "for i = 1 to 3:next j",
-            InterpreterError::NextWithoutForError,
-        );
+        assert_eval_error("next i", InterpreterError::NextWithoutFor);
+        assert_eval_error("for i = 1 to 3:next j", InterpreterError::NextWithoutFor);
         assert_eval_error(
             "for j = 1 to 3:for i = 1 to 3:next j:next i",
-            InterpreterError::NextWithoutForError,
+            InterpreterError::NextWithoutFor,
         );
     }
 
@@ -486,15 +483,15 @@ mod tests {
 
     #[test]
     fn undefined_statement_error_works() {
-        assert_eval_error("goto 30", InterpreterError::UndefinedStatementError);
-        assert_eval_error("goto x", InterpreterError::UndefinedStatementError);
-        assert_eval_error("gosub 30", InterpreterError::UndefinedStatementError);
-        assert_eval_error("gosub x", InterpreterError::UndefinedStatementError);
+        assert_eval_error("goto 30", InterpreterError::UndefinedStatement);
+        assert_eval_error("goto x", InterpreterError::UndefinedStatement);
+        assert_eval_error("gosub 30", InterpreterError::UndefinedStatement);
+        assert_eval_error("gosub x", InterpreterError::UndefinedStatement);
     }
 
     #[test]
     fn return_without_gosub_error_works() {
-        assert_eval_error("return", InterpreterError::ReturnWithoutGosubError);
+        assert_eval_error("return", InterpreterError::ReturnWithoutGosub);
     }
 
     #[test]
@@ -582,7 +579,7 @@ mod tests {
             10 print "hi"
             20 gosub 10
             "#,
-            InterpreterError::OutOfMemoryError(OutOfMemoryError::StackOverflow),
+            InterpreterError::OutOfMemory(OutOfMemoryError::StackOverflow),
         );
     }
 

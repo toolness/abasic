@@ -66,11 +66,11 @@ impl Program {
         current_value: f64,
     ) -> Result<f64, TracedInterpreterError> {
         let Some(loop_info) = self.loop_stack.pop() else {
-            return Err(InterpreterError::NextWithoutForError.into());
+            return Err(InterpreterError::NextWithoutFor.into());
         };
 
         if loop_info.symbol != symbol {
-            return Err(InterpreterError::NextWithoutForError.into());
+            return Err(InterpreterError::NextWithoutFor.into());
         }
 
         let new_value = current_value + 1.0;
@@ -106,7 +106,7 @@ impl Program {
             };
             Ok(())
         } else {
-            Err(InterpreterError::UndefinedStatementError.into())
+            Err(InterpreterError::UndefinedStatement.into())
         }
     }
 
@@ -122,7 +122,7 @@ impl Program {
 
     pub fn return_to_last_gosub(&mut self) -> Result<(), TracedInterpreterError> {
         let Some(return_location) = self.stack.pop() else {
-            return Err(InterpreterError::ReturnWithoutGosubError.into());
+            return Err(InterpreterError::ReturnWithoutGosub.into());
         };
         self.location = return_location;
         Ok(())
