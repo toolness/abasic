@@ -157,6 +157,9 @@ impl Interpreter {
         self.program.expect_next_token(Token::To)?;
         let to_value = self.evaluate_expression()?;
         let to_number = unwrap_number(to_value)?;
+
+        // TODO: Add support for STEP.
+
         self.program.start_loop(symbol.clone(), to_number);
         self.variables.insert(symbol, Value::Number(from_number));
         Ok(())
