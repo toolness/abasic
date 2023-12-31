@@ -22,10 +22,45 @@ enum Value {
 impl Value {
     fn default_for_variable<T: AsRef<str>>(variable_name: T) -> Self {
         if variable_name.as_ref().ends_with('$') {
-            Value::String(Rc::new(String::default()))
+            String::default().into()
         } else {
-            Value::Number(f64::default())
+            f64::default().into()
         }
+    }
+
+    fn typecast_for_variable_name<T: AsRef<str>>(
+        self,
+        variable_name: T,
+    ) -> Result<Self, TracedInterpreterError> {
+        if variable_name.as_ref().ends_with('$') {
+            match self {
+                Value::String(_) => Ok(self),
+                Value::Number(value) => Ok(value.to_string().into()),
+            }
+        } else {
+            match self {
+                Value::String(_) => Err(InterpreterError::TypeMismatch.into()),
+                Value::Number(_) => Ok(self),
+            }
+        }
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::String(Rc::new(value))
+    }
+}
+
+impl From<Rc<String>> for Value {
+    fn from(value: Rc<String>) -> Self {
+        Value::String(value.clone())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::Number(value)
     }
 }
 
@@ -59,8 +94,8 @@ impl Interpreter {
 
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.program.next_unwrapped_token()? {
-            Token::StringLiteral(string) => Ok(Value::String(string.clone())),
-            Token::NumericLiteral(number) => Ok(Value::Number(number)),
+            Token::StringLiteral(string) => Ok(string.into()),
+            Token::NumericLiteral(number) => Ok(number.into()),
             Token::Symbol(variable) => {
                 if let Some(value) = self.variables.get(&variable) {
                     Ok(value.clone())
@@ -94,9 +129,9 @@ impl Interpreter {
             maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
         if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
-            Ok(Value::Number(
-                unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus,
-            ))
+            let result =
+                unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus;
+            Ok(result.into())
         } else {
             Ok(value)
         }
@@ -111,9 +146,9 @@ impl Interpreter {
                 self.program.consume_next_token();
                 let second_operand = self.evaluate_expression()?;
                 return if value == second_operand {
-                    Ok(Value::Number(1.0))
+                    Ok(1.0.into())
                 } else {
-                    Ok(Value::Number(0.0))
+                    Ok(0.0.into())
                 };
             }
         }
@@ -142,9 +177,9 @@ impl Interpreter {
         variable: Rc<String>,
     ) -> Result<(), TracedInterpreterError> {
         self.program.expect_next_token(Token::Equals)?;
-        let value = self.evaluate_expression()?;
-        // TODO: We should only allow assigning numbers to variables that don't end
-        // with `$`, and only allow assigning strings to ones that end with `$`.
+        let value = self
+            .evaluate_expression()?
+            .typecast_for_variable_name(variable.as_str())?;
         self.variables.insert(variable, value);
         Ok(())
     }
@@ -197,7 +232,7 @@ impl Interpreter {
         // TODO: Add support for STEP.
 
         self.program.start_loop(symbol.clone(), to_number);
-        self.variables.insert(symbol, Value::Number(from_number));
+        self.variables.insert(symbol, from_number.into());
         Ok(())
     }
 
@@ -210,7 +245,7 @@ impl Interpreter {
         };
         let current_number = unwrap_number(current_value.clone())?;
         let new_number = self.program.end_loop(symbol.clone(), current_number)?;
-        self.variables.insert(symbol, Value::Number(new_number));
+        self.variables.insert(symbol, new_number.into());
         Ok(())
     }
 
@@ -364,7 +399,7 @@ fn maybe_apply_unary_plus_or_minus(
     value: Value,
 ) -> Result<Value, TracedInterpreterError> {
     if let Some(unary_sign) = unary_sign {
-        Ok(Value::Number(unwrap_number(value)? * unary_sign))
+        Ok((unwrap_number(value)? * unary_sign).into())
     } else {
         Ok(value)
     }
@@ -585,10 +620,16 @@ mod tests {
     }
 
     #[test]
-    fn type_mismatch_error_works() {
+    fn type_mismatch_error_works_with_expressions() {
         assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
         assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
         assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
+    }
+
+    #[test]
+    fn type_mismatch_error_works_with_variables() {
+        assert_eval_error("x = x$", InterpreterError::TypeMismatch);
+        assert_eval_error("x = \"hi\"", InterpreterError::TypeMismatch);
     }
 
     #[test]
