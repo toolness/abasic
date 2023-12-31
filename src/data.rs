@@ -245,7 +245,14 @@ mod tests {
 
     #[test]
     fn parsing_unquoted_string_with_quotes_in_does_not_work_when_starting_with_quoted_string() {
-        // This is weird but might as well document it...
+        // This is weird but might as well document it.
+        //
+        // Note that Applesoft BASIC will actually reject this with a syntax error, e.g.:
+        //
+        //   10 DATA "hello" there
+        //   20 READ A$
+        //
+        // Running this will print "SYNTAX ERROR IN 10".
         assert_parse_all_data("\"hello\" there", &[string("hello"), string("there")]);
     }
 
