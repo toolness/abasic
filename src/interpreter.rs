@@ -28,19 +28,19 @@ impl Value {
         }
     }
 
-    fn typecast_for_variable_name<T: AsRef<str>>(
-        self,
+    fn validate_type_matches_variable_name<T: AsRef<str>>(
+        &self,
         variable_name: T,
-    ) -> Result<Self, TracedInterpreterError> {
+    ) -> Result<(), TracedInterpreterError> {
         if variable_name.as_ref().ends_with('$') {
             match self {
-                Value::String(_) => Ok(self),
-                Value::Number(value) => Ok(value.to_string().into()),
+                Value::String(_) => Ok(()),
+                Value::Number(_) => Err(InterpreterError::TypeMismatch.into()),
             }
         } else {
             match self {
                 Value::String(_) => Err(InterpreterError::TypeMismatch.into()),
-                Value::Number(_) => Ok(self),
+                Value::Number(_) => Ok(()),
             }
         }
     }
@@ -177,9 +177,8 @@ impl Interpreter {
         variable: Rc<String>,
     ) -> Result<(), TracedInterpreterError> {
         self.program.expect_next_token(Token::Equals)?;
-        let value = self
-            .evaluate_expression()?
-            .typecast_for_variable_name(variable.as_str())?;
+        let value = self.evaluate_expression()?;
+        value.validate_type_matches_variable_name(variable.as_str())?;
         self.variables.insert(variable, value);
         Ok(())
     }
@@ -630,6 +629,9 @@ mod tests {
     fn type_mismatch_error_works_with_variables() {
         assert_eval_error("x = x$", InterpreterError::TypeMismatch);
         assert_eval_error("x = \"hi\"", InterpreterError::TypeMismatch);
+
+        assert_eval_error("x$ = x", InterpreterError::TypeMismatch);
+        assert_eval_error("x$ = 1", InterpreterError::TypeMismatch);
     }
 
     #[test]
