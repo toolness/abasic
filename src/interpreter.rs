@@ -19,6 +19,15 @@ enum Value {
     Number(f64),
 }
 
+impl Value {
+    fn to_bool(&self) -> bool {
+        match self {
+            Value::String(string) => !string.is_empty(),
+            Value::Number(number) => *number != 0.0,
+        }
+    }
+}
+
 enum EqualityOp {
     EqualTo,
     // TODO: Add support for other boolean operators.
@@ -191,7 +200,7 @@ impl Interpreter {
         // book seems to include ELSE clauses only in the form of line
         // numbers, e.g. `IF X THEN 100 ELSE 200`, which seems like a
         // reasonable compromise.
-        if value_to_bool(&conditional_value) {
+        if conditional_value.to_bool() {
             self.evaluate_statement()
         } else {
             self.program.discard_remaining_tokens();
@@ -442,13 +451,6 @@ fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
         Ok(number)
     } else {
         Err(InterpreterError::TypeMismatch.into())
-    }
-}
-
-fn value_to_bool(value: &Value) -> bool {
-    match value {
-        Value::String(string) => !string.is_empty(),
-        Value::Number(number) => *number != 0.0,
     }
 }
 
