@@ -19,6 +19,38 @@ enum Value {
     Number(f64),
 }
 
+enum EqualityOp {
+    EqualTo,
+    // TODO: Add support for other boolean operators.
+}
+
+impl EqualityOp {
+    // I considered TryFrom here but it required an associated Error type
+    // and I just wanted to use Option.
+    fn from_token(token: &Token) -> Option<Self> {
+        match token {
+            Token::Equals => Some(EqualityOp::EqualTo),
+            _ => None,
+        }
+    }
+
+    fn evaluate(
+        &self,
+        left_side: &Value,
+        right_side: &Value,
+    ) -> Result<Value, TracedInterpreterError> {
+        let result: bool = match self {
+            EqualityOp::EqualTo => left_side == right_side,
+        };
+        // This is how Applesoft BASIC evaluates equality expressions.
+        if result {
+            Ok(1.0.into())
+        } else {
+            Ok(0.0.into())
+        }
+    }
+}
+
 impl Value {
     fn default_for_variable<T: AsRef<str>>(variable_name: T) -> Self {
         if variable_name.as_ref().ends_with('$') {
@@ -141,15 +173,10 @@ impl Interpreter {
         let value = self.evaluate_plus_or_minus_expression()?;
 
         if let Some(next_token) = self.program.peek_next_token() {
-            // TODO: Add support for other boolean operators.
-            if next_token == Token::Equals {
+            if let Some(equality_op) = EqualityOp::from_token(&next_token) {
                 self.program.consume_next_token();
                 let second_operand = self.evaluate_expression()?;
-                return if value == second_operand {
-                    Ok(1.0.into())
-                } else {
-                    Ok(0.0.into())
-                };
+                return equality_op.evaluate(&value, &second_operand);
             }
         }
 
