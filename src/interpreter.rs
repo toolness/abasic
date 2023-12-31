@@ -19,6 +19,16 @@ enum Value {
     Number(f64),
 }
 
+impl Value {
+    fn default_for_variable<T: AsRef<str>>(variable_name: T) -> Self {
+        if variable_name.as_ref().ends_with('$') {
+            Value::String(Rc::new(String::default()))
+        } else {
+            Value::Number(f64::default())
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Interpreter {
     output: Vec<String>,
@@ -57,8 +67,7 @@ impl Interpreter {
                 } else {
                     // TODO: It'd be nice to at least log a warning or something here, since
                     //       this can be a notorious source of bugs.
-                    // TODO: If the variable ends with `$` we should return an empty string.
-                    Ok(Value::Number(0.0))
+                    Ok(Value::default_for_variable(variable.as_str()))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken.into()),
@@ -526,6 +535,17 @@ mod tests {
         assert_eval_output("x=1+1:print x", "2\n");
         assert_eval_output("x=1:print x + 2", "3\n");
         assert_eval_output("x=1:print x:x = x + 1:print x", "1\n2\n");
+    }
+
+    #[test]
+    fn default_number_values_work() {
+        assert_eval_output("print x", "0\n");
+        assert_eval_output("x = x + 1:print x", "1\n");
+    }
+
+    #[test]
+    fn default_string_values_work() {
+        assert_eval_output("print x$", "\n");
     }
 
     #[test]
