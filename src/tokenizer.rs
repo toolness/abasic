@@ -116,11 +116,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 break;
             };
 
-            // TODO: Symbols can end with `$`, we should support it.
+            let char_is_dollar_sign = char == b'$';
+
             let is_valid = if chars.is_empty() {
                 char.is_ascii_alphabetic()
             } else {
-                char.is_ascii_alphanumeric()
+                char.is_ascii_alphanumeric() || char_is_dollar_sign
             };
 
             if !is_valid {
@@ -129,6 +130,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
             chars.push(char.to_ascii_uppercase());
             self.index += pos;
+
+            if char_is_dollar_sign {
+                break;
+            }
 
             // Because of line crunching, it's possible that we have a
             // keyword immediately following a symbol. If this happens,
@@ -495,6 +500,12 @@ mod tests {
     }
 
     #[test]
+    fn parsing_symbol_with_dollar_sign_works() {
+        assert_values_parse_to_tokens(&["x$", " x $", "  x$  "], &[symbol("X$")]);
+        assert_values_parse_to_tokens(&["x$u", " x $u", "  x$u  "], &[symbol("X$"), symbol("U")]);
+    }
+
+    #[test]
     fn parsing_data_works() {
         use crate::data::test_util::{number, string};
 
@@ -516,7 +527,7 @@ mod tests {
     #[test]
     fn parsing_single_illegal_character_returns_error() {
         assert_values_parse_to_tokens_wrapped(
-            &["?", " %", "😊", "\n"],
+            &["?", " %", "😊", "\n", "$"],
             &[Err(SyntaxError::IllegalCharacter)],
         );
     }
