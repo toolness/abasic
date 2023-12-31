@@ -412,6 +412,8 @@ impl Interpreter {
     }
 }
 
+/// Parses a plus or minus sign, returning 1.0 for plus and
+/// -1.0 for minus, or None if it's something else.
 fn parse_plus_or_minus(token: &Token) -> Option<f64> {
     match &token {
         Token::Plus => Some(1.0),
@@ -420,6 +422,8 @@ fn parse_plus_or_minus(token: &Token) -> Option<f64> {
     }
 }
 
+/// Applies the result of `parse_plus_or_minus` to the
+/// given value as a unary operator.
 fn maybe_apply_unary_plus_or_minus(
     unary_sign: Option<f64>,
     value: Value,
@@ -431,6 +435,8 @@ fn maybe_apply_unary_plus_or_minus(
     }
 }
 
+/// Assume the given value wraps a number and return it; if it doesn't,
+/// return a type mismatch error.
 fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
     if let Value::Number(number) = value {
         Ok(number)
