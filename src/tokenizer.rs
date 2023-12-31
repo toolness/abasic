@@ -163,8 +163,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
         let mut latest_pos: Option<usize> = None;
 
         for (byte, pos) in self.crunch_remaining_bytes() {
-            // TODO: We should support decimals too.
-            if byte.is_ascii_digit() {
+            // TODO: We don't currently support scientific notation like ".1e10".
+
+            // Note that we're not concerned with whether the decimal is in
+            // the right place, we'll deal with that later when we parse the
+            // final number.
+            if byte.is_ascii_digit() || byte == b'.' {
                 latest_pos = Some(pos);
                 digits.push(byte as char);
             } else {
@@ -415,6 +419,22 @@ mod tests {
                 tokens
             );
         }
+    }
+
+    #[test]
+    fn parsing_decimal_number_works() {
+        assert_values_parse_to_tokens(
+            &[".1", " .1", " .10 ", "0000.10000"],
+            &[Token::NumericLiteral(0.1)],
+        );
+    }
+
+    #[test]
+    fn parsing_invalid_decimal_number_returns_error() {
+        assert_values_parse_to_tokens_wrapped(
+            &[".1.", " .1..", " ..10 "],
+            &[Err(SyntaxError::InvalidNumber)],
+        );
     }
 
     #[test]
