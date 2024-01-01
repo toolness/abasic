@@ -260,6 +260,12 @@ impl Program {
         }
     }
 
+    /// Calls the given function with the next token and returns the result.
+    ///
+    /// If the function returns a `Some` value, our position in the stream advances.
+    ///
+    /// If we're already at the end of the stream, the function isn't called, and
+    /// `None` is returned.
     pub fn try_next_token<T, F>(&mut self, f: F) -> Option<T>
     where
         F: FnOnce(Token) -> Option<T>,
