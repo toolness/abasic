@@ -28,6 +28,18 @@ impl Value {
     }
 }
 
+impl TryFrom<Value> for f64 {
+    type Error = TracedInterpreterError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Number(number) = value {
+            Ok(number)
+        } else {
+            Err(InterpreterError::TypeMismatch.into())
+        }
+    }
+}
+
 #[derive(PartialEq)]
 enum PlusOrMinusOp {
     Plus,
@@ -46,7 +58,7 @@ impl PlusOrMinusOp {
     }
 
     fn evaluate_unary(&self, value: Value) -> Result<Value, TracedInterpreterError> {
-        let mut number = unwrap_number(value)?;
+        let mut number: f64 = value.try_into()?;
 
         if self == &PlusOrMinusOp::Minus {
             number *= -1.0;
@@ -375,10 +387,10 @@ impl Interpreter {
         };
         self.program.expect_next_token(Token::Equals)?;
         let from_value = self.evaluate_expression()?;
-        let from_number = unwrap_number(from_value)?;
+        let from_number: f64 = from_value.try_into()?;
         self.program.expect_next_token(Token::To)?;
         let to_value = self.evaluate_expression()?;
-        let to_number = unwrap_number(to_value)?;
+        let to_number: f64 = to_value.try_into()?;
 
         // TODO: Add support for STEP.
 
@@ -394,7 +406,7 @@ impl Interpreter {
         let Some(current_value) = self.variables.get(&symbol) else {
             return Err(InterpreterError::NextWithoutFor.into());
         };
-        let current_number = unwrap_number(current_value.clone())?;
+        let current_number: f64 = current_value.clone().try_into()?;
         let new_number = self.program.end_loop(symbol.clone(), current_number)?;
         self.variables.insert(symbol, new_number.into());
         Ok(())
@@ -534,18 +546,6 @@ impl Interpreter {
         }
 
         Ok(())
-    }
-}
-
-/// Assume the given value wraps a number and return it; if it doesn't,
-/// return a type mismatch error.
-///
-/// TODO: Can we make this a TryFrom/TryInto instead?
-fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
-    if let Value::Number(number) = value {
-        Ok(number)
-    } else {
-        Err(InterpreterError::TypeMismatch.into())
     }
 }
 
