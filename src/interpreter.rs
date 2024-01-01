@@ -413,6 +413,7 @@ impl Interpreter {
             Some(Token::Next) => self.evaluate_next_statement(),
             Some(Token::Remark(_)) => Ok(()),
             Some(Token::Colon) => Ok(()),
+            Some(Token::Data(_)) => Ok(()),
             Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
             Some(_) => Err(SyntaxError::UnexpectedToken.into()),
             None => Ok(()),
@@ -805,6 +806,11 @@ mod tests {
     #[test]
     fn return_without_gosub_error_works() {
         assert_eval_error("return", InterpreterError::ReturnWithoutGosub);
+    }
+
+    #[test]
+    fn data_is_ignored() {
+        assert_eval_output("print 1:data a,b,c:print 2", "1\n2\n");
     }
 
     #[test]
