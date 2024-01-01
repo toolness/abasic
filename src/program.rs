@@ -260,6 +260,20 @@ impl Program {
         }
     }
 
+    /// Checks to see if the next token in the stream is the given token.
+    ///
+    /// If it is, then our position in the stream advances and we return `true`.
+    ///
+    /// Otherwise, we return `false`.
+    pub fn accept_next_token(&mut self, token: Token) -> bool {
+        if self.peek_next_token() == Some(token) {
+            self.location.token_index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Calls the given function with the next token and returns the result.
     ///
     /// If the function returns a `Some` value, our position in the stream advances.

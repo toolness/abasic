@@ -253,12 +253,20 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_unary_plus_or_minus_expression_term(
-        &mut self,
-    ) -> Result<Value, TracedInterpreterError> {
+    fn evaluate_parenthesized_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        if self.program.accept_next_token(Token::LeftParen) {
+            let value = self.evaluate_expression()?;
+            self.program.expect_next_token(Token::RightParen)?;
+            Ok(value)
+        } else {
+            self.evaluate_expression_term()
+        }
+    }
+
+    fn evaluate_unary_plus_or_minus(&mut self) -> Result<Value, TracedInterpreterError> {
         let maybe_plus_or_minus = self.program.try_next_token(PlusOrMinusOp::from_token);
 
-        let value = self.evaluate_expression_term()?;
+        let value = self.evaluate_parenthesized_expression()?;
 
         if let Some(plus_or_minus) = maybe_plus_or_minus {
             Ok(plus_or_minus.evaluate_unary(value)?)
@@ -268,7 +276,7 @@ impl Interpreter {
     }
 
     fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let value = self.evaluate_unary_plus_or_minus_expression_term()?;
+        let value = self.evaluate_unary_plus_or_minus()?;
 
         if let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
             let second_operand = self.evaluate_multiply_or_divide_expression()?;
@@ -642,6 +650,7 @@ mod tests {
         assert_eval_output("print 2 * -3", "-6\n");
         assert_eval_output("print 2 + 5 * 4 - 1", "21\n");
         assert_eval_output("print 5 * 4 * 2", "40\n");
+        assert_eval_output("print (5 + 3) * 4", "32\n");
     }
 
     #[test]
