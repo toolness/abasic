@@ -260,13 +260,20 @@ impl Program {
         }
     }
 
-    /// Advance to the next token in the stream, panicking if there are
-    /// no more tokens. This should only be used after e.g. calling
-    /// `peek_next_token` and verifying that the next token actually
-    /// exists.
-    pub fn consume_next_token(&mut self) {
-        self.tokens().get(self.location.token_index).unwrap();
-        self.location.token_index += 1;
+    pub fn try_next_token<T, F>(&mut self, f: F) -> Option<T>
+    where
+        F: FnOnce(Token) -> Option<T>,
+    {
+        if let Some(next_token) = self.peek_next_token() {
+            if let Some(t) = f(next_token) {
+                self.location.token_index += 1;
+                Some(t)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     /// Throw away any remaining tokens.

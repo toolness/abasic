@@ -49,7 +49,7 @@ enum PlusOrMinusOp {
 impl PlusOrMinusOp {
     // I considered TryFrom here but it required an associated Error type
     // and I just wanted to use Option.
-    fn from_token(token: &Token) -> Option<Self> {
+    fn from_token(token: Token) -> Option<Self> {
         match &token {
             Token::Plus => Some(PlusOrMinusOp::Plus),
             Token::Minus => Some(PlusOrMinusOp::Minus),
@@ -91,7 +91,7 @@ enum MultiplyOrDivideOp {
 impl MultiplyOrDivideOp {
     // I considered TryFrom here but it required an associated Error type
     // and I just wanted to use Option.
-    fn from_token(token: &Token) -> Option<Self> {
+    fn from_token(token: Token) -> Option<Self> {
         match token {
             Token::Multiply => Some(MultiplyOrDivideOp::Multiply),
             Token::Divide => Some(MultiplyOrDivideOp::Divide),
@@ -125,7 +125,7 @@ enum EqualityOp {
 impl EqualityOp {
     // I considered TryFrom here but it required an associated Error type
     // and I just wanted to use Option.
-    fn from_token(token: &Token) -> Option<Self> {
+    fn from_token(token: Token) -> Option<Self> {
         match token {
             Token::Equals => Some(EqualityOp::EqualTo),
             Token::LessThan => Some(EqualityOp::LessThan),
@@ -256,7 +256,7 @@ impl Interpreter {
     fn evaluate_unary_plus_or_minus_expression_term(
         &mut self,
     ) -> Result<Value, TracedInterpreterError> {
-        let maybe_plus_or_minus = self.parse_plus_or_minus_op();
+        let maybe_plus_or_minus = self.program.try_next_token(PlusOrMinusOp::from_token);
 
         let value = self.evaluate_expression_term()?;
 
@@ -267,28 +267,12 @@ impl Interpreter {
         }
     }
 
-    fn parse_plus_or_minus_op(&mut self) -> Option<PlusOrMinusOp> {
-        if let Some(next_token) = self.program.peek_next_token() {
-            if let Some(op) = PlusOrMinusOp::from_token(&next_token) {
-                self.program.consume_next_token();
-                Some(op)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
     fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let value = self.evaluate_unary_plus_or_minus_expression_term()?;
 
-        if let Some(next_token) = self.program.peek_next_token() {
-            if let Some(op) = MultiplyOrDivideOp::from_token(&next_token) {
-                self.program.consume_next_token();
-                let second_operand = self.evaluate_unary_plus_or_minus_expression_term()?;
-                return op.evaluate(&value, &second_operand);
-            }
+        if let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
+            let second_operand = self.evaluate_unary_plus_or_minus_expression_term()?;
+            return op.evaluate(&value, &second_operand);
         }
 
         Ok(value)
@@ -297,7 +281,7 @@ impl Interpreter {
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let value = self.evaluate_multiply_or_divide_expression()?;
 
-        if let Some(plus_or_minus) = self.parse_plus_or_minus_op() {
+        if let Some(plus_or_minus) = self.program.try_next_token(PlusOrMinusOp::from_token) {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
             let result = plus_or_minus.evaluate_binary(&value, &second_operand)?;
             Ok(result.into())
@@ -309,12 +293,9 @@ impl Interpreter {
     fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let value = self.evaluate_plus_or_minus_expression()?;
 
-        if let Some(next_token) = self.program.peek_next_token() {
-            if let Some(equality_op) = EqualityOp::from_token(&next_token) {
-                self.program.consume_next_token();
-                let second_operand = self.evaluate_expression()?;
-                return equality_op.evaluate(&value, &second_operand);
-            }
+        if let Some(equality_op) = self.program.try_next_token(EqualityOp::from_token) {
+            let second_operand = self.evaluate_expression()?;
+            return equality_op.evaluate(&value, &second_operand);
         }
 
         Ok(value)
