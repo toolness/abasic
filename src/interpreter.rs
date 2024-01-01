@@ -28,6 +28,49 @@ impl Value {
     }
 }
 
+#[derive(PartialEq)]
+enum PlusOrMinusOp {
+    Plus,
+    Minus,
+}
+
+impl PlusOrMinusOp {
+    // I considered TryFrom here but it required an associated Error type
+    // and I just wanted to use Option.
+    fn from_token(token: &Token) -> Option<Self> {
+        match &token {
+            Token::Plus => Some(PlusOrMinusOp::Plus),
+            Token::Minus => Some(PlusOrMinusOp::Minus),
+            _ => None,
+        }
+    }
+
+    fn evaluate_unary(&self, value: Value) -> Result<Value, TracedInterpreterError> {
+        let mut number = unwrap_number(value)?;
+
+        if self == &PlusOrMinusOp::Minus {
+            number *= -1.0;
+        }
+
+        Ok(number.into())
+    }
+
+    fn evaluate_binary(
+        &self,
+        left_side: &Value,
+        right_side: &Value,
+    ) -> Result<Value, TracedInterpreterError> {
+        let result = match (left_side, right_side) {
+            (Value::Number(l), Value::Number(r)) => match self {
+                PlusOrMinusOp::Plus => l + r,
+                PlusOrMinusOp::Minus => l - r,
+            },
+            _ => return Err(InterpreterError::TypeMismatch.into()),
+        };
+        Ok(result.into())
+    }
+}
+
 enum MultiplyOrDivideOp {
     Multiply,
     Divide,
@@ -198,11 +241,25 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_plus_or_minus(&mut self) -> Option<f64> {
+    fn evaluate_unary_plus_or_minus_expression_term(
+        &mut self,
+    ) -> Result<Value, TracedInterpreterError> {
+        let maybe_plus_or_minus = self.parse_plus_or_minus_op();
+
+        let value = self.evaluate_expression_term()?;
+
+        if let Some(plus_or_minus) = maybe_plus_or_minus {
+            Ok(plus_or_minus.evaluate_unary(value)?)
+        } else {
+            Ok(value)
+        }
+    }
+
+    fn parse_plus_or_minus_op(&mut self) -> Option<PlusOrMinusOp> {
         if let Some(next_token) = self.program.peek_next_token() {
-            if let Some(unary_plus_or_minus) = parse_plus_or_minus(&next_token) {
+            if let Some(op) = PlusOrMinusOp::from_token(&next_token) {
                 self.program.consume_next_token();
-                Some(unary_plus_or_minus)
+                Some(op)
             } else {
                 None
             }
@@ -212,12 +269,12 @@ impl Interpreter {
     }
 
     fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let value = self.evaluate_expression_term()?;
+        let value = self.evaluate_unary_plus_or_minus_expression_term()?;
 
         if let Some(next_token) = self.program.peek_next_token() {
             if let Some(op) = MultiplyOrDivideOp::from_token(&next_token) {
                 self.program.consume_next_token();
-                let second_operand = self.evaluate_expression_term()?;
+                let second_operand = self.evaluate_unary_plus_or_minus_expression_term()?;
                 return op.evaluate(&value, &second_operand);
             }
         }
@@ -226,16 +283,11 @@ impl Interpreter {
     }
 
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let unary_plus_or_minus = self.evaluate_plus_or_minus();
+        let value = self.evaluate_multiply_or_divide_expression()?;
 
-        let value = maybe_apply_unary_plus_or_minus(
-            unary_plus_or_minus,
-            self.evaluate_multiply_or_divide_expression()?,
-        )?;
-        if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
+        if let Some(plus_or_minus) = self.parse_plus_or_minus_op() {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
-            let result =
-                unwrap_number(value)? + unwrap_number(second_operand)? * binary_plus_or_minus;
+            let result = plus_or_minus.evaluate_binary(&value, &second_operand)?;
             Ok(result.into())
         } else {
             Ok(value)
@@ -485,31 +537,10 @@ impl Interpreter {
     }
 }
 
-/// Parses a plus or minus sign, returning 1.0 for plus and
-/// -1.0 for minus, or None if it's something else.
-fn parse_plus_or_minus(token: &Token) -> Option<f64> {
-    match &token {
-        Token::Plus => Some(1.0),
-        Token::Minus => Some(-1.0),
-        _ => None,
-    }
-}
-
-/// Applies the result of `parse_plus_or_minus` to the
-/// given value as a unary operator.
-fn maybe_apply_unary_plus_or_minus(
-    unary_sign: Option<f64>,
-    value: Value,
-) -> Result<Value, TracedInterpreterError> {
-    if let Some(unary_sign) = unary_sign {
-        Ok((unwrap_number(value)? * unary_sign).into())
-    } else {
-        Ok(value)
-    }
-}
-
 /// Assume the given value wraps a number and return it; if it doesn't,
 /// return a type mismatch error.
+///
+/// TODO: Can we make this a TryFrom/TryInto instead?
 fn unwrap_number(value: Value) -> Result<f64, TracedInterpreterError> {
     if let Value::Number(number) = value {
         Ok(number)
@@ -627,9 +658,7 @@ mod tests {
         assert_eval_output("print 1 / 2", "0.5\n");
         assert_eval_output("print 1 / 2 + 5", "5.5\n");
         assert_eval_output("print 1 / 2 + 5 / 2", "3\n");
-
-        // TODO: Uncomment this and make it work!
-        //assert_eval_output("print 2 * -3", "-6\n");
+        assert_eval_output("print 2 * -3", "-6\n");
     }
 
     #[test]
