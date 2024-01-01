@@ -28,6 +28,38 @@ impl Value {
     }
 }
 
+enum MultiplyOrDivideOp {
+    Multiply,
+    Divide,
+}
+
+impl MultiplyOrDivideOp {
+    // I considered TryFrom here but it required an associated Error type
+    // and I just wanted to use Option.
+    fn from_token(token: &Token) -> Option<Self> {
+        match token {
+            Token::Multiply => Some(MultiplyOrDivideOp::Multiply),
+            Token::Divide => Some(MultiplyOrDivideOp::Divide),
+            _ => None,
+        }
+    }
+
+    fn evaluate(
+        &self,
+        left_side: &Value,
+        right_side: &Value,
+    ) -> Result<Value, TracedInterpreterError> {
+        let result = match (left_side, right_side) {
+            (Value::Number(l), Value::Number(r)) => match self {
+                MultiplyOrDivideOp::Multiply => l * r,
+                MultiplyOrDivideOp::Divide => l / r,
+            },
+            _ => return Err(InterpreterError::TypeMismatch.into()),
+        };
+        Ok(result.into())
+    }
+}
+
 enum EqualityOp {
     EqualTo,
     LessThan,
@@ -179,11 +211,27 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let value = self.evaluate_expression_term()?;
+
+        if let Some(next_token) = self.program.peek_next_token() {
+            if let Some(op) = MultiplyOrDivideOp::from_token(&next_token) {
+                self.program.consume_next_token();
+                let second_operand = self.evaluate_expression_term()?;
+                return op.evaluate(&value, &second_operand);
+            }
+        }
+
+        Ok(value)
+    }
+
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let unary_plus_or_minus = self.evaluate_plus_or_minus();
 
-        let value =
-            maybe_apply_unary_plus_or_minus(unary_plus_or_minus, self.evaluate_expression_term()?)?;
+        let value = maybe_apply_unary_plus_or_minus(
+            unary_plus_or_minus,
+            self.evaluate_multiply_or_divide_expression()?,
+        )?;
         if let Some(binary_plus_or_minus) = self.evaluate_plus_or_minus() {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
             let result =
@@ -573,6 +621,15 @@ mod tests {
         assert_eval_output("print -4 + 4", "0\n");
         assert_eval_output("print 1 + 1", "2\n");
         assert_eval_output("print 1 + 1 - 3", "-1\n");
+        assert_eval_output("print 2 * 3", "6\n");
+        assert_eval_output("print 2 * 3 + 2", "8\n");
+        assert_eval_output("print 2 * 3 + 2 * 4", "14\n");
+        assert_eval_output("print 1 / 2", "0.5\n");
+        assert_eval_output("print 1 / 2 + 5", "5.5\n");
+        assert_eval_output("print 1 / 2 + 5 / 2", "3\n");
+
+        // TODO: Uncomment this and make it work!
+        //assert_eval_output("print 2 * -3", "-6\n");
     }
 
     #[test]
