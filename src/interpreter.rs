@@ -32,7 +32,7 @@ enum EqualityOp {
     EqualTo,
     LessThan,
     GreaterThan,
-    // TODO: Add support for not equal to
+    NotEqualTo,
 }
 
 impl EqualityOp {
@@ -43,6 +43,7 @@ impl EqualityOp {
             Token::Equals => Some(EqualityOp::EqualTo),
             Token::LessThan => Some(EqualityOp::LessThan),
             Token::GreaterThan => Some(EqualityOp::GreaterThan),
+            Token::NotEquals => Some(EqualityOp::NotEqualTo),
             _ => None,
         }
     }
@@ -52,6 +53,7 @@ impl EqualityOp {
             EqualityOp::EqualTo => left_side == right_side,
             EqualityOp::LessThan => left_side < right_side,
             EqualityOp::GreaterThan => left_side > right_side,
+            EqualityOp::NotEqualTo => left_side != right_side,
         }
     }
 
@@ -588,6 +590,9 @@ mod tests {
         assert_eval_output("print 1 > 2", "0\n");
         assert_eval_output("print 1 > 0", "1\n");
         assert_eval_output("print 1 > 1", "0\n");
+
+        assert_eval_output("print 1 <> 2", "1\n");
+        assert_eval_output("print 1 <> 1", "0\n");
     }
 
     #[test]
@@ -597,6 +602,9 @@ mod tests {
 
         assert_eval_output("print \"hi\" < x$", "0\n");
         assert_eval_output("print \"hi\" > x$", "1\n");
+
+        assert_eval_output("print \"hi\" <> x$", "1\n");
+        assert_eval_output("print x$ > x$", "0\n");
     }
 
     #[test]

@@ -16,6 +16,7 @@ pub enum Token {
     Plus,
     Minus,
     Equals,
+    NotEquals,
     LessThan,
     GreaterThan,
     If,
@@ -42,6 +43,7 @@ impl Display for Token {
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
             Token::Equals => write!(f, "="),
+            Token::NotEquals => write!(f, "<>"),
             Token::LessThan => write!(f, "<"),
             Token::GreaterThan => write!(f, ">"),
             Token::If => write!(f, "IF"),
@@ -95,8 +97,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
-    fn chomp_single_character(&mut self) -> Option<Result<Token, SyntaxError>> {
-        for (byte, pos) in self.crunch_remaining_bytes() {
+    fn chomp_one_or_two_characters(&mut self) -> Option<Result<Token, SyntaxError>> {
+        if let Some((byte, pos)) = self.crunch_remaining_bytes().next() {
             let token: Token = match byte {
                 b':' => Token::Colon,
                 b'+' => Token::Plus,
@@ -107,6 +109,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 _ => return None,
             };
             self.index += pos;
+
+            if token == Token::LessThan {
+                if let Some((next_char, pos)) = self.crunch_remaining_bytes().next() {
+                    if next_char == b'>' {
+                        self.index += pos;
+                        return Some(Ok(Token::NotEquals));
+                    }
+                }
+            }
+
             return Some(Ok(token));
         }
 
@@ -309,7 +321,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_next_token(&mut self) -> Result<Token, SyntaxError> {
         if let Some(token) = self.chomp_any_keyword() {
             Ok(token)
-        } else if let Some(result) = self.chomp_single_character() {
+        } else if let Some(result) = self.chomp_one_or_two_characters() {
             result
         } else if let Some(result) = self.chomp_string() {
             result
@@ -513,6 +525,19 @@ mod tests {
     #[test]
     fn parsing_single_colon_works() {
         assert_values_parse_to_tokens(&[":", " :", "  :  "], &[Token::Colon]);
+    }
+
+    #[test]
+    fn parsing_equality_operators_works() {
+        assert_values_parse_to_tokens(&["<>", " <>", "  <>  ", "< >"], &[Token::NotEquals]);
+        assert_values_parse_to_tokens(&["<", " <", "  <  "], &[Token::LessThan]);
+        assert_values_parse_to_tokens(&[">", " >", "  >  "], &[Token::GreaterThan]);
+        assert_values_parse_to_tokens(&["=", " =", "  =  "], &[Token::Equals]);
+
+        assert_values_parse_to_tokens(
+            &["<> =", " <>=", "  <> = ", "< > ="],
+            &[Token::NotEquals, Token::Equals],
+        );
     }
 
     #[test]
