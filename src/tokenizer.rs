@@ -13,6 +13,7 @@ pub enum Token {
     Gosub,
     Return,
     Colon,
+    Comma,
     LeftParen,
     RightParen,
     Plus,
@@ -44,6 +45,7 @@ impl Display for Token {
             Token::Gosub => write!(f, "GOSUB"),
             Token::Return => write!(f, "RETURN"),
             Token::Colon => write!(f, ":"),
+            Token::Comma => write!(f, ","),
             Token::LeftParen => write!(f, "("),
             Token::RightParen => write!(f, ")"),
             Token::Plus => write!(f, "+"),
@@ -109,6 +111,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
         if let Some((byte, pos)) = self.crunch_remaining_bytes().next() {
             let token: Token = match byte {
                 b':' => Token::Colon,
+                b',' => Token::Comma,
                 b'(' => Token::LeftParen,
                 b')' => Token::RightParen,
                 b'+' => Token::Plus,
