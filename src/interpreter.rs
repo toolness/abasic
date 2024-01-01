@@ -30,7 +30,9 @@ impl Value {
 
 enum EqualityOp {
     EqualTo,
-    // TODO: Add support for other boolean operators.
+    LessThan,
+    GreaterThan,
+    // TODO: Add support for not equal to
 }
 
 impl EqualityOp {
@@ -39,7 +41,17 @@ impl EqualityOp {
     fn from_token(token: &Token) -> Option<Self> {
         match token {
             Token::Equals => Some(EqualityOp::EqualTo),
+            Token::LessThan => Some(EqualityOp::LessThan),
+            Token::GreaterThan => Some(EqualityOp::GreaterThan),
             _ => None,
+        }
+    }
+
+    fn evaluate_partial_ord<T: PartialOrd>(&self, left_side: T, right_side: T) -> bool {
+        match self {
+            EqualityOp::EqualTo => left_side == right_side,
+            EqualityOp::LessThan => left_side < right_side,
+            EqualityOp::GreaterThan => left_side > right_side,
         }
     }
 
@@ -48,8 +60,10 @@ impl EqualityOp {
         left_side: &Value,
         right_side: &Value,
     ) -> Result<Value, TracedInterpreterError> {
-        let result: bool = match self {
-            EqualityOp::EqualTo => left_side == right_side,
+        let result = match (left_side, right_side) {
+            (Value::String(l), Value::String(r)) => self.evaluate_partial_ord(l, r),
+            (Value::Number(l), Value::Number(r)) => self.evaluate_partial_ord(l, r),
+            _ => return Err(InterpreterError::TypeMismatch.into()),
         };
         // This is how Applesoft BASIC evaluates equality expressions.
         if result {
@@ -560,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    fn print_works_with_boolean_expressions() {
+    fn print_works_with_numeric_equality_expressions() {
         assert_eval_output("print 1 = 2", "0\n");
         assert_eval_output("print 1 = 1", "1\n");
         assert_eval_output("print 2 = 2", "1\n");
@@ -568,6 +582,21 @@ mod tests {
         assert_eval_output("print 1 + 1 = 4 - 1", "0\n");
         assert_eval_output("print -1 = 1", "0\n");
         assert_eval_output("print 1 = -1", "0\n");
+
+        assert_eval_output("print 1 < 2", "1\n");
+        assert_eval_output("print 1 < 1", "0\n");
+        assert_eval_output("print 1 > 2", "0\n");
+        assert_eval_output("print 1 > 0", "1\n");
+        assert_eval_output("print 1 > 1", "0\n");
+    }
+
+    #[test]
+    fn print_works_with_string_equality_expressions() {
+        assert_eval_output("print \"hi\" = \"hi\"", "1\n");
+        assert_eval_output("print \"hi\" = \"there\"", "0\n");
+
+        assert_eval_output("print \"hi\" < x$", "0\n");
+        assert_eval_output("print \"hi\" > x$", "1\n");
     }
 
     #[test]
@@ -654,14 +683,24 @@ mod tests {
     }
 
     #[test]
-    fn type_mismatch_error_works_with_expressions() {
+    fn type_mismatch_error_works_with_arithmetic_expressions() {
         assert_eval_error("print -\"hi\"", InterpreterError::TypeMismatch);
         assert_eval_error("print \"hi\" - 4", InterpreterError::TypeMismatch);
         assert_eval_error("print 4 + \"hi\"", InterpreterError::TypeMismatch);
     }
 
     #[test]
-    fn type_mismatch_error_works_with_variables() {
+    fn type_mismatch_error_works_with_equality_expressions() {
+        assert_eval_error("print x = x$", InterpreterError::TypeMismatch);
+        assert_eval_error("print x$ = x", InterpreterError::TypeMismatch);
+        assert_eval_error("print x < x$", InterpreterError::TypeMismatch);
+        assert_eval_error("print x$ < x", InterpreterError::TypeMismatch);
+        assert_eval_error("print x > x$", InterpreterError::TypeMismatch);
+        assert_eval_error("print x$ > x", InterpreterError::TypeMismatch);
+    }
+
+    #[test]
+    fn type_mismatch_error_works_with_variable_assignment() {
         assert_eval_error("x = x$", InterpreterError::TypeMismatch);
         assert_eval_error("x = \"hi\"", InterpreterError::TypeMismatch);
 

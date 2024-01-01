@@ -16,6 +16,8 @@ pub enum Token {
     Plus,
     Minus,
     Equals,
+    LessThan,
+    GreaterThan,
     If,
     Then,
     End,
@@ -40,6 +42,8 @@ impl Display for Token {
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
             Token::Equals => write!(f, "="),
+            Token::LessThan => write!(f, "<"),
+            Token::GreaterThan => write!(f, ">"),
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
             Token::End => write!(f, "END"),
@@ -98,6 +102,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 b'+' => Token::Plus,
                 b'-' => Token::Minus,
                 b'=' => Token::Equals,
+                b'<' => Token::LessThan,
+                b'>' => Token::GreaterThan,
                 _ => return None,
             };
             self.index += pos;
