@@ -17,8 +17,14 @@ pub struct TracedInterpreterError {
 pub enum InterpreterError {
     Syntax(SyntaxError),
     TypeMismatch,
+    /// Applesoft BASIC doesn't have this type, but it seems useful. It basically
+    /// means we're trying to read data that can't be coerced into the type of
+    /// variable we're trying to store it in. Applesoft BASIC instead classifies
+    /// this kind of error as a syntax error, which seems confusing.
+    DataTypeMismatch,
     UndefinedStatement,
     OutOfMemory(OutOfMemoryError),
+    OutOfData,
     ReturnWithoutGosub,
     NextWithoutFor,
 }
@@ -86,6 +92,12 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::NextWithoutFor => {
                 write!(f, "NEXT WITHOUT FOR ERROR")?;
+            }
+            InterpreterError::OutOfData => {
+                write!(f, "OUT OF DATA ERROR")?;
+            }
+            InterpreterError::DataTypeMismatch => {
+                write!(f, "DATA TYPE MISMATCH")?;
             }
         }
         if let Some(line) = self.line_number {

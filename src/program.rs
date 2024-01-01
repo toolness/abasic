@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    data::{DataChunk, DataElement, DataIterator},
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     syntax_error::SyntaxError,
     tokenizer::Token,
@@ -11,7 +12,7 @@ use crate::{
 
 const STACK_LIMIT: usize = 256;
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub enum ProgramLine {
     #[default]
     Immediate,
@@ -39,6 +40,7 @@ pub struct Program {
     location: ProgramLocation,
     stack: Vec<ProgramLocation>,
     loop_stack: Vec<LoopInfo>,
+    data_iterator: Option<DataIterator>,
 }
 
 impl Program {
@@ -108,8 +110,9 @@ impl Program {
         Ok(new_value)
     }
 
-    /// Go to the first numbered line. Resets the stack.
+    /// Go to the first numbered line. Resets the stack and the data cursor.
     pub fn goto_first_numbered_line(&mut self) {
+        self.reset_data_cursor();
         if let Some(&first_line) = self.sorted_line_numbers.first() {
             self.stack.clear();
             self.location = ProgramLocation {
@@ -166,6 +169,37 @@ impl Program {
         }
     }
 
+    pub fn get_data_line_number(&self) -> Option<u64> {
+        if let Some(data_iterator) = &self.data_iterator {
+            if let Some(ProgramLine::Line(line_number)) = data_iterator.current_location() {
+                Some(line_number)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn reset_data_cursor(&mut self) {
+        self.data_iterator = None;
+    }
+
+    pub fn next_data_element(&mut self) -> Option<DataElement> {
+        let iterator = self.data_iterator.get_or_insert_with(|| {
+            let mut chunks = vec![];
+            for line in self.sorted_line_numbers.iter() {
+                for token in self.numbered_lines.get(line).unwrap() {
+                    if let Token::Data(data) = token {
+                        chunks.push(DataChunk::new(ProgramLine::Line(*line), data.clone()));
+                    }
+                }
+            }
+            DataIterator::new(chunks)
+        });
+        iterator.next()
+    }
+
     /// Attempt to move to the next line of the program. Returns false
     /// if we're at the end of the program and there's nothing left
     /// to execute.
@@ -213,6 +247,7 @@ impl Program {
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
         self.sorted_line_numbers.insert(line_number);
         self.numbered_lines.insert(line_number, tokens);
+        self.reset_data_cursor();
     }
 
     fn tokens(&self) -> &Vec<Token> {

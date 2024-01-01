@@ -1,6 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
+    data::DataElement,
     interpreter_error::{InterpreterError, TracedInterpreterError},
     program::Program,
     syntax_error::SyntaxError,
@@ -17,15 +18,6 @@ pub enum InterpreterState {
 enum Value {
     String(Rc<String>),
     Number(f64),
-}
-
-impl Value {
-    fn to_bool(&self) -> bool {
-        match self {
-            Value::String(string) => !string.is_empty(),
-            Value::Number(number) => *number != 0.0,
-        }
-    }
 }
 
 impl TryFrom<Value> for f64 {
@@ -164,6 +156,31 @@ impl EqualityOp {
 }
 
 impl Value {
+    // TODO: Should we use the `From` trait instead?  Or is this more explicit?
+    fn to_bool(&self) -> bool {
+        match self {
+            Value::String(string) => !string.is_empty(),
+            Value::Number(number) => *number != 0.0,
+        }
+    }
+
+    fn coerce_from_data_element<T: AsRef<str>>(
+        variable_name: T,
+        data_element: &DataElement,
+    ) -> Result<Value, TracedInterpreterError> {
+        if variable_name.as_ref().ends_with('$') {
+            match data_element {
+                DataElement::String(s) => Ok(Value::String(s.clone())),
+                DataElement::Number(n) => Ok(Value::String(Rc::new((*n).to_string()))),
+            }
+        } else {
+            match data_element {
+                DataElement::String(_) => Err(InterpreterError::DataTypeMismatch.into()),
+                DataElement::Number(n) => Ok(Value::Number(*n)),
+            }
+        }
+    }
+
     fn default_for_variable<T: AsRef<str>>(variable_name: T) -> Self {
         if variable_name.as_ref().ends_with('$') {
             String::default().into()
@@ -336,6 +353,19 @@ impl Interpreter {
         Ok(())
     }
 
+    fn evaluate_read_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        // TODO: Support multiple comma-separated items.
+        let Some(Token::Symbol(symbol)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        let Some(element) = self.program.next_data_element() else {
+            return Err(InterpreterError::OutOfData.into());
+        };
+        let value = Value::coerce_from_data_element(symbol.as_str(), &element)?;
+        self.variables.insert(symbol, value);
+        Ok(())
+    }
+
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         while let Some(token) = self.program.peek_next_token() {
             match token {
@@ -411,10 +441,12 @@ impl Interpreter {
             Some(Token::End) => Ok(self.program.end()),
             Some(Token::For) => self.evaluate_for_statement(),
             Some(Token::Next) => self.evaluate_next_statement(),
+            Some(Token::Restore) => Ok(self.program.reset_data_cursor()),
+            Some(Token::Read) => self.evaluate_read_statement(),
             Some(Token::Remark(_)) => Ok(()),
             Some(Token::Colon) => Ok(()),
             Some(Token::Data(_)) => Ok(()),
-            Some(Token::Symbol(value)) => self.evaluate_assignment_statement(value),
+            Some(Token::Symbol(symbol)) => self.evaluate_assignment_statement(symbol),
             Some(_) => Err(SyntaxError::UnexpectedToken.into()),
             None => Ok(()),
         }
@@ -462,7 +494,11 @@ impl Interpreter {
         result: Result<T, TracedInterpreterError>,
     ) -> Result<T, TracedInterpreterError> {
         if let Err(mut err) = result {
-            if let Some(line_number) = self.program.get_line_number() {
+            let line_number = match err.error {
+                InterpreterError::DataTypeMismatch => self.program.get_data_line_number(),
+                _ => self.program.get_line_number(),
+            };
+            if let Some(line_number) = line_number {
                 err.set_line_number(line_number);
             }
             self.state = InterpreterState::Idle;
@@ -796,6 +832,14 @@ mod tests {
     }
 
     #[test]
+    fn out_of_data_error_works() {
+        assert_eval_error("read a", InterpreterError::OutOfData);
+        // Applesoft BASIC only recognizes data in actual line numbers in the program, so
+        // an immediate data statement is basically a no-op.
+        assert_eval_error("data 1,2,3:read a", InterpreterError::OutOfData);
+    }
+
+    #[test]
     fn undefined_statement_error_works() {
         assert_eval_error("goto 30", InterpreterError::UndefinedStatement);
         assert_eval_error("goto x", InterpreterError::UndefinedStatement);
@@ -943,6 +987,74 @@ mod tests {
             40 print "dog"
             "#,
             "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn restore_works() {
+        assert_program_output(
+            r#"
+            10 data sup,dog,1
+            20 for i = 1 to 3
+            30 read a$
+            40 print a$
+            45 restore
+            50 next i
+            "#,
+            "sup\nsup\nsup\n",
+        );
+    }
+
+    #[test]
+    fn data_at_beginning_works() {
+        assert_program_output(
+            r#"
+            10 data sup,dog,1
+            20 for i = 1 to 3
+            30 read a$
+            40 print a$
+            50 next i
+            "#,
+            "sup\ndog\n1\n",
+        );
+    }
+
+    #[test]
+    fn data_at_end_works() {
+        assert_program_output(
+            r#"
+            20 for i = 1 to 3
+            30 read a$
+            40 print a$
+            50 next i
+            60 data sup,dog,1
+            "#,
+            "sup\ndog\n1\n",
+        );
+    }
+
+    #[test]
+    fn data_in_middle_works() {
+        assert_program_output(
+            r#"
+            20 for i = 1 to 3
+            30 read a$
+            35 data sup,dog,1
+            40 print a$
+            50 next i
+            "#,
+            "sup\ndog\n1\n",
+        );
+    }
+
+    #[test]
+    fn data_type_mismatch_works() {
+        assert_program_error(
+            r#"
+            10 data sup
+            20 read a
+            "#,
+            InterpreterError::DataTypeMismatch,
         );
     }
 }

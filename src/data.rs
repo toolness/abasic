@@ -1,5 +1,63 @@
 use std::rc::Rc;
 
+use crate::program::ProgramLine;
+
+#[derive(Debug)]
+pub struct DataChunk {
+    location: ProgramLine,
+    data: Rc<Vec<DataElement>>,
+}
+
+impl DataChunk {
+    pub fn new(location: ProgramLine, data: Rc<Vec<DataElement>>) -> Self {
+        DataChunk { location, data }
+    }
+}
+
+#[derive(Debug)]
+pub struct DataIterator {
+    chunks: Vec<DataChunk>,
+    chunk_index: usize,
+    chunk_item_index: usize,
+}
+
+impl DataIterator {
+    pub fn new(chunks: Vec<DataChunk>) -> Self {
+        Self {
+            chunks,
+            chunk_index: 0,
+            chunk_item_index: 0,
+        }
+    }
+
+    pub fn current_location(&self) -> Option<ProgramLine> {
+        if let Some(chunk) = self.chunks.get(self.chunk_index) {
+            Some(chunk.location)
+        } else {
+            None
+        }
+    }
+}
+
+impl Iterator for DataIterator {
+    type Item = DataElement;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let Some(chunk) = self.chunks.get(self.chunk_index) else {
+                return None;
+            };
+            let Some(element) = chunk.data.get(self.chunk_item_index) else {
+                self.chunk_item_index = 0;
+                self.chunk_index += 1;
+                continue;
+            };
+            self.chunk_item_index += 1;
+            return Some(element.clone());
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DataElement {
     String(Rc<String>),
@@ -140,11 +198,16 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use crate::data::parse_data_until_colon;
+    use std::rc::Rc;
+
+    use crate::{
+        data::{parse_data_until_colon, DataChunk},
+        program::ProgramLine,
+    };
 
     use super::{
         test_util::{number, string},
-        DataElement,
+        DataElement, DataIterator,
     };
 
     fn assert_parse_all_data(value: &'static str, expect: &[DataElement]) {
@@ -174,6 +237,33 @@ mod tests {
             "Parsing '{}' (comparing unchomped str)",
             value
         );
+    }
+
+    #[test]
+    fn empty_data_iterator_works() {
+        let mut iterator = DataIterator::new(vec![]);
+        assert_eq!(iterator.next(), None);
+        assert_eq!(iterator.next(), None);
+    }
+
+    #[test]
+    fn non_empty_data_iterator_works() {
+        let mut iterator = DataIterator::new(vec![
+            DataChunk::new(
+                ProgramLine::Line(10),
+                Rc::new(vec![string("hi"), number(1.0)]),
+            ),
+            DataChunk::new(ProgramLine::Line(20), Rc::new(vec![string("boop")])),
+        ]);
+        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(iterator.next(), Some(string("hi")));
+        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(iterator.next(), Some(number(1.0)));
+        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(iterator.next(), Some(string("boop")));
+        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(20)));
+        assert_eq!(iterator.next(), None);
+        assert_eq!(iterator.current_location(), None);
     }
 
     #[test]
