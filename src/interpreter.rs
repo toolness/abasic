@@ -271,7 +271,7 @@ impl Interpreter {
         let value = self.evaluate_unary_plus_or_minus_expression_term()?;
 
         if let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
-            let second_operand = self.evaluate_unary_plus_or_minus_expression_term()?;
+            let second_operand = self.evaluate_multiply_or_divide_expression()?;
             return op.evaluate(&value, &second_operand);
         }
 
@@ -640,6 +640,8 @@ mod tests {
         assert_eval_output("print 1 / 2 + 5", "5.5\n");
         assert_eval_output("print 1 / 2 + 5 / 2", "3\n");
         assert_eval_output("print 2 * -3", "-6\n");
+        assert_eval_output("print 2 + 5 * 4 - 1", "21\n");
+        assert_eval_output("print 5 * 4 * 2", "40\n");
     }
 
     #[test]
