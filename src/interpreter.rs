@@ -47,17 +47,34 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_function_call(
+        &mut self,
+        function_name: &str,
+    ) -> Result<Option<Value>, TracedInterpreterError> {
+        match function_name {
+            "ABS" => {
+                self.program.expect_next_token(Token::LeftParen)?;
+                let arg: f64 = self.evaluate_expression()?.try_into()?;
+                self.program.expect_next_token(Token::RightParen)?;
+                Ok(Some(arg.abs().into()))
+            }
+            _ => Ok(None),
+        }
+    }
+
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.program.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(string.into()),
             Token::NumericLiteral(number) => Ok(number.into()),
-            Token::Symbol(variable) => {
-                if let Some(value) = self.variables.get(&variable) {
+            Token::Symbol(symbol) => {
+                if let Some(value) = self.evaluate_function_call(symbol.as_str())? {
+                    Ok(value)
+                } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
                 } else {
                     // TODO: It'd be nice to at least log a warning or something here, since
                     //       this can be a notorious source of bugs.
-                    Ok(Value::default_for_variable(variable.as_str()))
+                    Ok(Value::default_for_variable(symbol.as_str()))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken.into()),
@@ -602,6 +619,20 @@ mod tests {
 
         assert_eval_output("print 1 <> 2", "1\n");
         assert_eval_output("print 1 <> 1", "0\n");
+    }
+
+    #[test]
+    fn abs_works() {
+        assert_eval_output("print abs(5)", "5\n");
+        assert_eval_output("print abs(-5)", "5\n");
+        assert_eval_output("print abs(-6.0 + 1)", "5\n");
+        assert_eval_output("print abs(x)", "0\n");
+    }
+
+    #[ignore]
+    #[test]
+    fn builtin_functions_cannot_be_redefined() {
+        todo!("TODO: Add a test to make sure ABS can't be redefined, etc.");
     }
 
     #[test]
