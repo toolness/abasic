@@ -140,15 +140,33 @@ impl Interpreter {
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let conditional_value = self.evaluate_expression()?;
         self.program.expect_next_token(Token::Then)?;
-        // TODO: It would be nice to support ELSE somehow, even though
-        // AppleSoft basic doesn't really seem to. Tim Hartnell's
-        // book seems to include ELSE clauses only in the form of line
-        // numbers, e.g. `IF X THEN 100 ELSE 200`, which seems like a
-        // reasonable compromise.
+        // Note that Applesoft BASIC doesn't seem to support ELSE,
+        // but it's used in Tim Hartnell's book. We'll support very simple
+        // cases; see the test suite for details.
         if conditional_value.to_bool() {
-            self.evaluate_statement()
+            // Evaluate the "then" clause.
+            self.evaluate_statement()?;
+            if self.program.peek_next_token() == Some(Token::Else) {
+                // Skip the else clause, and anything else on this line.
+                self.program.discard_remaining_tokens();
+            }
+            Ok(())
         } else {
-            self.program.discard_remaining_tokens();
+            // Skip past the "then" clause. If we encounter a colon, ignore
+            // the rest of the line, but if we encounter an "else", evaluate
+            // everything after it.
+            while let Some(token) = self.program.next_token() {
+                match token {
+                    Token::Colon => {
+                        self.program.discard_remaining_tokens();
+                    }
+                    Token::Else => {
+                        self.evaluate_statement()?;
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
             Ok(())
         }
     }
@@ -224,7 +242,7 @@ impl Interpreter {
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         while let Some(token) = self.program.peek_next_token() {
             match token {
-                Token::Colon => break,
+                Token::Colon | Token::Else => break,
                 _ => match self.evaluate_expression()? {
                     Value::String(string) => {
                         self.output.push(string.to_string());
@@ -439,7 +457,10 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use crate::interpreter_error::{OutOfMemoryError, TracedInterpreterError};
+    use crate::{
+        interpreter_error::{OutOfMemoryError, TracedInterpreterError},
+        syntax_error::SyntaxError,
+    };
 
     use super::{Interpreter, InterpreterError, InterpreterState};
 
@@ -668,9 +689,37 @@ mod tests {
     }
 
     #[test]
-    fn if_statement_processes_multiple_statements() {
+    fn if_statement_processes_multiple_statements_in_then_clause() {
         assert_eval_output("if 1 then print \"hi\":print", "hi\n\n");
         assert_eval_output("if 0 then print \"hi\":print:kaboom", "");
+        assert_eval_output("if 1 then x=3:print \"hi \" x:print", "hi 3\n\n");
+    }
+
+    #[test]
+    fn if_statement_processes_multiple_statements_in_else_clause() {
+        assert_eval_output("if 1 then print \"hi\" else print \"blah\":print \"this is only executed with the else clause\"", "hi\n");
+        assert_eval_output(
+            "if 0 then print \"hi\" else print \"blah\":print",
+            "blah\n\n",
+        );
+        assert_eval_output(
+            "if 1 then y=4 else x=3:print \"this is only executed with the else clause\"",
+            "",
+        );
+        assert_eval_output("if 0 then y=4 else x=3:print \"hallo \" y", "hallo 0\n");
+    }
+
+    #[test]
+    fn if_statement_does_not_support_else_when_then_clause_has_multiple_statements() {
+        assert_eval_error(
+            "if 1 then print:print else print",
+            SyntaxError::UnexpectedToken.into(),
+        );
+
+        assert_eval_error(
+            "if 1 then x = 3:y = 4 else z = 3",
+            SyntaxError::UnexpectedToken.into(),
+        );
     }
 
     #[test]

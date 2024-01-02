@@ -29,6 +29,12 @@ pub enum InterpreterError {
     NextWithoutFor,
 }
 
+impl From<SyntaxError> for InterpreterError {
+    fn from(value: SyntaxError) -> Self {
+        InterpreterError::Syntax(value)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum OutOfMemoryError {
     StackOverflow,
@@ -43,7 +49,7 @@ impl TracedInterpreterError {
 impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
         TracedInterpreterError {
-            error: InterpreterError::Syntax(value),
+            error: value.into(),
             line_number: None,
             backtrace: Backtrace::capture(),
         }

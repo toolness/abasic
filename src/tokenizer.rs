@@ -27,6 +27,7 @@ pub enum Token {
     GreaterThan,
     If,
     Then,
+    Else,
     End,
     For,
     To,
@@ -62,6 +63,7 @@ impl Display for Token {
             Token::GreaterThan => write!(f, ">"),
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
+            Token::Else => write!(f, "ELSE"),
             Token::End => write!(f, "END"),
             Token::For => write!(f, "FOR"),
             Token::To => write!(f, "TO"),
@@ -291,6 +293,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::If)
         } else if self.chomp_keyword("THEN") {
             Some(Token::Then)
+        } else if self.chomp_keyword("ELSE") {
+            Some(Token::Else)
         } else if self.chomp_keyword("END") {
             Some(Token::End)
         } else if self.chomp_keyword("FOR") {
