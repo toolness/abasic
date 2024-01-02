@@ -27,6 +27,7 @@ pub enum InterpreterError {
     OutOfData,
     ReturnWithoutGosub,
     NextWithoutFor,
+    Unimplemented,
 }
 
 impl From<SyntaxError> for InterpreterError {
@@ -104,6 +105,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::DataTypeMismatch => {
                 write!(f, "DATA TYPE MISMATCH")?;
+            }
+            InterpreterError::Unimplemented => {
+                write!(f, "UNIMPLEMENTED ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

@@ -65,6 +65,7 @@ impl Interpreter {
         let result = match function_name {
             "ABS" => self.evaluate_unary_function(builtins::abs),
             "INT" => self.evaluate_unary_function(builtins::int),
+            "RND" => self.evaluate_unary_function(builtins::rnd),
             _ => {
                 return Ok(None);
             }
@@ -665,6 +666,18 @@ mod tests {
         assert_eval_output("print int(3)", "3\n");
         assert_eval_output("print int(4.1)", "4\n");
         assert_eval_output("print int(5.9)", "5\n");
+    }
+
+    #[test]
+    fn rnd_works() {
+        fastrand::seed(0);
+        assert_eval_output(
+            "for i = 1 to 3:print int(rnd(1) * 50):next i",
+            "3\n40\n19\n",
+        );
+
+        assert_eval_error("print rnd(-1)", InterpreterError::Unimplemented);
+        assert_eval_error("print rnd(0)", InterpreterError::Unimplemented);
     }
 
     #[ignore]
