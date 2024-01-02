@@ -1,6 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
+    builtins,
     data::parse_data_until_colon,
     interpreter_error::{InterpreterError, TracedInterpreterError},
     operators::{EqualityOp, MultiplyOrDivideOp, PlusOrMinusOp},
@@ -47,19 +48,28 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_unary_function<F: Fn(Value) -> Result<Value, TracedInterpreterError>>(
+        &mut self,
+        f: F,
+    ) -> Result<Value, TracedInterpreterError> {
+        self.program.expect_next_token(Token::LeftParen)?;
+        let arg = self.evaluate_expression()?;
+        self.program.expect_next_token(Token::RightParen)?;
+        f(arg)
+    }
+
     fn evaluate_function_call(
         &mut self,
         function_name: &str,
     ) -> Result<Option<Value>, TracedInterpreterError> {
-        match function_name {
-            "ABS" => {
-                self.program.expect_next_token(Token::LeftParen)?;
-                let arg: f64 = self.evaluate_expression()?.try_into()?;
-                self.program.expect_next_token(Token::RightParen)?;
-                Ok(Some(arg.abs().into()))
+        let result = match function_name {
+            "ABS" => self.evaluate_unary_function(builtins::abs),
+            "INT" => self.evaluate_unary_function(builtins::int),
+            _ => {
+                return Ok(None);
             }
-            _ => Ok(None),
-        }
+        };
+        result.map(|value| Some(value))
     }
 
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
@@ -648,6 +658,13 @@ mod tests {
         assert_eval_output("print abs(-5)", "5\n");
         assert_eval_output("print abs(-6.0 + 1)", "5\n");
         assert_eval_output("print abs(x)", "0\n");
+    }
+
+    #[test]
+    fn int_works() {
+        assert_eval_output("print int(3)", "3\n");
+        assert_eval_output("print int(4.1)", "4\n");
+        assert_eval_output("print int(5.9)", "5\n");
     }
 
     #[ignore]
