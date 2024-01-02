@@ -5,6 +5,7 @@ mod line_cruncher;
 mod program;
 mod syntax_error;
 mod tokenizer;
+mod value;
 
 use std::io::{stdin, IsTerminal};
 use std::sync::mpsc::channel;
