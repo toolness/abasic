@@ -278,6 +278,24 @@ impl Program {
         next
     }
 
+    /// Goes back in the stream just before the occurrence of the given token.
+    ///
+    /// If the token isn't found, panics.
+    ///
+    /// Generally this shouldn't be used unless absolutely necessary, e.g. because
+    /// we might need to pause evaluation to do some asynchronous activity and then
+    /// resume it again once the task is complete.
+    pub fn rewind_before_token(&mut self, token: Token) {
+        let wrapped_token = Some(token.clone());
+        while self.location.token_index > 0 {
+            self.location.token_index -= 1;
+            if self.peek_next_token() == wrapped_token {
+                return;
+            }
+        }
+        panic!("Token {:?} not found!", token);
+    }
+
     /// Return the next token in the stream, advancing our
     /// position in it.  If there are no more tokens, return an error.
     pub fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {

@@ -166,6 +166,10 @@ impl DataParser {
 ///
 /// It doesn't conform completely to Applesoft BASIC but it gets us
 /// most of the way there.
+///
+/// Note that this will never return an empty `Vec`: even if the string
+/// is empty, it will still return a single-element `Vec` with an empty
+/// string in it.
 pub fn parse_data_until_colon(value: &str) -> (Vec<DataElement>, usize) {
     let mut parser = DataParser::default();
 

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    data::DataElement,
+    data::{parse_data_until_colon, DataElement},
     interpreter_error::{InterpreterError, TracedInterpreterError},
     program::Program,
     syntax_error::SyntaxError,
@@ -12,6 +12,7 @@ use crate::{
 pub enum InterpreterState {
     Idle,
     Running,
+    AwaitingInput,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -231,6 +232,7 @@ pub struct Interpreter {
     program: Program,
     variables: HashMap<Rc<String>, Value>,
     state: InterpreterState,
+    input: Option<String>,
 }
 
 impl Interpreter {
@@ -240,6 +242,7 @@ impl Interpreter {
             program: Default::default(),
             variables: HashMap::new(),
             state: InterpreterState::Idle,
+            input: None,
         }
     }
 
@@ -366,6 +369,50 @@ impl Interpreter {
         Ok(())
     }
 
+    fn rewind_program_and_await_input(&mut self) {
+        // We need to rewind to before the INPUT token, so that when we resume
+        // execution after input has been retrieved, we will get back to this
+        // point in the code. This is a hack, but I want to be able to run this
+        // in async contexts without having to explicitly make every single part
+        // of this interpreter use async/await.
+        self.program.rewind_before_token(Token::Input);
+        self.state = InterpreterState::AwaitingInput;
+    }
+
+    fn evaluate_input_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        if let Some(input) = self.input.take() {
+            // TODO: Support multiple comma-separated items.
+            let Some(Token::Symbol(symbol)) = self.program.next_token() else {
+                return Err(SyntaxError::UnexpectedToken.into());
+            };
+            let (data, _) = parse_data_until_colon(input.as_str());
+            // We're guaranteed to have at least one item in here, even if the input was an empty string.
+            let first_element = &data[0];
+            let has_excess_data = data.len() > 1;
+            match Value::coerce_from_data_element(symbol.as_str(), first_element) {
+                Ok(value) => {
+                    self.variables.insert(symbol, value);
+                    if has_excess_data {
+                        self.output.push("EXTRA IGNORED\n".to_string());
+                    }
+                    Ok(())
+                }
+                Err(TracedInterpreterError {
+                    error: InterpreterError::DataTypeMismatch,
+                    ..
+                }) => {
+                    self.output.push("REENTER\n".to_string());
+                    self.rewind_program_and_await_input();
+                    Ok(())
+                }
+                Err(err) => Err(err),
+            }
+        } else {
+            self.rewind_program_and_await_input();
+            Ok(())
+        }
+    }
+
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         while let Some(token) = self.program.peek_next_token() {
             match token {
@@ -434,6 +481,7 @@ impl Interpreter {
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Print) => self.evaluate_print_statement(),
+            Some(Token::Input) => self.evaluate_input_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Goto) => self.evaluate_goto_statement(),
             Some(Token::Gosub) => self.evaluate_gosub_statement(),
@@ -506,6 +554,12 @@ impl Interpreter {
         } else {
             result
         }
+    }
+
+    pub fn provide_input(&mut self, input: String) {
+        assert_eq!(self.state, InterpreterState::AwaitingInput);
+        self.input = Some(input);
+        self.state = InterpreterState::Running;
     }
 
     pub fn continue_evaluating(&mut self) -> Result<(), TracedInterpreterError> {
@@ -1056,5 +1110,11 @@ mod tests {
             "#,
             InterpreterError::DataTypeMismatch,
         );
+    }
+
+    #[ignore]
+    #[test]
+    fn input_works() {
+        todo!("TODO: Add some INPUT tests!");
     }
 }
