@@ -2,6 +2,7 @@ mod data;
 mod interpreter;
 mod interpreter_error;
 mod line_cruncher;
+mod operators;
 mod program;
 mod syntax_error;
 mod tokenizer;
