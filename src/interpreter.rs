@@ -211,10 +211,10 @@ impl Interpreter {
             let Some(Token::Symbol(symbol)) = self.program.next_token() else {
                 return Err(SyntaxError::UnexpectedToken.into());
             };
-            let (data, _) = parse_data_until_colon(input.as_str());
+            let (data, bytes_read) = parse_data_until_colon(input.as_str());
             // We're guaranteed to have at least one item in here, even if the input was an empty string.
             let first_element = &data[0];
-            let has_excess_data = data.len() > 1;
+            let has_excess_data = data.len() > 1 || bytes_read < input.len();
             match Value::coerce_from_data_element(symbol.as_str(), first_element) {
                 Ok(value) => {
                     self.variables.insert(symbol, value);
@@ -1062,7 +1062,7 @@ mod tests {
     }
 
     #[test]
-    fn input_ignoring_extra_works() {
+    fn input_ignoring_extra_works_with_commas() {
         assert_program_actions(
             r#"
             10 input a$
@@ -1070,6 +1070,22 @@ mod tests {
         "#,
             &[
                 Action::expect_output("").then_input("sup, dog"),
+                Action::expect_output("EXTRA IGNORED\nhello sup\n"),
+            ],
+        )
+    }
+
+    #[test]
+    fn input_ignoring_extra_works_with_colons() {
+        // This is weird, but it's how Applesoft BASIC works, and it's how
+        // this interpreter works because it's the easiest thing to implement.
+        assert_program_actions(
+            r#"
+            10 input a$
+            20 print "hello " a$
+        "#,
+            &[
+                Action::expect_output("").then_input("sup:dog"),
                 Action::expect_output("EXTRA IGNORED\nhello sup\n"),
             ],
         )
