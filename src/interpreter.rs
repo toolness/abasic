@@ -635,20 +635,43 @@ mod tests {
 
     use super::{Interpreter, InterpreterError, InterpreterState};
 
-    fn evaluate_until_idle(
-        interpreter: &mut Interpreter,
-        line: &str,
-    ) -> Result<(), TracedInterpreterError> {
-        interpreter.start_evaluating(line)?;
+    struct Action {
+        expected_output: &'static str,
+        then_input: Option<&'static str>,
+    }
+
+    impl Action {
+        fn expect_output(expected_output: &'static str) -> Self {
+            Action {
+                expected_output,
+                then_input: None,
+            }
+        }
+
+        fn then_input(mut self, input: &'static str) -> Self {
+            self.then_input = Some(input);
+            self
+        }
+    }
+
+    fn evaluate_while_running(interpreter: &mut Interpreter) -> Result<(), TracedInterpreterError> {
         while interpreter.get_state() == InterpreterState::Running {
             interpreter.continue_evaluating()?;
         }
         Ok(())
     }
 
+    fn evaluate_line_while_running(
+        interpreter: &mut Interpreter,
+        line: &str,
+    ) -> Result<(), TracedInterpreterError> {
+        interpreter.start_evaluating(line)?;
+        evaluate_while_running(interpreter)
+    }
+
     fn assert_eval_error(line: &'static str, expected: InterpreterError) {
         let mut interpreter = Interpreter::new();
-        match evaluate_until_idle(&mut interpreter, line) {
+        match evaluate_line_while_running(&mut interpreter, line) {
             Ok(_) => {
                 panic!("expected '{}' to error but it didn't", line);
             }
@@ -664,14 +687,40 @@ mod tests {
         assert_eq!(output, expected, "evaluating '{}'", line);
     }
 
-    fn assert_program_output(program: &'static str, expected: &'static str) {
+    fn assert_program_actions(program: &'static str, actions: &[Action]) {
         let mut interpreter = Interpreter::new();
         let lines = program.split("\n").map(|line| line.trim_start());
         for line in lines {
             eval_line_and_expect_success(&mut interpreter, line);
         }
-        let output = eval_line_and_expect_success(&mut interpreter, "run");
-        assert_eq!(output, expected, "running program: {}", program);
+        let mut output = eval_line_and_expect_success(&mut interpreter, "run");
+        for (i, action) in actions.iter().enumerate() {
+            assert_eq!(
+                output, action.expected_output,
+                "running action {} of program: {}",
+                i, program
+            );
+            if let Some(input) = action.then_input {
+                interpreter.provide_input(input.to_string());
+                output = match evaluate_while_running(&mut interpreter) {
+                    Ok(_) => interpreter
+                        .get_and_clear_output_buffer()
+                        .unwrap_or_default(),
+                    Err(err) => {
+                        panic!(
+                            "after inputting '{}', expected successful evaluation but got {}\nIntepreter state is: {:?}",
+                            input,
+                            err,
+                            interpreter
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fn assert_program_output(program: &'static str, expected: &'static str) {
+        assert_program_actions(program, &[Action::expect_output(expected)]);
     }
 
     fn assert_program_error(program: &'static str, expected: InterpreterError) {
@@ -680,7 +729,7 @@ mod tests {
         for line in lines {
             eval_line_and_expect_success(&mut interpreter, line);
         }
-        match evaluate_until_idle(&mut interpreter, "run") {
+        match evaluate_line_while_running(&mut interpreter, "run") {
             Ok(_) => {
                 panic!("expected program to error but it didn't: {}", program);
             }
@@ -694,7 +743,7 @@ mod tests {
         interpreter: &mut Interpreter,
         line: T,
     ) -> String {
-        match evaluate_until_idle(interpreter, line.as_ref()) {
+        match evaluate_line_while_running(interpreter, line.as_ref()) {
             Ok(_) => interpreter
                 .get_and_clear_output_buffer()
                 .unwrap_or_default(),
@@ -1112,9 +1161,46 @@ mod tests {
         );
     }
 
-    #[ignore]
     #[test]
     fn input_works() {
-        todo!("TODO: Add some INPUT tests!");
+        assert_program_actions(
+            r#"
+            10 input a$
+            20 print "hello " a$
+        "#,
+            &[
+                Action::expect_output("").then_input("buddy"),
+                Action::expect_output("hello buddy\n"),
+            ],
+        )
+    }
+
+    #[test]
+    fn input_reentry_works() {
+        assert_program_actions(
+            r#"
+            10 input a
+            20 print "hello " a
+        "#,
+            &[
+                Action::expect_output("").then_input("this is not a number"),
+                Action::expect_output("REENTER\n").then_input("123"),
+                Action::expect_output("hello 123\n"),
+            ],
+        )
+    }
+
+    #[test]
+    fn input_ignoring_extra_works() {
+        assert_program_actions(
+            r#"
+            10 input a$
+            20 print "hello " a$
+        "#,
+            &[
+                Action::expect_output("").then_input("sup, dog"),
+                Action::expect_output("EXTRA IGNORED\nhello sup\n"),
+            ],
+        )
     }
 }
