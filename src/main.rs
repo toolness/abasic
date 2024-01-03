@@ -32,6 +32,10 @@ struct CliArgs {
     /// Enter interactive mode after running source file.
     #[arg(short, long)]
     interactive: bool,
+
+    /// Disable warnings (e.g. use of undeclared variables).
+    #[arg(short, long)]
+    no_warnings: bool,
 }
 
 impl CliArgs {
@@ -43,7 +47,7 @@ impl CliArgs {
 fn show_warning(message: String, line: Option<u64>) {
     let line_str = line.map(|line| format!(" IN {}", line));
 
-    println!(
+    eprintln!(
         "{}: {}",
         format!("WARNING{}", line_str.unwrap_or_default()).yellow(),
         message
@@ -58,10 +62,15 @@ struct StdioInterpreter {
 
 impl StdioInterpreter {
     fn new(args: CliArgs) -> Self {
+        let interpreter = Interpreter::new(if args.no_warnings {
+            |_message, _line| {}
+        } else {
+            show_warning
+        });
         StdioInterpreter {
             args,
             printer: StdioPrinter::new(),
-            interpreter: Interpreter::new(show_warning),
+            interpreter,
         }
     }
 
