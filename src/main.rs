@@ -5,6 +5,7 @@ mod interpreter_error;
 mod line_cruncher;
 mod operators;
 mod program;
+mod stdio_printer;
 mod syntax_error;
 mod tokenizer;
 mod value;
@@ -15,18 +16,19 @@ use std::sync::mpsc::channel;
 use ctrlc;
 use interpreter::{Interpreter, InterpreterState};
 use rustyline::{error::ReadlineError, DefaultEditor};
+use stdio_printer::StdioPrinter;
 
 const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
 
-fn break_interpreter(interpreter: &mut Interpreter) {
+fn break_interpreter(printer: &mut StdioPrinter, interpreter: &mut Interpreter) {
     // TODO: Applesoft BASIC actually lets the user use "CONT" to resume
     // program execution after a break or "STOP" statement, it'd be nice
     // to support that. Instead, we're currently just stopping the program
     // and preventing it from being resumed.
     if let Some(line_number) = interpreter.stop_evaluating() {
-        println!("BREAK IN {}", line_number);
+        printer.eprintln(format!("BREAK IN {}", line_number));
     } else {
-        println!("BREAK");
+        printer.eprintln("BREAK");
     }
 }
 
@@ -81,7 +83,10 @@ fn run_interpreter(source_filename: Option<String>) -> i32 {
         initial_command = Some("RUN");
     }
 
+    let mut printer = StdioPrinter::default();
+
     loop {
+        printer.print_buffered_output();
         let readline = if let Some(command) = initial_command.take() {
             Ok(command.to_string())
         } else {
@@ -103,16 +108,16 @@ fn run_interpreter(source_filename: Option<String>) -> i32 {
 
                     // Regardless of whether an error occurred, show any buffered output.
                     if let Some(output) = interpreter.get_and_clear_output_buffer() {
-                        print!("{}", output);
+                        printer.print(output);
                     }
 
                     if rx.try_recv().is_ok() {
-                        break_interpreter(&mut interpreter);
+                        break_interpreter(&mut printer, &mut interpreter);
                         break;
                     }
 
                     if let Err(err) = result {
-                        println!("{}", err);
+                        printer.eprintln(err.to_string());
                         if stdin().is_terminal() {
                             break;
                         } else {
@@ -125,13 +130,14 @@ fn run_interpreter(source_filename: Option<String>) -> i32 {
                         InterpreterState::Idle => break,
                         InterpreterState::Running => {}
                         InterpreterState::AwaitingInput => {
-                            let readline = rl.readline("? ");
+                            let prompt = format!("{}? ", printer.pop_buffered_output());
+                            let readline = rl.readline(&prompt);
                             match readline {
                                 Ok(line) => {
                                     interpreter.provide_input(line);
                                 }
                                 Err(ReadlineError::Interrupted) => {
-                                    break_interpreter(&mut interpreter);
+                                    break_interpreter(&mut printer, &mut interpreter);
                                     break;
                                 }
                                 Err(ReadlineError::Eof) => {
@@ -147,7 +153,7 @@ fn run_interpreter(source_filename: Option<String>) -> i32 {
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                eprintln!("CTRL-C pressed, exiting.");
+                printer.eprintln("CTRL-C pressed, exiting.");
                 break;
             }
             Err(ReadlineError::Eof) => {
