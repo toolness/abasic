@@ -20,10 +20,20 @@ This is a simple Rust-based BASIC interpreter with the following goals:
 
 ## Quick start
 
-Right now there's just a test suite, really:
+```
+cargo run
+```
+
+You can get command-line help with:
 
 ```
-cargo test
+cargo run -- --help
+```
+
+Or you can run a program:
+
+```
+cargo run -- programs/chemist.bas
 ```
 
 ## License
