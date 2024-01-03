@@ -30,7 +30,33 @@ fn break_interpreter(interpreter: &mut Interpreter) {
     }
 }
 
-fn run_interpreter() -> i32 {
+fn load_source_file(interpreter: &mut Interpreter, filename: &String) -> Result<(), ()> {
+    let Ok(code) = std::fs::read_to_string(filename) else {
+        println!("ERROR READING FILE: {}", filename);
+        return Err(());
+    };
+    let lines = code.split('\n');
+    for (i, line) in lines.enumerate() {
+        let Some(first_char) = line.chars().next() else {
+            continue;
+        };
+        if !first_char.is_ascii_digit() {
+            eprintln!(
+                "WARNING: Line {} of '{}' is not a numbered line, ignoring it.",
+                i + 1,
+                filename
+            );
+            continue;
+        }
+        if let Err(err) = interpreter.start_evaluating(line) {
+            println!("{}", err);
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
+fn run_interpreter(source_filename: Option<String>) -> i32 {
     let (tx, rx) = channel();
 
     ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
@@ -46,8 +72,21 @@ fn run_interpreter() -> i32 {
 
     let mut interpreter = Interpreter::new();
 
+    let mut initial_command = None;
+
+    if let Some(filename) = source_filename {
+        if let Err(_) = load_source_file(&mut interpreter, &filename) {
+            return 1;
+        }
+        initial_command = Some("RUN");
+    }
+
     loop {
-        let readline = rl.readline("] ");
+        let readline = if let Some(command) = initial_command.take() {
+            Ok(command.to_string())
+        } else {
+            rl.readline("] ")
+        };
         match readline {
             Ok(line) => {
                 if let Err(err) = rl.add_history_entry(line.as_str()) {
@@ -128,6 +167,6 @@ fn run_interpreter() -> i32 {
 }
 
 fn main() {
-    let exit_code = run_interpreter();
+    let exit_code = run_interpreter(std::env::args().nth(1));
     std::process::exit(exit_code);
 }
