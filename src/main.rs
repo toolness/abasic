@@ -39,6 +39,14 @@ impl CliArgs {
     }
 }
 
+fn show_warning(message: String, line: Option<u64>) {
+    print!("WARNING");
+    if let Some(line) = line {
+        print!(" IN {}", line);
+    }
+    println!(": {}", message);
+}
+
 struct StdioInterpreter {
     args: CliArgs,
     printer: StdioPrinter,
@@ -50,7 +58,7 @@ impl StdioInterpreter {
         StdioInterpreter {
             args,
             printer: StdioPrinter::new(),
-            interpreter: Interpreter::new(),
+            interpreter: Interpreter::new(show_warning),
         }
     }
 

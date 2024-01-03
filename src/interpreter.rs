@@ -24,20 +24,34 @@ pub enum InterpreterState {
     AwaitingInput,
 }
 
-#[derive(Debug)]
 pub struct Interpreter {
     output: Vec<String>,
     program: Program,
+    warn_callback: Box<dyn FnMut(String, Option<u64>)>,
     variables: HashMap<Rc<String>, Value>,
     arrays: HashMap<Rc<String>, ValueArray>,
     state: InterpreterState,
     input: Option<String>,
 }
 
+impl core::fmt::Debug for Interpreter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Interpreter")
+            .field("output", &self.output)
+            .field("program", &self.program)
+            .field("variables", &self.variables)
+            .field("arrays", &self.arrays)
+            .field("state", &self.state)
+            .field("input", &self.input)
+            .finish()
+    }
+}
+
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(warn_callback: impl FnMut(String, Option<u64>) + 'static) -> Self {
         Interpreter {
             output: vec![],
+            warn_callback: Box::new(warn_callback),
             program: Default::default(),
             variables: HashMap::new(),
             arrays: HashMap::new(),
@@ -81,6 +95,10 @@ impl Interpreter {
         result.map(|value| Some(value))
     }
 
+    fn warn<T: AsRef<str>>(&mut self, message: T) {
+        (self.warn_callback)(message.as_ref().to_string(), self.program.get_line_number());
+    }
+
     fn parse_optional_array_index(&mut self) -> Result<Option<Vec<usize>>, TracedInterpreterError> {
         if self.program.peek_next_token() != Some(Token::LeftParen) {
             Ok(None)
@@ -116,8 +134,7 @@ impl Interpreter {
         // It seems we can't use hash_map::Entry here to provide a default value,
         // because we might actually error when creating the default value.
         if !self.arrays.contains_key(array_name) {
-            // TODO: It'd be nice to at least log a warning or something here, since
-            //       this can be a notorious source of bugs.
+            self.warn(format!("Use of undeclared array '{}'.", array_name));
             let array = ValueArray::default_for_variable_and_dimensionality(
                 &array_name.as_str(),
                 dimensions,
@@ -166,8 +183,7 @@ impl Interpreter {
                 } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
                 } else {
-                    // TODO: It'd be nice to at least log a warning or something here, since
-                    //       this can be a notorious source of bugs.
+                    self.warn(format!("Use of undeclared variable '{}'.", symbol));
                     Ok(Value::default_for_variable(symbol.as_str()))
                 }
             }
@@ -643,6 +659,12 @@ mod tests {
         }
     }
 
+    fn create_interpreter() -> Interpreter {
+        Interpreter::new(|string, line| {
+            eprintln!("Warning on line {:?}: {}", line, string);
+        })
+    }
+
     fn evaluate_while_running(interpreter: &mut Interpreter) -> Result<(), TracedInterpreterError> {
         while interpreter.get_state() == InterpreterState::Running {
             interpreter.continue_evaluating()?;
@@ -659,7 +681,7 @@ mod tests {
     }
 
     fn assert_eval_error(line: &'static str, expected: InterpreterError) {
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = create_interpreter();
         match evaluate_line_while_running(&mut interpreter, line) {
             Ok(_) => {
                 panic!("expected '{}' to error but it didn't", line);
@@ -671,13 +693,13 @@ mod tests {
     }
 
     fn assert_eval_output(line: &'static str, expected: &'static str) {
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = create_interpreter();
         let output = eval_line_and_expect_success(&mut interpreter, line);
         assert_eq!(output, expected, "evaluating '{}'", line);
     }
 
     fn assert_program_actions(program: &'static str, actions: &[Action]) {
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = create_interpreter();
         let lines = program.split("\n").map(|line| line.trim_start());
         for line in lines {
             eval_line_and_expect_success(&mut interpreter, line);
@@ -713,7 +735,7 @@ mod tests {
     }
 
     fn assert_program_error(program: &'static str, expected: InterpreterError) {
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = create_interpreter();
         let lines = program.split("\n").map(|line| line.trim_start());
         for line in lines {
             eval_line_and_expect_success(&mut interpreter, line);
