@@ -141,7 +141,6 @@ impl Interpreter {
 
         while let Some(equality_op) = self.program.try_next_token(EqualityOp::from_token) {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
-            println!("{:?} {:?} {:?}", value, equality_op, second_operand);
             value = equality_op.evaluate(&value, &second_operand)?;
         }
 
