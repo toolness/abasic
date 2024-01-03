@@ -25,7 +25,18 @@ const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
+    /// BASIC source file to execute.
     source_filename: Option<String>,
+
+    /// Enter interactive mode after running source file.
+    #[arg(short, long)]
+    interactive: bool,
+}
+
+impl CliArgs {
+    fn is_interactive(&self) -> bool {
+        self.source_filename.is_none() || self.interactive
+    }
 }
 
 struct StdioInterpreter {
@@ -43,7 +54,7 @@ impl StdioInterpreter {
         }
     }
 
-    fn break_interpreter(&mut self) {
+    fn break_interpreter(&mut self) -> Result<(), i32> {
         // TODO: Applesoft BASIC actually lets the user use "CONT" to resume
         // program execution after a break or "STOP" statement, it'd be nice
         // to support that. Instead, we're currently just stopping the program
@@ -53,12 +64,16 @@ impl StdioInterpreter {
         } else {
             self.printer.eprintln("BREAK");
         }
+        if !self.args.is_interactive() {
+            return Err(1);
+        }
+        Ok(())
     }
 
-    fn load_source_file(&mut self, filename: &String) -> Result<(), ()> {
+    fn load_source_file(&mut self, filename: &String) -> Result<(), i32> {
         let Ok(code) = std::fs::read_to_string(filename) else {
             println!("ERROR READING FILE: {}", filename);
-            return Err(());
+            return Err(1);
         };
         let lines = code.split('\n');
         for (i, line) in lines.enumerate() {
@@ -75,18 +90,13 @@ impl StdioInterpreter {
             }
             if let Err(err) = self.interpreter.start_evaluating(line) {
                 println!("{}", err);
-                return Err(());
+                return Err(1);
             }
         }
         Ok(())
     }
 
     fn run(&mut self) -> i32 {
-        let (tx, rx) = channel();
-
-        ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
-            .expect("Error setting Ctrl-C handler.");
-
         let Ok(mut rl) = DefaultEditor::new() else {
             eprintln!("Initializing DefaultEditor failed!");
             return 1;
@@ -95,26 +105,46 @@ impl StdioInterpreter {
         // Ignore the result, if it errors it's generally b/c the file doesn't exist.
         let _ = rl.load_history(HISTORY_FILENAME);
 
+        let run_result = self.run_impl(&mut rl);
+
+        // Ignore the result, if we fail no biggie.
+        let _ = rl.save_history(HISTORY_FILENAME);
+
+        match run_result {
+            Ok(_) => 0,
+            Err(exit_code) => exit_code,
+        }
+    }
+
+    fn run_impl(&mut self, rl: &mut DefaultEditor) -> Result<(), i32> {
+        let (tx, rx) = channel();
+
+        ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
+            .expect("Error setting Ctrl-C handler.");
+
         let mut initial_command = None;
 
         if let Some(filename) = &self.args.source_filename.clone() {
-            if let Err(_) = self.load_source_file(&filename) {
-                return 1;
-            }
+            self.load_source_file(&filename)?;
             initial_command = Some("RUN");
         }
 
         loop {
             self.printer.print_buffered_output();
+            let add_to_history = initial_command.is_none() && self.args.is_interactive();
             let readline = if let Some(command) = initial_command.take() {
                 Ok(command.to_string())
-            } else {
+            } else if self.args.is_interactive() {
                 rl.readline("] ")
+            } else {
+                return Ok(());
             };
             match readline {
                 Ok(line) => {
-                    if let Err(err) = rl.add_history_entry(line.as_str()) {
-                        eprintln!("WARNING: Failed to add history entry (${:?}).", err);
+                    if add_to_history {
+                        if let Err(err) = rl.add_history_entry(line.as_str()) {
+                            eprintln!("WARNING: Failed to add history entry (${:?}).", err);
+                        }
                     }
                     loop {
                         let result = match self.interpreter.get_state() {
@@ -133,17 +163,17 @@ impl StdioInterpreter {
                         }
 
                         if rx.try_recv().is_ok() {
-                            self.break_interpreter();
+                            self.break_interpreter()?;
                             break;
                         }
 
                         if let Err(err) = result {
                             self.printer.eprintln(err.to_string());
-                            if stdin().is_terminal() {
+                            if self.args.is_interactive() && stdin().is_terminal() {
                                 break;
                             } else {
                                 // If we're not interactive, treat errors as fatal.
-                                return 1;
+                                return Err(1);
                             }
                         }
 
@@ -158,15 +188,15 @@ impl StdioInterpreter {
                                         self.interpreter.provide_input(line);
                                     }
                                     Err(ReadlineError::Interrupted) => {
-                                        self.break_interpreter();
+                                        self.break_interpreter()?;
                                         break;
                                     }
                                     Err(ReadlineError::Eof) => {
-                                        return 0;
+                                        return Ok(());
                                     }
                                     Err(err) => {
                                         eprintln!("Error: {:?}", err);
-                                        return 1;
+                                        return Err(1);
                                     }
                                 }
                             }
@@ -182,15 +212,12 @@ impl StdioInterpreter {
                 }
                 Err(err) => {
                     eprintln!("Error: {:?}", err);
-                    return 1;
+                    return Err(1);
                 }
             }
         }
 
-        // Ignore the result, if we fail no biggie.
-        let _ = rl.save_history(HISTORY_FILENAME);
-
-        return 0;
+        Ok(())
     }
 }
 
