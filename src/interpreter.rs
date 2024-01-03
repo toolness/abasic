@@ -1195,6 +1195,22 @@ mod tests {
         );
     }
 
+    #[ignore]
+    #[test]
+    fn data_works_with_arrays() {
+        // TODO: Make this pass!
+        assert_program_output(
+            r#"
+            10 data sup,dog,1
+            20 for i = 1 to 3
+            30 read a$(i)
+            40 print a$(i)
+            50 next i
+            "#,
+            "sup\ndog\n1\n",
+        );
+    }
+
     #[test]
     fn data_at_beginning_works() {
         assert_program_output(
@@ -1254,6 +1270,22 @@ mod tests {
             r#"
             10 input a$
             20 print "hello " a$
+        "#,
+            &[
+                Action::expect_output("").then_input("buddy"),
+                Action::expect_output("hello buddy\n"),
+            ],
+        )
+    }
+
+    #[ignore]
+    #[test]
+    fn input_works_with_arrays() {
+        // TODO: Make this pass!
+        assert_program_actions(
+            r#"
+            10 input a$(0)
+            20 print "hello " a$(0)
         "#,
             &[
                 Action::expect_output("").then_input("buddy"),
