@@ -82,5 +82,60 @@ mod tests {
         arr.set(&[0], 15).unwrap();
         assert_eq!(*arr.get(&[0]).unwrap(), 15);
         assert_eq!(arr.get(&[1]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.get(&[]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.set(&[], 1), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.set(&[1], 1), Err(InterpreterError::BadSubscript));
+    }
+
+    #[test]
+    fn one_dimensional_arrays_work() {
+        let mut arr = DimArray::<u8>::new(&[1]).unwrap();
+        arr.set(&[1], 20).unwrap();
+        arr.set(&[0], 15).unwrap();
+        assert_eq!(*arr.get(&[1]).unwrap(), 20);
+        assert_eq!(*arr.get(&[0]).unwrap(), 15);
+        assert_eq!(arr.get(&[2]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.get(&[]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.set(&[], 1), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.set(&[2], 1), Err(InterpreterError::BadSubscript));
+    }
+
+    #[test]
+    fn two_dimensional_arrays_work() {
+        let mut arr = DimArray::<u8>::new(&[1, 1]).unwrap();
+        arr.set(&[0, 0], 1).unwrap();
+        arr.set(&[0, 1], 2).unwrap();
+        arr.set(&[1, 0], 3).unwrap();
+        arr.set(&[1, 1], 4).unwrap();
+        assert_eq!(*arr.get(&[0, 0]).unwrap(), 1);
+        assert_eq!(*arr.get(&[0, 1]).unwrap(), 2);
+        assert_eq!(*arr.get(&[1, 0]).unwrap(), 3);
+        assert_eq!(*arr.get(&[1, 1]).unwrap(), 4);
+        assert_eq!(arr.get(&[0]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.get(&[0, 2]), Err(InterpreterError::BadSubscript));
+    }
+
+    #[test]
+    fn three_dimensional_arrays_work() {
+        let mut arr = DimArray::<u8>::new(&[1, 1, 1]).unwrap();
+        arr.set(&[0, 0, 0], 1).unwrap();
+        arr.set(&[0, 1, 0], 2).unwrap();
+        arr.set(&[1, 0, 0], 3).unwrap();
+        arr.set(&[1, 1, 0], 4).unwrap();
+        arr.set(&[0, 0, 1], 5).unwrap();
+        arr.set(&[0, 1, 1], 6).unwrap();
+        arr.set(&[1, 0, 1], 7).unwrap();
+        arr.set(&[1, 1, 1], 8).unwrap();
+        assert_eq!(*arr.get(&[0, 0, 0]).unwrap(), 1);
+        assert_eq!(*arr.get(&[0, 1, 0]).unwrap(), 2);
+        assert_eq!(*arr.get(&[1, 0, 0]).unwrap(), 3);
+        assert_eq!(*arr.get(&[1, 1, 0]).unwrap(), 4);
+        assert_eq!(*arr.get(&[0, 0, 1]).unwrap(), 5);
+        assert_eq!(*arr.get(&[0, 1, 1]).unwrap(), 6);
+        assert_eq!(*arr.get(&[1, 0, 1]).unwrap(), 7);
+        assert_eq!(*arr.get(&[1, 1, 1]).unwrap(), 8);
+        assert_eq!(arr.get(&[0]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.get(&[0, 0]), Err(InterpreterError::BadSubscript));
+        assert_eq!(arr.get(&[0, 0, 2]), Err(InterpreterError::BadSubscript));
     }
 }
