@@ -842,11 +842,20 @@ mod tests {
     }
 
     #[test]
-    fn implicit_arrays_work() {
+    fn default_array_values_work() {
         assert_eval_output("print a(1)", "0\n");
         assert_eval_output("print a$(1)", "\n");
         assert_eval_output("print a(1,2,3)", "0\n");
         assert_eval_output("print a$(1,2,3)", "\n");
+    }
+
+    #[test]
+    fn variables_and_arrays_exist_in_separate_universes() {
+        // This is not a bug, it's how Applesoft BASIC works. Although it might
+        // be a bug in Applesoft BASIC, I'm not sure.
+        assert_eval_output("print a:print a(1)", "0\n0\n");
+        assert_eval_output("a = 1:print a:print a(1)", "1\n0\n");
+        assert_eval_output("print a(1):a = 1:print a:print a(1)", "0\n1\n0\n");
     }
 
     #[test]
