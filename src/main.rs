@@ -33,9 +33,9 @@ struct CliArgs {
     #[arg(short, long)]
     interactive: bool,
 
-    /// Disable warnings (e.g. use of undeclared variables).
+    /// Enable warnings (e.g. use of undeclared variables).
     #[arg(short, long)]
-    no_warnings: bool,
+    warnings: bool,
 }
 
 impl CliArgs {
@@ -62,10 +62,10 @@ struct StdioInterpreter {
 
 impl StdioInterpreter {
     fn new(args: CliArgs) -> Self {
-        let interpreter = Interpreter::new(if args.no_warnings {
-            |_message, _line| {}
-        } else {
+        let interpreter = Interpreter::new(if args.warnings {
             show_warning
+        } else {
+            |_message, _line| {}
         });
         StdioInterpreter {
             args,
