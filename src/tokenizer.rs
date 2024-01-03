@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Dim,
+    Let,
     Print,
     Input,
     Goto,
@@ -48,6 +49,7 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Dim => write!(f, "DIM"),
+            Token::Let => write!(f, "LET"),
             Token::Print => write!(f, "PRINT"),
             Token::Input => write!(f, "INPUT"),
             Token::Goto => write!(f, "GOTO"),
@@ -288,6 +290,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_any_keyword(&mut self) -> Option<Token> {
         if self.chomp_keyword("DIM") {
             Some(Token::Dim)
+        } else if self.chomp_keyword("LET") {
+            Some(Token::Let)
         } else if self.chomp_keyword("PRINT") {
             Some(Token::Print)
         } else if self.chomp_keyword("INPUT") {
