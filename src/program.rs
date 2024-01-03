@@ -30,6 +30,7 @@ struct LoopInfo {
     location: ProgramLocation,
     symbol: Rc<String>,
     to_value: f64,
+    step_value: f64,
 }
 
 #[derive(Debug, Default)]
@@ -54,7 +55,7 @@ impl Program {
         self.location = Default::default();
     }
 
-    pub fn start_loop(&mut self, symbol: Rc<String>, to_value: f64) {
+    pub fn start_loop(&mut self, symbol: Rc<String>, to_value: f64, step_value: f64) {
         // TODO: We might want to check the loop stack to see if there's already
         // a loop with the same symbol in-progress, and if so, delete everything
         // from that point to the top of the stack. This might be necessary because
@@ -84,6 +85,7 @@ impl Program {
             location: self.location,
             symbol,
             to_value,
+            step_value,
         })
     }
 
@@ -100,9 +102,15 @@ impl Program {
             return Err(InterpreterError::NextWithoutFor.into());
         }
 
-        let new_value = current_value + 1.0;
+        let new_value = current_value + loop_info.step_value;
 
-        if new_value <= loop_info.to_value {
+        let continue_loop = if loop_info.step_value >= 0.0 {
+            new_value <= loop_info.to_value
+        } else {
+            new_value >= loop_info.to_value
+        };
+
+        if continue_loop {
             self.location = loop_info.location;
             self.loop_stack.push(loop_info);
         }

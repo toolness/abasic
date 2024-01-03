@@ -311,9 +311,14 @@ impl Interpreter {
         let to_value = self.evaluate_expression()?;
         let to_number: f64 = to_value.try_into()?;
 
-        // TODO: Add support for STEP.
+        let step_number = if self.program.accept_next_token(Token::Step) {
+            self.evaluate_expression()?.try_into()?
+        } else {
+            1.0
+        };
 
-        self.program.start_loop(symbol.clone(), to_number);
+        self.program
+            .start_loop(symbol.clone(), to_number, step_number);
         self.variables.insert(symbol, from_number.into());
         Ok(())
     }
@@ -820,6 +825,13 @@ mod tests {
         );
 
         assert_eval_output("for i = 4 to 6: print i:next i", "4\n5\n6\n");
+
+        assert_eval_output(
+            "for i = 3 to 1 step -1: print i:next i:print \"DONE\" i",
+            "3\n2\n1\nDONE0\n",
+        );
+
+        assert_eval_output("for i = 1 to 3 step 2: print i:next i", "1\n3\n");
     }
 
     #[test]

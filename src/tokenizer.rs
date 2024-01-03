@@ -32,6 +32,7 @@ pub enum Token {
     End,
     For,
     To,
+    Step,
     Next,
     Read,
     Restore,
@@ -69,6 +70,7 @@ impl Display for Token {
             Token::End => write!(f, "END"),
             Token::For => write!(f, "FOR"),
             Token::To => write!(f, "TO"),
+            Token::Step => write!(f, "STEP"),
             Token::Next => write!(f, "NEXT"),
             Token::Read => write!(f, "READ"),
             Token::Restore => write!(f, "RESTORE"),
@@ -306,6 +308,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::To)
         } else if self.chomp_keyword("NEXT") {
             Some(Token::Next)
+        } else if self.chomp_keyword("STEP") {
+            Some(Token::Step)
         } else if self.chomp_keyword("READ") {
             Some(Token::Read)
         } else if self.chomp_keyword("RESTORE") {
