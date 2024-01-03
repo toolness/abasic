@@ -1043,6 +1043,11 @@ mod tests {
     }
 
     #[test]
+    fn division_by_zero_error_works() {
+        assert_eval_error("print 5/0", InterpreterError::DivisionByZero);
+    }
+
+    #[test]
     fn data_is_ignored() {
         assert_eval_output("print 1:data a,b,c:print 2", "1\n2\n");
     }

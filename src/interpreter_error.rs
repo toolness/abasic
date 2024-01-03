@@ -30,6 +30,7 @@ pub enum InterpreterError {
     BadSubscript,
     IllegalQuantity,
     Unimplemented,
+    DivisionByZero,
 }
 
 impl From<SyntaxError> for InterpreterError {
@@ -123,6 +124,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::IllegalQuantity => {
                 write!(f, "ILLEGAL QUANTITY ERROR")?;
+            }
+            InterpreterError::DivisionByZero => {
+                write!(f, "DIVISION BY ZERO ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

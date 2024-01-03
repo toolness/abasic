@@ -72,7 +72,13 @@ impl MultiplyOrDivideOp {
         let result = match (left_side, right_side) {
             (Value::Number(l), Value::Number(r)) => match self {
                 MultiplyOrDivideOp::Multiply => l * r,
-                MultiplyOrDivideOp::Divide => l / r,
+                MultiplyOrDivideOp::Divide => {
+                    if *r == 0.0 {
+                        return Err(InterpreterError::DivisionByZero.into());
+                    } else {
+                        l / r
+                    }
+                }
             },
             _ => return Err(InterpreterError::TypeMismatch.into()),
         };
