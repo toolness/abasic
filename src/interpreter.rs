@@ -253,23 +253,26 @@ impl Interpreter {
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let mut ends_with_semicolon = false;
         while let Some(token) = self.program.peek_next_token() {
-            ends_with_semicolon = token == Token::Semicolon;
             match token {
                 Token::Colon | Token::Else => break,
                 Token::Semicolon => {
                     // Semicolons in Applesoft BASIC are very weird, they can be interspersed
                     // throughout a PRINT statement and appear to do nothing, unless they're at
                     // the end, in which case there won't be a newline at the end of the output.
+                    ends_with_semicolon = true;
                     self.program.next_token().unwrap();
                 }
-                _ => match self.evaluate_expression()? {
-                    Value::String(string) => {
-                        self.output.push(string.to_string());
+                _ => {
+                    ends_with_semicolon = false;
+                    match self.evaluate_expression()? {
+                        Value::String(string) => {
+                            self.output.push(string.to_string());
+                        }
+                        Value::Number(number) => {
+                            self.output.push(format!("{}", number));
+                        }
                     }
-                    Value::Number(number) => {
-                        self.output.push(format!("{}", number));
-                    }
-                },
+                }
             }
         }
         if !ends_with_semicolon {
@@ -628,6 +631,7 @@ mod tests {
         assert_eval_output("print ;", "");
         assert_eval_output("print ;\"\"", "\n");
         assert_eval_output("print \"hello 😊\";", "hello 😊");
+        assert_eval_output("print \"hello\";:print \"there\"", "hellothere\n");
     }
 
     #[test]
