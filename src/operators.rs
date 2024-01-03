@@ -4,7 +4,7 @@ use crate::{
     value::Value,
 };
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum PlusOrMinusOp {
     Plus,
     Minus,
@@ -47,6 +47,7 @@ impl PlusOrMinusOp {
     }
 }
 
+#[derive(Debug)]
 pub enum MultiplyOrDivideOp {
     Multiply,
     Divide,
@@ -79,6 +80,7 @@ impl MultiplyOrDivideOp {
     }
 }
 
+#[derive(Debug)]
 pub enum EqualityOp {
     EqualTo,
     LessThan,

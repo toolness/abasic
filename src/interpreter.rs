@@ -115,37 +115,41 @@ impl Interpreter {
     }
 
     fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let value = self.evaluate_unary_plus_or_minus()?;
+        let mut value = self.evaluate_unary_plus_or_minus()?;
 
-        if let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
-            let second_operand = self.evaluate_multiply_or_divide_expression()?;
-            return op.evaluate(&value, &second_operand);
+        while let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
+            let second_operand = self.evaluate_unary_plus_or_minus()?;
+            value = op.evaluate(&value, &second_operand)?;
         }
 
         Ok(value)
     }
 
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let value = self.evaluate_multiply_or_divide_expression()?;
+        let mut value = self.evaluate_multiply_or_divide_expression()?;
 
-        if let Some(plus_or_minus) = self.program.try_next_token(PlusOrMinusOp::from_token) {
-            let second_operand = self.evaluate_plus_or_minus_expression()?;
-            let result = plus_or_minus.evaluate_binary(&value, &second_operand)?;
-            Ok(result.into())
-        } else {
-            Ok(value)
-        }
-    }
-
-    fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let value = self.evaluate_plus_or_minus_expression()?;
-
-        if let Some(equality_op) = self.program.try_next_token(EqualityOp::from_token) {
-            let second_operand = self.evaluate_expression()?;
-            return equality_op.evaluate(&value, &second_operand);
+        while let Some(plus_or_minus) = self.program.try_next_token(PlusOrMinusOp::from_token) {
+            let second_operand = self.evaluate_multiply_or_divide_expression()?;
+            value = plus_or_minus.evaluate_binary(&value, &second_operand)?;
         }
 
         Ok(value)
+    }
+
+    fn evaluate_equality_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let mut value = self.evaluate_plus_or_minus_expression()?;
+
+        while let Some(equality_op) = self.program.try_next_token(EqualityOp::from_token) {
+            let second_operand = self.evaluate_plus_or_minus_expression()?;
+            println!("{:?} {:?} {:?}", value, equality_op, second_operand);
+            value = equality_op.evaluate(&value, &second_operand)?;
+        }
+
+        Ok(value)
+    }
+
+    fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        self.evaluate_equality_expression()
     }
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -652,6 +656,7 @@ mod tests {
         assert_eval_output("print 2 + 5 * 4 - 1", "21\n");
         assert_eval_output("print 5 * 4 * 2", "40\n");
         assert_eval_output("print (5 + 3) * 4", "32\n");
+        assert_eval_output("print 15 / 5 * 3", "9\n");
     }
 
     #[test]
@@ -672,6 +677,12 @@ mod tests {
 
         assert_eval_output("print 1 <> 2", "1\n");
         assert_eval_output("print 1 <> 1", "0\n");
+    }
+
+    #[test]
+    fn print_works_with_chained_numeric_equality_expressions() {
+        assert_eval_output("print 5 > 4 > 3", "0\n");
+        assert_eval_output("print 5 > 4 = 1", "1\n");
     }
 
     #[test]
