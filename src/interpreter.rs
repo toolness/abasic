@@ -336,16 +336,14 @@ impl Interpreter {
     fn evaluate_input_statement(&mut self) -> Result<(), TracedInterpreterError> {
         if let Some(input) = self.input.take() {
             // TODO: Support multiple comma-separated items.
-            let Some(Token::Symbol(symbol)) = self.program.next_token() else {
-                return Err(SyntaxError::UnexpectedToken.into());
-            };
+            let lvalue = self.parse_lvalue()?;
             let (data, bytes_read) = parse_data_until_colon(input.as_str());
             // We're guaranteed to have at least one item in here, even if the input was an empty string.
             let first_element = &data[0];
             let has_excess_data = data.len() > 1 || bytes_read < input.len();
-            match Value::coerce_from_data_element(symbol.as_str(), first_element) {
+            match Value::coerce_from_data_element(lvalue.symbol_name.as_str(), first_element) {
                 Ok(value) => {
-                    self.variables.insert(symbol, value);
+                    self.assign_value(lvalue, value)?;
                     if has_excess_data {
                         self.output.push("EXTRA IGNORED\n".to_string());
                     }
@@ -1312,10 +1310,8 @@ mod tests {
         )
     }
 
-    #[ignore]
     #[test]
     fn input_works_with_arrays() {
-        // TODO: Make this pass!
         assert_program_actions(
             r#"
             10 input a$(0)
