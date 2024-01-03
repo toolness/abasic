@@ -915,6 +915,8 @@ mod tests {
 
         assert_eval_output("a$(0) = \"blarg\":print a$(0)", "blarg\n");
         assert_eval_output("a$(1,1) = \"blarg\":print a$(1,1)", "blarg\n");
+
+        assert_eval_output("x = 4:a(x+1) = 123:print a(5)", "123\n");
     }
 
     #[test]
