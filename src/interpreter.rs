@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use crate::{
     builtins,
     data::parse_data_until_colon,
+    dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
     operators::{EqualityOp, MultiplyOrDivideOp, PlusOrMinusOp},
     program::Program,
@@ -23,6 +24,7 @@ pub struct Interpreter {
     output: Vec<String>,
     program: Program,
     variables: HashMap<Rc<String>, Value>,
+    arrays: HashMap<Rc<String>, ValueArray>,
     state: InterpreterState,
     input: Option<String>,
 }
@@ -33,6 +35,7 @@ impl Interpreter {
             output: vec![],
             program: Default::default(),
             variables: HashMap::new(),
+            arrays: HashMap::new(),
             state: InterpreterState::Idle,
             input: None,
         }
@@ -73,13 +76,63 @@ impl Interpreter {
         result.map(|value| Some(value))
     }
 
+    fn parse_array_index(&mut self) -> Result<Vec<usize>, TracedInterpreterError> {
+        let mut indices: Vec<usize> = vec![];
+        self.program.expect_next_token(Token::LeftParen)?;
+        loop {
+            let Value::Number(value) = self.evaluate_expression()? else {
+                return Err(InterpreterError::TypeMismatch.into());
+            };
+            let Ok(index) = usize::try_from(value as i64) else {
+                return Err(InterpreterError::IllegalQuantity.into());
+            };
+            indices.push(index);
+            if !self.program.accept_next_token(Token::Comma) {
+                break;
+            }
+        }
+        self.program.expect_next_token(Token::RightParen)?;
+        Ok(indices)
+    }
+
+    fn evaluate_array_index(
+        &mut self,
+        array_name: Rc<String>,
+    ) -> Result<Value, TracedInterpreterError> {
+        let index = self.parse_array_index()?;
+
+        // It seems we can't use hash_map::Entry here to provide a default value,
+        // because we might actually error when creating the default value.
+        let array = match self.arrays.get(&array_name) {
+            Some(value) => value,
+            None => {
+                // TODO: It'd be nice to at least log a warning or something here, since
+                //       this can be a notorious source of bugs.
+                let array = ValueArray::default_for_variable_and_dimensionality(
+                    &array_name.as_str(),
+                    index.len(),
+                )?;
+                self.arrays.insert(array_name.clone(), array);
+                self.arrays.get(&array_name).unwrap()
+            }
+        };
+
+        Ok(array.get(&index)?)
+    }
+
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
         match self.program.next_unwrapped_token()? {
             Token::StringLiteral(string) => Ok(string.into()),
             Token::NumericLiteral(number) => Ok(number.into()),
             Token::Symbol(symbol) => {
-                if let Some(value) = self.evaluate_function_call(symbol.as_str())? {
-                    Ok(value)
+                let is_array_or_function_call =
+                    self.program.peek_next_token() == Some(Token::LeftParen);
+                if is_array_or_function_call {
+                    if let Some(value) = self.evaluate_function_call(symbol.as_str())? {
+                        Ok(value)
+                    } else {
+                        self.evaluate_array_index(symbol)
+                    }
                 } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
                 } else {
@@ -789,6 +842,14 @@ mod tests {
     }
 
     #[test]
+    fn implicit_arrays_work() {
+        assert_eval_output("print a(1)", "0\n");
+        assert_eval_output("print a$(1)", "\n");
+        assert_eval_output("print a(1,2,3)", "0\n");
+        assert_eval_output("print a$(1,2,3)", "\n");
+    }
+
+    #[test]
     fn assignment_works() {
         assert_eval_output("x=1:print x", "1\n");
         assert_eval_output("X=1:print x", "1\n");
@@ -884,6 +945,30 @@ mod tests {
         // Applesoft BASIC only recognizes data in actual line numbers in the program, so
         // an immediate data statement is basically a no-op.
         assert_eval_error("data 1,2,3:read a", InterpreterError::OutOfData);
+    }
+
+    #[test]
+    fn syntax_error_raised_when_no_array_index_is_given() {
+        assert_eval_error("print a()", SyntaxError::UnexpectedToken.into());
+    }
+
+    #[test]
+    fn illegal_quantity_error_works() {
+        assert_eval_error("print a(-1)", InterpreterError::IllegalQuantity);
+    }
+
+    #[test]
+    fn bad_subscript_error_works() {
+        assert_eval_error("print a(1):print a(1,1)", InterpreterError::BadSubscript);
+        assert_eval_error("print a(1,1):print a(1)", InterpreterError::BadSubscript);
+
+        // This is weird b/c implicitly-created arrays are sized at 10 dimensions.
+        assert_eval_error("print a(11)", InterpreterError::BadSubscript);
+    }
+
+    #[test]
+    fn type_mismatch_error_works_with_array_indexing() {
+        assert_eval_error("print a(\"hi\")", InterpreterError::TypeMismatch);
     }
 
     #[test]

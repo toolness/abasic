@@ -28,6 +28,7 @@ pub enum InterpreterError {
     ReturnWithoutGosub,
     NextWithoutFor,
     BadSubscript,
+    IllegalQuantity,
     Unimplemented,
 }
 
@@ -119,6 +120,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::BadSubscript => {
                 write!(f, "BAD SUBSCRIPT ERROR")?;
+            }
+            InterpreterError::IllegalQuantity => {
+                write!(f, "ILLEGAL QUANTITY ERROR")?;
             }
         }
         if let Some(line) = self.line_number {
