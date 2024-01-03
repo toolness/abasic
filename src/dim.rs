@@ -63,7 +63,7 @@ impl<T: Default + Clone> DimArray<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::interpreter_error::InterpreterError;
+    use crate::interpreter_error::{InterpreterError, OutOfMemoryError};
 
     use super::DimArray;
 
@@ -72,6 +72,14 @@ mod tests {
         assert_eq!(
             DimArray::<u8>::new(&[]),
             Err(InterpreterError::BadSubscript)
+        );
+    }
+
+    #[test]
+    fn too_large_arrays_return_err() {
+        assert_eq!(
+            DimArray::<u8>::new(&[99999, 99999]),
+            Err(OutOfMemoryError::ArrayTooLarge.into())
         );
     }
 
