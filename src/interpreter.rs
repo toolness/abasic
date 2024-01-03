@@ -465,6 +465,7 @@ impl Interpreter {
 
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
+            Some(Token::Dim) => self.evaluate_dim_statement(),
             Some(Token::Print) => self.evaluate_print_statement(),
             Some(Token::Input) => self.evaluate_input_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
@@ -1091,6 +1092,22 @@ mod tests {
     #[test]
     fn division_by_zero_error_works() {
         assert_eval_error("print 5/0", InterpreterError::DivisionByZero);
+    }
+
+    #[test]
+    fn dim_works() {
+        assert_eval_output("dim a(100):a(57) = 123:print a(56):print a(57)", "0\n123\n");
+
+        // This is weird, but Applesoft is weird.
+        assert_eval_output("dim a:dim a:a = 5:print a:dim a:print a", "5\n5\n");
+    }
+
+    #[test]
+    fn redimensioned_array_error_works() {
+        assert_eval_error(
+            "dim a(1):dim a(1)",
+            InterpreterError::RedimensionedArrayError,
+        );
     }
 
     #[test]
