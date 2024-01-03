@@ -15,6 +15,7 @@ use std::io::{stdin, IsTerminal};
 use std::sync::mpsc::channel;
 
 use clap::Parser;
+use colored::*;
 use ctrlc;
 use interpreter::{Interpreter, InterpreterState};
 use rustyline::{error::ReadlineError, DefaultEditor};
@@ -40,11 +41,13 @@ impl CliArgs {
 }
 
 fn show_warning(message: String, line: Option<u64>) {
-    print!("WARNING");
-    if let Some(line) = line {
-        print!(" IN {}", line);
-    }
-    println!(": {}", message);
+    let line_str = line.map(|line| format!(" IN {}", line));
+
+    println!(
+        "{}: {}",
+        format!("WARNING{}", line_str.unwrap_or_default()).yellow(),
+        message
+    );
 }
 
 struct StdioInterpreter {
