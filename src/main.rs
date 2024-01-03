@@ -83,7 +83,7 @@ fn run_interpreter(source_filename: Option<String>) -> i32 {
         initial_command = Some("RUN");
     }
 
-    let mut printer = StdioPrinter::default();
+    let mut printer = StdioPrinter::new();
 
     loop {
         printer.print_buffered_output();
