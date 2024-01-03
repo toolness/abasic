@@ -27,6 +27,7 @@ pub enum InterpreterError {
     OutOfData,
     ReturnWithoutGosub,
     NextWithoutFor,
+    BadSubscript,
     Unimplemented,
 }
 
@@ -39,6 +40,7 @@ impl From<SyntaxError> for InterpreterError {
 #[derive(Debug, PartialEq)]
 pub enum OutOfMemoryError {
     StackOverflow,
+    ArrayTooLarge,
 }
 
 impl TracedInterpreterError {
@@ -57,10 +59,16 @@ impl From<SyntaxError> for TracedInterpreterError {
     }
 }
 
+impl From<OutOfMemoryError> for InterpreterError {
+    fn from(value: OutOfMemoryError) -> Self {
+        InterpreterError::OutOfMemory(value)
+    }
+}
+
 impl From<OutOfMemoryError> for TracedInterpreterError {
     fn from(value: OutOfMemoryError) -> Self {
         TracedInterpreterError {
-            error: InterpreterError::OutOfMemory(value),
+            error: value.into(),
             line_number: None,
             backtrace: Backtrace::capture(),
         }
@@ -108,6 +116,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::Unimplemented => {
                 write!(f, "UNIMPLEMENTED ERROR")?;
+            }
+            InterpreterError::BadSubscript => {
+                write!(f, "BAD SUBSCRIPT ERROR")?;
             }
         }
         if let Some(line) = self.line_number {
