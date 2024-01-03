@@ -25,6 +25,13 @@ impl ValueArray {
         dimensions: usize,
     ) -> Result<Self, TracedInterpreterError> {
         let max_indices = vec![DEFAULT_ARRAY_SIZE; dimensions];
+        Self::create(variable_name, max_indices)
+    }
+
+    pub fn create(
+        variable_name: &str,
+        max_indices: Vec<usize>,
+    ) -> Result<Self, TracedInterpreterError> {
         if variable_name.ends_with('$') {
             Ok(ValueArray::String(DimArray::new(&max_indices)?))
         } else {

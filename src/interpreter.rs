@@ -365,6 +365,21 @@ impl Interpreter {
         }
     }
 
+    fn evaluate_dim_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let lvalue = self.parse_lvalue()?;
+        let Some(max_indices) = lvalue.array_index else {
+            // You'd think this would be some kind of syntax error, but Applesoft
+            // just no-ops...
+            return Ok(());
+        };
+        if self.arrays.contains_key(&lvalue.symbol_name) {
+            return Err(InterpreterError::RedimensionedArrayError.into());
+        }
+        let array = ValueArray::create(lvalue.symbol_name.as_str(), max_indices)?;
+        self.arrays.insert(lvalue.symbol_name, array);
+        Ok(())
+    }
+
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let mut ends_with_semicolon = false;
         while let Some(token) = self.program.peek_next_token() {

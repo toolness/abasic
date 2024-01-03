@@ -31,6 +31,7 @@ pub enum InterpreterError {
     IllegalQuantity,
     Unimplemented,
     DivisionByZero,
+    RedimensionedArrayError,
 }
 
 impl From<SyntaxError> for InterpreterError {
@@ -127,6 +128,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::DivisionByZero => {
                 write!(f, "DIVISION BY ZERO ERROR")?;
+            }
+            InterpreterError::RedimensionedArrayError => {
+                write!(f, "REDIM'D ARRAY ERROR")?;
             }
         }
         if let Some(line) = self.line_number {
