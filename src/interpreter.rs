@@ -95,27 +95,44 @@ impl Interpreter {
         Ok(indices)
     }
 
-    fn evaluate_array_index(
+    fn maybe_create_default_array(
+        &mut self,
+        array_name: &Rc<String>,
+        dimensions: usize,
+    ) -> Result<(), TracedInterpreterError> {
+        // It seems we can't use hash_map::Entry here to provide a default value,
+        // because we might actually error when creating the default value.
+        if !self.arrays.contains_key(array_name) {
+            // TODO: It'd be nice to at least log a warning or something here, since
+            //       this can be a notorious source of bugs.
+            let array = ValueArray::default_for_variable_and_dimensionality(
+                &array_name.as_str(),
+                dimensions,
+            )?;
+            self.arrays.insert(array_name.clone(), array);
+        }
+        Ok(())
+    }
+
+    fn set_value_at_array_index(
+        &mut self,
+        array_name: &Rc<String>,
+        index: &Vec<usize>,
+        value: Value,
+    ) -> Result<(), TracedInterpreterError> {
+        self.maybe_create_default_array(&array_name, index.len())?;
+        let array = self.arrays.get_mut(array_name).unwrap();
+        array.set(index, value)
+    }
+
+    fn evaluate_value_at_array_index(
         &mut self,
         array_name: Rc<String>,
     ) -> Result<Value, TracedInterpreterError> {
         let index = self.parse_array_index()?;
 
-        // It seems we can't use hash_map::Entry here to provide a default value,
-        // because we might actually error when creating the default value.
-        let array = match self.arrays.get(&array_name) {
-            Some(value) => value,
-            None => {
-                // TODO: It'd be nice to at least log a warning or something here, since
-                //       this can be a notorious source of bugs.
-                let array = ValueArray::default_for_variable_and_dimensionality(
-                    &array_name.as_str(),
-                    index.len(),
-                )?;
-                self.arrays.insert(array_name.clone(), array);
-                self.arrays.get(&array_name).unwrap()
-            }
-        };
+        self.maybe_create_default_array(&array_name, index.len())?;
+        let array = self.arrays.get(&array_name).unwrap();
 
         Ok(array.get(&index)?)
     }
@@ -131,7 +148,7 @@ impl Interpreter {
                     if let Some(value) = self.evaluate_function_call(symbol.as_str())? {
                         Ok(value)
                     } else {
-                        self.evaluate_array_index(symbol)
+                        self.evaluate_value_at_array_index(symbol)
                     }
                 } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
@@ -242,10 +259,23 @@ impl Interpreter {
         &mut self,
         variable: Rc<String>,
     ) -> Result<(), TracedInterpreterError> {
+        let mut index: Option<Vec<usize>> = None;
+        if self.program.peek_next_token() == Some(Token::LeftParen) {
+            index = Some(self.parse_array_index()?);
+        }
+
         self.program.expect_next_token(Token::Equals)?;
         let value = self.evaluate_expression()?;
         value.validate_type_matches_variable_name(variable.as_str())?;
-        self.variables.insert(variable, value);
+
+        match index {
+            Some(index) => {
+                self.set_value_at_array_index(&variable, &index, value)?;
+            }
+            None => {
+                self.variables.insert(variable, value);
+            }
+        }
         Ok(())
     }
 
@@ -850,6 +880,15 @@ mod tests {
     }
 
     #[test]
+    fn array_assignment_works() {
+        assert_eval_output("a(0) = 5:print a(0)", "5\n");
+        assert_eval_output("a(1,1) = 5:print a(1,1)", "5\n");
+
+        assert_eval_output("a$(0) = \"blarg\":print a$(0)", "blarg\n");
+        assert_eval_output("a$(1,1) = \"blarg\":print a$(1,1)", "blarg\n");
+    }
+
+    #[test]
     fn variables_and_arrays_exist_in_separate_universes() {
         // This is not a bug, it's how Applesoft BASIC works. Although it might
         // be a bug in Applesoft BASIC, I'm not sure.
@@ -949,6 +988,15 @@ mod tests {
     }
 
     #[test]
+    fn type_mismatch_error_works_with_array_assignment() {
+        assert_eval_error("x(1) = x$", InterpreterError::TypeMismatch);
+        assert_eval_error("x(1) = \"hi\"", InterpreterError::TypeMismatch);
+
+        assert_eval_error("x$(1) = x", InterpreterError::TypeMismatch);
+        assert_eval_error("x$(1) = 1", InterpreterError::TypeMismatch);
+    }
+
+    #[test]
     fn out_of_data_error_works() {
         assert_eval_error("read a", InterpreterError::OutOfData);
         // Applesoft BASIC only recognizes data in actual line numbers in the program, so
@@ -970,6 +1018,7 @@ mod tests {
     fn bad_subscript_error_works() {
         assert_eval_error("print a(1):print a(1,1)", InterpreterError::BadSubscript);
         assert_eval_error("print a(1,1):print a(1)", InterpreterError::BadSubscript);
+        assert_eval_error("a(1) = 5:print a(1,1)", InterpreterError::BadSubscript);
 
         // This is weird b/c implicitly-created arrays are sized at 10 dimensions.
         assert_eval_error("print a(11)", InterpreterError::BadSubscript);

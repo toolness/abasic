@@ -23,6 +23,18 @@ impl TryFrom<Value> for f64 {
     }
 }
 
+impl TryFrom<Value> for Rc<String> {
+    type Error = TracedInterpreterError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::String(string) = value {
+            Ok(string)
+        } else {
+            Err(InterpreterError::TypeMismatch.into())
+        }
+    }
+}
+
 impl Value {
     // TODO: Should we use the `From` trait instead?  Or is this more explicit?
     pub fn to_bool(&self) -> bool {

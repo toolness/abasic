@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    interpreter_error::{InterpreterError, OutOfMemoryError},
+    interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     value::Value,
 };
 
@@ -23,7 +23,7 @@ impl ValueArray {
     pub fn default_for_variable_and_dimensionality(
         variable_name: &str,
         dimensions: usize,
-    ) -> Result<Self, InterpreterError> {
+    ) -> Result<Self, TracedInterpreterError> {
         let max_indices = vec![DEFAULT_ARRAY_SIZE; dimensions];
         if variable_name.ends_with('$') {
             Ok(ValueArray::String(DimArray::new(&max_indices)?))
@@ -32,7 +32,19 @@ impl ValueArray {
         }
     }
 
-    pub fn get(&self, index: &[usize]) -> Result<Value, InterpreterError> {
+    pub fn set(&mut self, index: &[usize], value: Value) -> Result<(), TracedInterpreterError> {
+        match self {
+            ValueArray::String(ref mut array) => {
+                array.set(index, value.try_into()?)?;
+            }
+            ValueArray::Number(array) => {
+                array.set(index, value.try_into()?)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get(&self, index: &[usize]) -> Result<Value, TracedInterpreterError> {
         match self {
             ValueArray::String(array) => Ok(array.get(index)?.into()),
             ValueArray::Number(array) => Ok(array.get(index)?.into()),
