@@ -12,6 +12,11 @@ use crate::{
     value::Value,
 };
 
+struct LValue {
+    symbol_name: Rc<String>,
+    array_index: Option<Vec<usize>>,
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum InterpreterState {
     Idle,
@@ -74,6 +79,14 @@ impl Interpreter {
             }
         };
         result.map(|value| Some(value))
+    }
+
+    fn parse_optional_array_index(&mut self) -> Result<Option<Vec<usize>>, TracedInterpreterError> {
+        if self.program.peek_next_token() != Some(Token::LeftParen) {
+            Ok(None)
+        } else {
+            self.parse_array_index().map(|index| Some(index))
+        }
     }
 
     fn parse_array_index(&mut self) -> Result<Vec<usize>, TracedInterpreterError> {
@@ -255,40 +268,58 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_assignment_statement(
+    fn assign_value(
         &mut self,
-        variable: Rc<String>,
+        lvalue: LValue,
+        rvalue: Value,
     ) -> Result<(), TracedInterpreterError> {
-        let mut index: Option<Vec<usize>> = None;
-        if self.program.peek_next_token() == Some(Token::LeftParen) {
-            index = Some(self.parse_array_index()?);
-        }
+        rvalue.validate_type_matches_variable_name(lvalue.symbol_name.as_str())?;
 
-        self.program.expect_next_token(Token::Equals)?;
-        let value = self.evaluate_expression()?;
-        value.validate_type_matches_variable_name(variable.as_str())?;
-
-        match index {
+        match lvalue.array_index {
             Some(index) => {
-                self.set_value_at_array_index(&variable, &index, value)?;
+                self.set_value_at_array_index(&lvalue.symbol_name, &index, rvalue)?;
             }
             None => {
-                self.variables.insert(variable, value);
+                self.variables.insert(lvalue.symbol_name, rvalue);
             }
         }
+
         Ok(())
+    }
+
+    fn evaluate_assignment_statement(
+        &mut self,
+        symbol_name: Rc<String>,
+    ) -> Result<(), TracedInterpreterError> {
+        let lvalue = LValue {
+            symbol_name,
+            array_index: self.parse_optional_array_index()?,
+        };
+        self.program.expect_next_token(Token::Equals)?;
+        let value = self.evaluate_expression()?;
+        self.assign_value(lvalue, value)?;
+        Ok(())
+    }
+
+    fn parse_lvalue(&mut self) -> Result<LValue, TracedInterpreterError> {
+        let Some(Token::Symbol(symbol_name)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        let array_index = self.parse_optional_array_index()?;
+        Ok(LValue {
+            symbol_name,
+            array_index,
+        })
     }
 
     fn evaluate_read_statement(&mut self) -> Result<(), TracedInterpreterError> {
         // TODO: Support multiple comma-separated items.
-        let Some(Token::Symbol(symbol)) = self.program.next_token() else {
-            return Err(SyntaxError::UnexpectedToken.into());
-        };
+        let lvalue = self.parse_lvalue()?;
         let Some(element) = self.program.next_data_element() else {
             return Err(InterpreterError::OutOfData.into());
         };
-        let value = Value::coerce_from_data_element(symbol.as_str(), &element)?;
-        self.variables.insert(symbol, value);
+        let value = Value::coerce_from_data_element(lvalue.symbol_name.as_str(), &element)?;
+        self.assign_value(lvalue, value)?;
         Ok(())
     }
 
@@ -1200,10 +1231,8 @@ mod tests {
         );
     }
 
-    #[ignore]
     #[test]
     fn data_works_with_arrays() {
-        // TODO: Make this pass!
         assert_program_output(
             r#"
             10 data sup,dog,1
