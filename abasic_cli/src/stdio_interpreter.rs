@@ -2,8 +2,8 @@ use std::io::{stdin, IsTerminal};
 use std::sync::mpsc::channel;
 
 use crate::cli_args::CliArgs;
-use crate::interpreter::{Interpreter, InterpreterState};
 use crate::stdio_printer::StdioPrinter;
+use abasic_core::{Interpreter, InterpreterState};
 use colored::*;
 use ctrlc;
 use rustyline::{error::ReadlineError, DefaultEditor};

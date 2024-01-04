@@ -6,11 +6,18 @@ version = 3
 name = "abasic"
 version = "0.1.0"
 dependencies = [
+ "abasic_core",
  "clap",
  "colored",
  "ctrlc",
- "fastrand",
  "rustyline",
+]
+
+[[package]]
+name = "abasic_core"
+version = "0.1.0"
+dependencies = [
+ "fastrand",
 ]
 
 [[package]]

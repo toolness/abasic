@@ -22,7 +22,10 @@ This is a simple Rust-based BASIC interpreter with the following goals:
 
 Install the executable with:
 
+<!-- Note that the `cd` here is annoying, we can remove it if this ever gets fixed: https://github.com/rust-lang/cargo/issues/4101 -->
+
 ```
+cd abasic_core
 cargo install --path=.
 ```
 
