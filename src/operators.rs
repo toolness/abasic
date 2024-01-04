@@ -90,7 +90,9 @@ impl MultiplyOrDivideOp {
 pub enum EqualityOp {
     EqualTo,
     LessThan,
+    LessThanOrEqualTo,
     GreaterThan,
+    GreaterThanOrEqualTo,
     NotEqualTo,
 }
 
@@ -101,7 +103,9 @@ impl EqualityOp {
         match token {
             Token::Equals => Some(EqualityOp::EqualTo),
             Token::LessThan => Some(EqualityOp::LessThan),
+            Token::LessThanOrEqualTo => Some(EqualityOp::LessThanOrEqualTo),
             Token::GreaterThan => Some(EqualityOp::GreaterThan),
+            Token::GreaterThanOrEqualTo => Some(EqualityOp::GreaterThanOrEqualTo),
             Token::NotEquals => Some(EqualityOp::NotEqualTo),
             _ => None,
         }
@@ -111,7 +115,9 @@ impl EqualityOp {
         match self {
             EqualityOp::EqualTo => left_side == right_side,
             EqualityOp::LessThan => left_side < right_side,
+            EqualityOp::LessThanOrEqualTo => left_side <= right_side,
             EqualityOp::GreaterThan => left_side > right_side,
+            EqualityOp::GreaterThanOrEqualTo => left_side >= right_side,
             EqualityOp::NotEqualTo => left_side != right_side,
         }
     }

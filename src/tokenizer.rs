@@ -27,7 +27,9 @@ pub enum Token {
     Equals,
     NotEquals,
     LessThan,
+    LessThanOrEqualTo,
     GreaterThan,
+    GreaterThanOrEqualTo,
     If,
     Then,
     Else,
@@ -67,7 +69,9 @@ impl Display for Token {
             Token::Equals => write!(f, "="),
             Token::NotEquals => write!(f, "<>"),
             Token::LessThan => write!(f, "<"),
+            Token::LessThanOrEqualTo => write!(f, "<="),
             Token::GreaterThan => write!(f, ">"),
+            Token::GreaterThanOrEqualTo => write!(f, ">="),
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
             Token::Else => write!(f, "ELSE"),
@@ -147,6 +151,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
                     if next_char == b'>' {
                         self.index += pos;
                         return Some(Ok(Token::NotEquals));
+                    } else if next_char == b'=' {
+                        self.index += pos;
+                        return Some(Ok(Token::LessThanOrEqualTo));
+                    }
+                }
+            } else if token == Token::GreaterThan {
+                if let Some((next_char, pos)) = self.crunch_remaining_bytes().next() {
+                    if next_char == b'=' {
+                        self.index += pos;
+                        return Some(Ok(Token::GreaterThanOrEqualTo));
                     }
                 }
             }

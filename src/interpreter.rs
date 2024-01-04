@@ -829,6 +829,14 @@ mod tests {
         assert_eval_output("print 1 > 0", "1\n");
         assert_eval_output("print 1 > 1", "0\n");
 
+        assert_eval_output("print 1 >= 1", "1\n");
+        assert_eval_output("print 2 >= 1", "1\n");
+        assert_eval_output("print 2 >= 3", "0\n");
+
+        assert_eval_output("print 1 <= 1", "1\n");
+        assert_eval_output("print 2 <= 1", "0\n");
+        assert_eval_output("print 2 <= 3", "1\n");
+
         assert_eval_output("print 1 <> 2", "1\n");
         assert_eval_output("print 1 <> 1", "0\n");
     }
