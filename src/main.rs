@@ -1,4 +1,5 @@
 mod builtins;
+mod cli_args;
 mod data;
 mod dim;
 mod interpreter;
@@ -15,6 +16,7 @@ use std::io::{stdin, IsTerminal};
 use std::sync::mpsc::channel;
 
 use clap::Parser;
+use cli_args::CliArgs;
 use colored::*;
 use ctrlc;
 use interpreter::{Interpreter, InterpreterState};
@@ -22,27 +24,6 @@ use rustyline::{error::ReadlineError, DefaultEditor};
 use stdio_printer::StdioPrinter;
 
 const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct CliArgs {
-    /// BASIC source file to execute.
-    source_filename: Option<String>,
-
-    /// Enter interactive mode after running source file.
-    #[arg(short, long)]
-    interactive: bool,
-
-    /// Enable warnings (e.g. use of undeclared variables).
-    #[arg(short, long)]
-    warnings: bool,
-}
-
-impl CliArgs {
-    fn is_interactive(&self) -> bool {
-        self.source_filename.is_none() || self.interactive
-    }
-}
 
 fn show_warning(message: String, line: Option<u64>) {
     let line_str = line.map(|line| format!(" IN {}", line));
