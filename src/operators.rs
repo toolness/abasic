@@ -67,6 +67,24 @@ impl UnaryOp {
     }
 }
 
+pub fn evaluate_logical_or(
+    left_side: &Value,
+    right_side: &Value,
+) -> Result<Value, TracedInterpreterError> {
+    Ok(Value::from_bool(
+        left_side.to_bool() || right_side.to_bool(),
+    ))
+}
+
+pub fn evaluate_logical_and(
+    left_side: &Value,
+    right_side: &Value,
+) -> Result<Value, TracedInterpreterError> {
+    Ok(Value::from_bool(
+        left_side.to_bool() && right_side.to_bool(),
+    ))
+}
+
 #[derive(Debug)]
 pub enum MultiplyOrDivideOp {
     Multiply,

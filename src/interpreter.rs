@@ -5,7 +5,10 @@ use crate::{
     data::parse_data_until_colon,
     dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
-    operators::{AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp, UnaryOp},
+    operators::{
+        evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp,
+        UnaryOp,
+    },
     program::Program,
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
@@ -246,8 +249,32 @@ impl Interpreter {
         Ok(value)
     }
 
+    fn evaluate_logical_and_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let mut value = self.evaluate_equality_expression()?;
+
+        while self.program.accept_next_token(Token::And) {
+            let second_operand = self.evaluate_equality_expression()?;
+            value = evaluate_logical_and(&value, &second_operand)?;
+        }
+
+        Ok(value)
+    }
+
+    // Logical OR actually has lower precedence than logical AND.  See the Applesoft II BASIC
+    // Reference Manual, pg. 36.
+    fn evaluate_logical_or_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let mut value = self.evaluate_logical_and_expression()?;
+
+        while self.program.accept_next_token(Token::Or) {
+            let second_operand = self.evaluate_logical_and_expression()?;
+            value = evaluate_logical_or(&value, &second_operand)?;
+        }
+
+        Ok(value)
+    }
+
     fn evaluate_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        self.evaluate_equality_expression()
+        self.evaluate_logical_or_expression()
     }
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -874,7 +901,6 @@ mod tests {
         assert_eval_output("print not 530 + 10", "10\n");
     }
 
-    #[ignore]
     #[test]
     fn binary_logical_operators_work() {
         // TODO: Implement logical operators.
