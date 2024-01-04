@@ -367,13 +367,17 @@ impl Interpreter {
     }
 
     fn evaluate_read_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        // TODO: Support multiple comma-separated items.
-        let lvalue = self.parse_lvalue()?;
-        let Some(element) = self.program.next_data_element() else {
-            return Err(InterpreterError::OutOfData.into());
-        };
-        let value = Value::coerce_from_data_element(lvalue.symbol_name.as_str(), &element)?;
-        self.assign_value(lvalue, value)?;
+        loop {
+            let lvalue = self.parse_lvalue()?;
+            let Some(element) = self.program.next_data_element() else {
+                return Err(InterpreterError::OutOfData.into());
+            };
+            let value = Value::coerce_from_data_element(lvalue.symbol_name.as_str(), &element)?;
+            self.assign_value(lvalue, value)?;
+            if !self.program.accept_next_token(Token::Comma) {
+                break;
+            }
+        }
         Ok(())
     }
 
@@ -1376,6 +1380,20 @@ mod tests {
             50 next i
             "#,
             "sup\nsup\nsup\n",
+        );
+    }
+
+    #[test]
+    fn read_works_with_commas() {
+        assert_program_output(
+            r#"
+            10 data sup,dog,1
+            20 read A$,b$,c
+            30 print a$
+            40 print b$
+            50 print c
+            "#,
+            "sup\ndog\n1\n",
         );
     }
 
