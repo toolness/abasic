@@ -466,7 +466,7 @@ impl Interpreter {
         };
 
         self.program
-            .start_loop(symbol.clone(), to_number, step_number);
+            .start_loop(symbol.clone(), to_number, step_number)?;
         self.variables.insert(symbol, from_number.into());
         Ok(())
     }
@@ -1055,6 +1055,15 @@ mod tests {
         assert_eval_output(
             "for i = 1 to 2: print \"i = \" i:for j = 1 to 2:print \"j = \" j:next j:next i",
             "i = 1\nj = 1\nj = 2\ni = 2\nj = 1\nj = 2\n",
+        );
+    }
+
+    #[test]
+    fn weird_looping_works() {
+        // This is weird but works in Applesoft BASIC.
+        assert_eval_output(
+            r#"for i = 1 to 2: print "i = " i:for j = 1 to 2:print "j = " j:next i"#,
+            "i = 1\nj = 1\ni = 2\nj = 1\n",
         );
     }
 

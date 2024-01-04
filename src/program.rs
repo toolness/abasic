@@ -55,38 +55,78 @@ impl Program {
         self.location = Default::default();
     }
 
-    pub fn start_loop(&mut self, symbol: Rc<String>, to_value: f64, step_value: f64) {
-        // TODO: We might want to check the loop stack to see if there's already
-        // a loop with the same symbol in-progress, and if so, delete everything
-        // from that point to the top of the stack. This might be necessary because
-        // loops in basic don't have any kind of "break" statement, and we don't want
-        // to memory leak if the inside of a loop uses a goto.
-        //
-        // Other notes...
-        //
-        // The following works in Applesoft BASIC (it doesn't in our implementation):
-        //
-        //   10 for i = 1 to 3
-        //   20 for j = 1 to 4
-        //   30 print "i" i "j" j
-        //   40 next i
-        //
-        // It will print "i1j1", "i2j1", "i3j1" and then exit.
-        //
-        // However, adding a "50 next j" at the end of the program *will* fail in
-        // Applesoft BASIC, with a "NEXT WITHOUT FOR ERROR IN 50".
-        //
-        // The following doesn't run out of memory in Applesoft BASIC--it just
-        // loops infinitely--while it will leak memory in our implementation:
-        //
-        //   10 for i = 1 to 3
-        //   20 goto 10
+    /// Removes any loop with the given symbol, and any loops in front of it in
+    /// the loop stack.
+    ///
+    /// Returns the loop info for the loop, or None if one wasn't found.
+    ///
+    /// This is necessary because loops in basic don't have any kind of "break"
+    /// statement, and we don't want to memory leak if the inside of a loop uses a
+    /// goto or does something else strange with flow control.
+    ///
+    /// Situations that work in Applesoft BASIC, which this strategy enables:
+    ///
+    ///   10 for i = 1 to 3
+    ///   20 for j = 1 to 4
+    ///   30 print "i" i "j" j
+    ///   40 next i
+    ///
+    /// It will print "i1j1", "i2j1", "i3j1" and then exit.
+    ///
+    /// However, adding a "50 next j" at the end of the program *will* fail in
+    /// Applesoft BASIC:
+    ///
+    ///   10 for i = 1 to 3
+    ///   20 for j = 1 to 4
+    ///   30 print "i" i "j" j
+    ///   40 next i
+    ///   50 next j
+    ///
+    /// Running this raises a "NEXT WITHOUT FOR ERROR IN 50". The reason given
+    /// for this in the Applesoft II BASIC reference manual is that "when the NEXT
+    /// I is encountered, all knowledge of the J-loop is lost".  This method
+    /// effectively implements this "forgetting".
+    ///
+    /// Note that the following doesn't run out of memory in Applesoft BASIC--it just
+    /// loops infinitely--and this method ensures that it will work the same in
+    /// our implementation:
+    ///
+    ///   10 for i = 1 to 3
+    ///   20 goto 10
+    fn remove_loop_with_name(&mut self, symbol: &Rc<String>) -> Option<LoopInfo> {
+        let mut found_index = None;
+        for (i, loop_info) in self.loop_stack.iter().enumerate().rev() {
+            if &loop_info.symbol == symbol {
+                found_index = Some(i);
+                break;
+            }
+        }
+        match found_index {
+            Some(i) => {
+                let mut removed = self.loop_stack.drain(i..);
+                Some(removed.next().unwrap())
+            }
+            None => None,
+        }
+    }
+
+    pub fn start_loop(
+        &mut self,
+        symbol: Rc<String>,
+        to_value: f64,
+        step_value: f64,
+    ) -> Result<(), TracedInterpreterError> {
+        self.remove_loop_with_name(&symbol);
+        if self.loop_stack.len() == STACK_LIMIT {
+            return Err(OutOfMemoryError::StackOverflow.into());
+        }
         self.loop_stack.push(LoopInfo {
             location: self.location,
             symbol,
             to_value,
             step_value,
-        })
+        });
+        Ok(())
     }
 
     pub fn end_loop(
@@ -94,7 +134,7 @@ impl Program {
         symbol: Rc<String>,
         current_value: f64,
     ) -> Result<f64, TracedInterpreterError> {
-        let Some(loop_info) = self.loop_stack.pop() else {
+        let Some(loop_info) = self.remove_loop_with_name(&symbol) else {
             return Err(InterpreterError::NextWithoutFor.into());
         };
 
