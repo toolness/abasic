@@ -4,22 +4,12 @@ use std::sync::mpsc::channel;
 
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
-use abasic_core::{Interpreter, InterpreterState};
+use abasic_core::{Interpreter, InterpreterOutput, InterpreterState};
 use colored::*;
 use ctrlc;
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 const HISTORY_FILENAME: &'static str = ".abasic-history.txt";
-
-fn show_warning(message: String, line: Option<u64>) {
-    let line_str = line.map(|line| format!(" IN {}", line));
-
-    eprintln!(
-        "{}: {}",
-        format!("WARNING{}", line_str.unwrap_or_default()).yellow(),
-        message
-    );
-}
 
 fn get_history_path() -> Option<PathBuf> {
     // Note that we're using the deprecated std::env::home_dir() here, which
@@ -47,11 +37,8 @@ pub struct StdioInterpreter {
 
 impl StdioInterpreter {
     pub fn new(args: CliArgs) -> Self {
-        let interpreter = Interpreter::new(if args.warnings {
-            show_warning
-        } else {
-            |_message, _line| {}
-        });
+        let mut interpreter = Interpreter::new();
+        interpreter.enable_warnings = args.warnings;
         StdioInterpreter {
             args,
             printer: StdioPrinter::new(),
@@ -205,8 +192,15 @@ impl StdioInterpreter {
             };
 
             // Regardless of whether an error occurred, show any buffered output.
-            if let Some(output) = self.interpreter.get_and_clear_output_buffer() {
-                self.printer.print(output);
+            for output in self.interpreter.take_output() {
+                match output {
+                    InterpreterOutput::Print(string) => {
+                        self.printer.print(string);
+                    }
+                    _ => {
+                        eprint!("{}", output.to_string().yellow())
+                    }
+                }
             }
 
             if let Err(err) = result {

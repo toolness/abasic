@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     builtins,
@@ -15,6 +15,33 @@ use crate::{
     value::Value,
 };
 
+#[derive(Debug)]
+pub enum InterpreterOutput {
+    Print(String),
+    Warning(String, Option<u64>),
+    ExtraIgnored,
+    Reenter,
+}
+
+impl Display for InterpreterOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InterpreterOutput::Print(string) => string.fmt(f),
+            InterpreterOutput::Warning(message, line) => {
+                let line_str = line.map(|line| format!(" IN {}", line));
+                write!(
+                    f,
+                    "{}: {}\n",
+                    format!("WARNING{}", line_str.unwrap_or_default()),
+                    message
+                )
+            }
+            InterpreterOutput::ExtraIgnored => write!(f, "EXTRA IGNORED\n"),
+            InterpreterOutput::Reenter => write!(f, "REENTER\n"),
+        }
+    }
+}
+
 struct LValue {
     symbol_name: Rc<String>,
     array_index: Option<Vec<usize>>,
@@ -28,9 +55,9 @@ pub enum InterpreterState {
 }
 
 pub struct Interpreter {
-    output: Vec<String>,
+    output: Vec<InterpreterOutput>,
     program: Program,
-    warn_callback: Box<dyn FnMut(String, Option<u64>)>,
+    pub enable_warnings: bool,
     variables: HashMap<Rc<String>, Value>,
     arrays: HashMap<Rc<String>, ValueArray>,
     state: InterpreterState,
@@ -42,6 +69,7 @@ impl core::fmt::Debug for Interpreter {
         f.debug_struct("Interpreter")
             .field("output", &self.output)
             .field("program", &self.program)
+            .field("enable_warnings", &self.enable_warnings)
             .field("variables", &self.variables)
             .field("arrays", &self.arrays)
             .field("state", &self.state)
@@ -51,26 +79,20 @@ impl core::fmt::Debug for Interpreter {
 }
 
 impl Interpreter {
-    pub fn new(warn_callback: impl FnMut(String, Option<u64>) + 'static) -> Self {
+    pub fn new() -> Self {
         Interpreter {
             output: vec![],
-            warn_callback: Box::new(warn_callback),
             program: Default::default(),
             variables: HashMap::new(),
             arrays: HashMap::new(),
             state: InterpreterState::Idle,
+            enable_warnings: false,
             input: None,
         }
     }
 
-    pub fn get_and_clear_output_buffer(&mut self) -> Option<String> {
-        if self.output.is_empty() {
-            None
-        } else {
-            let output = self.output.join("");
-            self.output.clear();
-            Some(output)
-        }
+    pub fn take_output(&mut self) -> Vec<InterpreterOutput> {
+        std::mem::take(&mut self.output)
     }
 
     fn evaluate_unary_function<F: Fn(Value) -> Result<Value, TracedInterpreterError>>(
@@ -99,7 +121,12 @@ impl Interpreter {
     }
 
     fn warn<T: AsRef<str>>(&mut self, message: T) {
-        (self.warn_callback)(message.as_ref().to_string(), self.program.get_line_number());
+        if self.enable_warnings {
+            self.output.push(InterpreterOutput::Warning(
+                message.as_ref().to_string(),
+                self.program.get_line_number(),
+            ));
+        }
     }
 
     fn parse_optional_array_index(&mut self) -> Result<Option<Vec<usize>>, TracedInterpreterError> {
@@ -137,7 +164,9 @@ impl Interpreter {
         // It seems we can't use hash_map::Entry here to provide a default value,
         // because we might actually error when creating the default value.
         if !self.arrays.contains_key(array_name) {
-            self.warn(format!("Use of undeclared array '{}'.", array_name));
+            if self.enable_warnings {
+                self.warn(format!("Use of undeclared array '{}'.", array_name));
+            }
             let array = ValueArray::default_for_variable_and_dimensionality(
                 &array_name.as_str(),
                 dimensions,
@@ -186,7 +215,9 @@ impl Interpreter {
                 } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
                 } else {
-                    self.warn(format!("Use of undeclared variable '{}'.", symbol));
+                    if self.enable_warnings {
+                        self.warn(format!("Use of undeclared variable '{}'.", symbol));
+                    }
                     Ok(Value::default_for_variable(symbol.as_str()))
                 }
             }
@@ -403,7 +434,7 @@ impl Interpreter {
                 Ok(value) => {
                     self.assign_value(lvalue, value)?;
                     if has_excess_data {
-                        self.output.push("EXTRA IGNORED\n".to_string());
+                        self.output.push(InterpreterOutput::ExtraIgnored);
                     }
                     Ok(())
                 }
@@ -411,7 +442,7 @@ impl Interpreter {
                     error: InterpreterError::DataTypeMismatch,
                     ..
                 }) => {
-                    self.output.push("REENTER\n".to_string());
+                    self.output.push(InterpreterOutput::Reenter);
                     self.rewind_program_and_await_input();
                     Ok(())
                 }
@@ -440,6 +471,7 @@ impl Interpreter {
 
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let mut ends_with_semicolon = false;
+        let mut strings: Vec<String> = vec![];
         while let Some(token) = self.program.peek_next_token() {
             match token {
                 Token::Colon | Token::Else => break,
@@ -452,25 +484,26 @@ impl Interpreter {
                 }
                 Token::Comma => {
                     ends_with_semicolon = false;
-                    self.output.push("\t".to_string());
+                    strings.push("\t".to_string());
                     self.program.next_token().unwrap();
                 }
                 _ => {
                     ends_with_semicolon = false;
                     match self.evaluate_expression()? {
                         Value::String(string) => {
-                            self.output.push(string.to_string());
+                            strings.push(string.to_string());
                         }
                         Value::Number(number) => {
-                            self.output.push(format!("{}", number));
+                            strings.push(format!("{}", number));
                         }
                     }
                 }
             }
         }
         if !ends_with_semicolon {
-            self.output.push(String::from("\n"));
+            strings.push(String::from("\n"));
         }
+        self.output.push(InterpreterOutput::Print(strings.join("")));
         Ok(())
     }
 
@@ -577,7 +610,12 @@ impl Interpreter {
                 self.run()?;
             }
             "LIST" => {
-                self.output.extend(self.program.list());
+                self.output.extend(
+                    self.program
+                        .list()
+                        .into_iter()
+                        .map(|line| InterpreterOutput::Print(line)),
+                );
             }
             _ => {
                 return Ok(false);
@@ -707,9 +745,7 @@ mod tests {
     }
 
     fn create_interpreter() -> Interpreter {
-        Interpreter::new(|string, line| {
-            eprintln!("Warning on line {:?}: {}", line, string);
-        })
+        Interpreter::new()
     }
 
     fn evaluate_while_running(interpreter: &mut Interpreter) -> Result<(), TracedInterpreterError> {
@@ -761,9 +797,7 @@ mod tests {
             if let Some(input) = action.then_input {
                 interpreter.provide_input(input.to_string());
                 output = match evaluate_while_running(&mut interpreter) {
-                    Ok(_) => interpreter
-                        .get_and_clear_output_buffer()
-                        .unwrap_or_default(),
+                    Ok(_) => take_output_as_string(&mut interpreter),
                     Err(err) => {
                         panic!(
                             "after inputting '{}', expected successful evaluation but got {}\nIntepreter state is: {:?}",
@@ -797,14 +831,21 @@ mod tests {
         }
     }
 
+    fn take_output_as_string(interpreter: &mut Interpreter) -> String {
+        interpreter
+            .take_output()
+            .into_iter()
+            .map(|output| output.to_string())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
     fn eval_line_and_expect_success<T: AsRef<str>>(
         interpreter: &mut Interpreter,
         line: T,
     ) -> String {
         match evaluate_line_while_running(interpreter, line.as_ref()) {
-            Ok(_) => interpreter
-                .get_and_clear_output_buffer()
-                .unwrap_or_default(),
+            Ok(_) => take_output_as_string(interpreter),
             Err(err) => {
                 panic!(
                     "expected '{}' to evaluate successfully but got {}\nIntepreter state is: {:?}",

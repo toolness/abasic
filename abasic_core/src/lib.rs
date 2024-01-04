@@ -10,4 +10,4 @@ mod syntax_error;
 mod tokenizer;
 mod value;
 
-pub use interpreter::{Interpreter, InterpreterState};
+pub use interpreter::{Interpreter, InterpreterOutput, InterpreterState};
