@@ -67,6 +67,16 @@ impl UnaryOp {
     }
 }
 
+pub fn evaluate_exponent(
+    left_side: Value,
+    right_side: Value,
+) -> Result<Value, TracedInterpreterError> {
+    let number: f64 = left_side.try_into()?;
+    let power: f64 = right_side.try_into()?;
+
+    Ok(number.powf(power).into())
+}
+
 pub fn evaluate_logical_or(
     left_side: &Value,
     right_side: &Value,

@@ -6,8 +6,8 @@ use crate::{
     dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
     operators::{
-        evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp,
-        UnaryOp,
+        evaluate_exponent, evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp,
+        MultiplyOrDivideOp, UnaryOp,
     },
     program::Program,
     syntax_error::SyntaxError,
@@ -216,11 +216,22 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+    fn evaluate_exponent_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let mut value = self.evaluate_unary_operator()?;
 
+        while self.program.accept_next_token(Token::Caret) {
+            let power = self.evaluate_unary_operator()?;
+            value = evaluate_exponent(value, power)?;
+        }
+
+        Ok(value)
+    }
+
+    fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
+        let mut value = self.evaluate_exponent_expression()?;
+
         while let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
-            let second_operand = self.evaluate_unary_operator()?;
+            let second_operand = self.evaluate_exponent_expression()?;
             value = op.evaluate(&value, &second_operand)?;
         }
 
@@ -884,11 +895,12 @@ mod tests {
         assert_eval_output("print 5 > 4 = 1", "1\n");
     }
 
-    #[ignore]
     #[test]
     fn exponentiation_works() {
-        // TODO: Implement exponentiation.
         assert_eval_output("print 5 ^ 2", "25\n");
+        assert_eval_output("print 5 ^ 2 + 3 ^ 2", "34\n");
+        assert_eval_output("print 5 ^ 2 * 2 ^ 2", "100\n");
+        assert_eval_output("print -5 ^ 2", "25\n");
     }
 
     #[test]
@@ -903,7 +915,6 @@ mod tests {
 
     #[test]
     fn binary_logical_operators_work() {
-        // TODO: Implement logical operators.
         assert_eval_output("print 5 AND 2", "1\n");
         assert_eval_output("print 5 AND 0", "0\n");
         assert_eval_output("print 0 AND 0", "0\n");
