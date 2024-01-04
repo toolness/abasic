@@ -5,7 +5,7 @@ use crate::{
     data::parse_data_until_colon,
     dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
-    operators::{EqualityOp, MultiplyOrDivideOp, PlusOrMinusOp},
+    operators::{AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp, UnaryOp},
     program::Program,
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
@@ -201,23 +201,23 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_unary_plus_or_minus(&mut self) -> Result<Value, TracedInterpreterError> {
-        let maybe_plus_or_minus = self.program.try_next_token(PlusOrMinusOp::from_token);
+    fn evaluate_unary_operator(&mut self) -> Result<Value, TracedInterpreterError> {
+        let maybe_unary_op = self.program.try_next_token(UnaryOp::from_token);
 
         let value = self.evaluate_parenthesized_expression()?;
 
-        if let Some(plus_or_minus) = maybe_plus_or_minus {
-            Ok(plus_or_minus.evaluate_unary(value)?)
+        if let Some(unary_op) = maybe_unary_op {
+            Ok(unary_op.evaluate(value)?)
         } else {
             Ok(value)
         }
     }
 
     fn evaluate_multiply_or_divide_expression(&mut self) -> Result<Value, TracedInterpreterError> {
-        let mut value = self.evaluate_unary_plus_or_minus()?;
+        let mut value = self.evaluate_unary_operator()?;
 
         while let Some(op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
-            let second_operand = self.evaluate_unary_plus_or_minus()?;
+            let second_operand = self.evaluate_unary_operator()?;
             value = op.evaluate(&value, &second_operand)?;
         }
 
@@ -227,9 +227,9 @@ impl Interpreter {
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<Value, TracedInterpreterError> {
         let mut value = self.evaluate_multiply_or_divide_expression()?;
 
-        while let Some(plus_or_minus) = self.program.try_next_token(PlusOrMinusOp::from_token) {
+        while let Some(plus_or_minus) = self.program.try_next_token(AddOrSubtractOp::from_token) {
             let second_operand = self.evaluate_multiply_or_divide_expression()?;
-            value = plus_or_minus.evaluate_binary(&value, &second_operand)?;
+            value = plus_or_minus.evaluate(&value, &second_operand)?;
         }
 
         Ok(value)
@@ -864,9 +864,19 @@ mod tests {
         assert_eval_output("print 5 ^ 2", "25\n");
     }
 
+    #[test]
+    fn unary_logical_operator_works() {
+        assert_eval_output("print not 5", "0\n");
+        assert_eval_output("print not 0", "1\n");
+        assert_eval_output("print not 5 * 300", "0\n");
+        assert_eval_output("print not 0 * 300", "300\n");
+        assert_eval_output("print not 0 + 10", "11\n");
+        assert_eval_output("print not 530 + 10", "10\n");
+    }
+
     #[ignore]
     #[test]
-    fn logical_operators_work() {
+    fn binary_logical_operators_work() {
         // TODO: Implement logical operators.
         assert_eval_output("print 5 AND 2", "1\n");
         assert_eval_output("print 5 AND 0", "0\n");

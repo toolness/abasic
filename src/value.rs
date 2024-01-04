@@ -44,6 +44,15 @@ impl Value {
         }
     }
 
+    // TODO: Should we use the `From` trait instead?  Or is this more explicit?
+    pub fn from_bool(value: bool) -> Value {
+        if value {
+            1.0.into()
+        } else {
+            0.0.into()
+        }
+    }
+
     pub fn coerce_from_data_element<T: AsRef<str>>(
         variable_name: T,
         data_element: &DataElement,

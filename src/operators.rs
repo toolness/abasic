@@ -5,45 +5,65 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq)]
-pub enum PlusOrMinusOp {
-    Plus,
-    Minus,
+pub enum AddOrSubtractOp {
+    Add,
+    Subtract,
 }
 
-impl PlusOrMinusOp {
+impl AddOrSubtractOp {
     // I considered TryFrom here but it required an associated Error type
     // and I just wanted to use Option.
     pub fn from_token(token: Token) -> Option<Self> {
         match &token {
-            Token::Plus => Some(PlusOrMinusOp::Plus),
-            Token::Minus => Some(PlusOrMinusOp::Minus),
+            Token::Plus => Some(AddOrSubtractOp::Add),
+            Token::Minus => Some(AddOrSubtractOp::Subtract),
             _ => None,
         }
     }
 
-    pub fn evaluate_unary(&self, value: Value) -> Result<Value, TracedInterpreterError> {
-        let mut number: f64 = value.try_into()?;
-
-        if self == &PlusOrMinusOp::Minus {
-            number *= -1.0;
-        }
-
-        Ok(number.into())
-    }
-
-    pub fn evaluate_binary(
+    pub fn evaluate(
         &self,
         left_side: &Value,
         right_side: &Value,
     ) -> Result<Value, TracedInterpreterError> {
         let result = match (left_side, right_side) {
             (Value::Number(l), Value::Number(r)) => match self {
-                PlusOrMinusOp::Plus => l + r,
-                PlusOrMinusOp::Minus => l - r,
+                AddOrSubtractOp::Add => l + r,
+                AddOrSubtractOp::Subtract => l - r,
             },
             _ => return Err(InterpreterError::TypeMismatch.into()),
         };
         Ok(result.into())
+    }
+}
+
+pub enum UnaryOp {
+    Positive,
+    Negative,
+    Not,
+}
+
+impl UnaryOp {
+    // I considered TryFrom here but it required an associated Error type
+    // and I just wanted to use Option.
+    pub fn from_token(token: Token) -> Option<Self> {
+        match &token {
+            Token::Plus => Some(UnaryOp::Positive),
+            Token::Minus => Some(UnaryOp::Negative),
+            Token::Not => Some(UnaryOp::Not),
+            _ => None,
+        }
+    }
+
+    pub fn evaluate(&self, value: Value) -> Result<Value, TracedInterpreterError> {
+        match self {
+            UnaryOp::Positive => Ok(value),
+            UnaryOp::Negative => {
+                let number: f64 = -value.try_into()?;
+                Ok(number.into())
+            }
+            UnaryOp::Not => Ok(Value::from_bool(!value.to_bool())),
+        }
     }
 }
 
