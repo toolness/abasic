@@ -408,6 +408,11 @@ impl Interpreter {
                     ends_with_semicolon = true;
                     self.program.next_token().unwrap();
                 }
+                Token::Comma => {
+                    ends_with_semicolon = false;
+                    self.output.push("\t".to_string());
+                    self.program.next_token().unwrap();
+                }
                 _ => {
                     ends_with_semicolon = false;
                     match self.evaluate_expression()? {
@@ -782,6 +787,11 @@ mod tests {
         assert_eval_output("print \"hello 😊\"", "hello 😊\n");
         assert_eval_output("print \"hello 😊\" 5", "hello 😊5\n");
         assert_eval_output("print \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
+    }
+
+    #[test]
+    fn print_works_with_comma() {
+        assert_eval_output("print ,1", "\t1\n");
     }
 
     #[test]
