@@ -1,0 +1,4 @@
+#! /usr/bin/env sh
+
+cd abasic_cli
+cargo install --path=.
