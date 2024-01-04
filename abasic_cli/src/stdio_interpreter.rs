@@ -211,9 +211,7 @@ impl StdioInterpreter {
 
             if let Err(err) = result {
                 self.printer.eprintln(err.to_string());
-                if self.args.is_interactive() && stdin().is_terminal() {
-                    break;
-                } else {
+                if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);
                 }
