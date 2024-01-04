@@ -104,6 +104,9 @@ impl Program {
 
         let new_value = current_value + loop_info.step_value;
 
+        // I obtained this logic through experimentation with
+        // Applesoft BASIC, but it's also mentioned in the Dartmouth
+        // BASIC manual, fourth edition.
         let continue_loop = if loop_info.step_value >= 0.0 {
             new_value <= loop_info.to_value
         } else {
