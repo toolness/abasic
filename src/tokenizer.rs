@@ -30,6 +30,9 @@ pub enum Token {
     LessThanOrEqualTo,
     GreaterThan,
     GreaterThanOrEqualTo,
+    And,
+    Or,
+    Not,
     If,
     Then,
     Else,
@@ -72,6 +75,9 @@ impl Display for Token {
             Token::LessThanOrEqualTo => write!(f, "<="),
             Token::GreaterThan => write!(f, ">"),
             Token::GreaterThanOrEqualTo => write!(f, ">="),
+            Token::And => write!(f, "AND"),
+            Token::Or => write!(f, "OR"),
+            Token::Not => write!(f, "NOT"),
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
             Token::Else => write!(f, "ELSE"),
@@ -322,6 +328,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Then)
         } else if self.chomp_keyword("ELSE") {
             Some(Token::Else)
+        } else if self.chomp_keyword("AND") {
+            Some(Token::And)
+        } else if self.chomp_keyword("OR") {
+            Some(Token::Or)
+        } else if self.chomp_keyword("NOT") {
+            Some(Token::Not)
         } else if self.chomp_keyword("END") {
             Some(Token::End)
         } else if self.chomp_keyword("FOR") {
