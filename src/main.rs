@@ -149,6 +149,14 @@ impl StdioInterpreter {
             initial_command = Some("RUN");
         }
 
+        if self.args.is_interactive() {
+            println!(
+                "Welcome to Atul's BASIC Interpreter v{}.",
+                env!("CARGO_PKG_VERSION")
+            );
+            println!("Press CTRL-C to exit.");
+        }
+
         loop {
             self.printer.print_buffered_output();
             let add_to_history = initial_command.is_none() && self.args.is_interactive();
