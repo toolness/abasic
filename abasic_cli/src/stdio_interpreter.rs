@@ -147,90 +147,80 @@ impl StdioInterpreter {
         }
 
         loop {
-            self.printer.print_buffered_output();
-            let add_to_history = initial_command.is_none() && self.args.is_interactive();
-            let readline = if let Some(command) = initial_command.take() {
-                Ok(command.to_string())
-            } else if self.args.is_interactive() {
-                rl.readline("] ")
-            } else {
-                return Ok(());
-            };
-            match readline {
-                Ok(line) => {
-                    if add_to_history {
-                        if let Err(err) = rl.add_history_entry(line.as_str()) {
-                            eprintln!("WARNING: Failed to add history entry (${:?}).", err);
-                        }
-                    }
-                    loop {
-                        let result = match self.interpreter.get_state() {
-                            InterpreterState::Idle => self.interpreter.start_evaluating(&line),
-                            InterpreterState::Running => self.interpreter.continue_evaluating(),
-                            InterpreterState::AwaitingInput => {
-                                panic!(
-                                    "We should never be in this state at the beginning of the loop"
-                                )
-                            }
-                        };
-
-                        // Regardless of whether an error occurred, show any buffered output.
-                        if let Some(output) = self.interpreter.get_and_clear_output_buffer() {
-                            self.printer.print(output);
-                        }
-
-                        if rx.try_recv().is_ok() {
-                            self.break_interpreter()?;
-                            break;
-                        }
-
-                        if let Err(err) = result {
-                            self.printer.eprintln(err.to_string());
-                            if self.args.is_interactive() && stdin().is_terminal() {
-                                break;
-                            } else {
-                                // If we're not interactive, treat errors as fatal.
-                                return Err(1);
-                            }
-                        }
-
-                        match self.interpreter.get_state() {
-                            InterpreterState::Idle => break,
-                            InterpreterState::Running => {}
-                            InterpreterState::AwaitingInput => {
-                                let prompt = format!("{}? ", self.printer.pop_buffered_output());
-                                let readline = rl.readline(&prompt);
-                                match readline {
-                                    Ok(line) => {
-                                        self.interpreter.provide_input(line);
-                                    }
-                                    Err(ReadlineError::Interrupted) => {
-                                        self.break_interpreter()?;
-                                        break;
-                                    }
-                                    Err(ReadlineError::Eof) => {
-                                        return Ok(());
-                                    }
-                                    Err(err) => {
-                                        eprintln!("Error: {:?}", err);
-                                        return Err(1);
-                                    }
+            let result = match self.interpreter.get_state() {
+                InterpreterState::Idle => {
+                    self.printer.print_buffered_output();
+                    let add_to_history = initial_command.is_none() && self.args.is_interactive();
+                    let readline = if let Some(command) = initial_command.take() {
+                        Ok(command.to_string())
+                    } else if self.args.is_interactive() {
+                        rl.readline("] ")
+                    } else {
+                        return Ok(());
+                    };
+                    match readline {
+                        Ok(line) => {
+                            if add_to_history {
+                                if let Err(err) = rl.add_history_entry(line.as_str()) {
+                                    eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                                 }
                             }
+                            self.interpreter.start_evaluating(line)
+                        }
+                        Err(ReadlineError::Interrupted) => {
+                            self.printer.eprintln("CTRL-C pressed, exiting.");
+                            break;
+                        }
+                        Err(ReadlineError::Eof) => {
+                            break;
+                        }
+                        Err(err) => {
+                            eprintln!("Error: {:?}", err);
+                            return Err(1);
                         }
                     }
                 }
-                Err(ReadlineError::Interrupted) => {
-                    self.printer.eprintln("CTRL-C pressed, exiting.");
-                    break;
+                InterpreterState::Running => self.interpreter.continue_evaluating(),
+                InterpreterState::AwaitingInput => {
+                    let prompt = format!("{}? ", self.printer.pop_buffered_output());
+                    let readline = rl.readline(&prompt);
+                    match readline {
+                        Ok(line) => {
+                            self.interpreter.provide_input(line);
+                            Ok(())
+                        }
+                        Err(ReadlineError::Interrupted) => {
+                            self.break_interpreter()?;
+                            Ok(())
+                        }
+                        Err(ReadlineError::Eof) => {
+                            return Ok(());
+                        }
+                        Err(err) => {
+                            eprintln!("Error: {:?}", err);
+                            return Err(1);
+                        }
+                    }
                 }
-                Err(ReadlineError::Eof) => {
+            };
+
+            // Regardless of whether an error occurred, show any buffered output.
+            if let Some(output) = self.interpreter.get_and_clear_output_buffer() {
+                self.printer.print(output);
+            }
+
+            if let Err(err) = result {
+                self.printer.eprintln(err.to_string());
+                if self.args.is_interactive() && stdin().is_terminal() {
                     break;
-                }
-                Err(err) => {
-                    eprintln!("Error: {:?}", err);
+                } else {
+                    // If we're not interactive, treat errors as fatal.
                     return Err(1);
                 }
+            }
+
+            if rx.try_recv().is_ok() {
+                self.break_interpreter()?;
             }
         }
 
