@@ -1222,7 +1222,7 @@ mod tests {
             30 goto 60
             40 print "sup"
             50 return
-            60
+            60 end
             "#,
             "sup\ndog\n",
         );
@@ -1267,7 +1267,7 @@ mod tests {
             30 goto 60
             40 print "sup"
             50 return
-            60
+            60 end
             "#,
             "calling\nsup\nreturned\ndog\n",
         );

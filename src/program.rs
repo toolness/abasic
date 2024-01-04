@@ -256,8 +256,13 @@ impl Program {
     }
 
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
-        self.sorted_line_numbers.insert(line_number);
-        self.numbered_lines.insert(line_number, tokens);
+        if tokens.is_empty() {
+            self.sorted_line_numbers.remove(&line_number);
+            self.numbered_lines.remove(&line_number);
+        } else {
+            self.sorted_line_numbers.insert(line_number);
+            self.numbered_lines.insert(line_number, tokens);
+        }
         self.reset_data_cursor();
     }
 
