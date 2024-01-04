@@ -860,6 +860,7 @@ mod tests {
         // TODO: Implement logical operators.
         assert_eval_output("print 5 AND 2", "1\n");
         assert_eval_output("print 5 AND 0", "0\n");
+        assert_eval_output("print 0 AND 0", "0\n");
 
         assert_eval_output("print 5 OR 2", "1\n");
         assert_eval_output("print 5 OR 0", "1\n");
