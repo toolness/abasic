@@ -1,4 +1,5 @@
 use std::io::{stdin, IsTerminal};
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
 use crate::cli_args::CliArgs;
@@ -8,7 +9,7 @@ use colored::*;
 use ctrlc;
 use rustyline::{error::ReadlineError, DefaultEditor};
 
-const HISTORY_FILENAME: &'static str = ".interpreter-history.txt";
+const HISTORY_FILENAME: &'static str = ".abasic-history.txt";
 
 fn show_warning(message: String, line: Option<u64>) {
     let line_str = line.map(|line| format!(" IN {}", line));
@@ -18,6 +19,24 @@ fn show_warning(message: String, line: Option<u64>) {
         format!("WARNING{}", line_str.unwrap_or_default()).yellow(),
         message
     );
+}
+
+fn get_history_path() -> Option<PathBuf> {
+    // Note that we're using the deprecated std::env::home_dir() here, which
+    // doesn't give correct paths under some environments like Cygwin and Mingw,
+    // but we'll just not support those for now--the few alternatives I found on
+    // crates.io seem to have a lot of dependencies and supporting those other
+    // platforms isn't a high priority right now anyways.
+    #[allow(deprecated)]
+    if let Some(path) = std::env::home_dir() {
+        if path.exists() {
+            Some(path.join(HISTORY_FILENAME))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 pub struct StdioInterpreter {
@@ -88,13 +107,17 @@ impl StdioInterpreter {
             return 1;
         };
 
-        // Ignore the result, if it errors it's generally b/c the file doesn't exist.
-        let _ = rl.load_history(HISTORY_FILENAME);
+        let history_path = get_history_path();
+
+        // Note that we're ignoring the result here, which is generally OK--if it
+        // errors, it's probably because the file doesn't exist, and even then
+        // history is optional anyways.
+        history_path.clone().map(|path| rl.load_history(&path));
 
         let run_result = self.run_impl(&mut rl);
 
-        // Ignore the result, if we fail no biggie.
-        let _ = rl.save_history(HISTORY_FILENAME);
+        // Again, we're ignoring the result here, see above for rationale.
+        history_path.map(|path| rl.save_history(&path));
 
         match run_result {
             Ok(_) => 0,
