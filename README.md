@@ -20,21 +20,25 @@ This is a simple Rust-based BASIC interpreter with the following goals:
 
 ## Quick start
 
-```
-cargo run
-```
-
-You can get command-line help with:
+Install the executable with:
 
 ```
-cargo run -- --help
+cargo install --path=.
+```
+
+You can run the BASIC interpreter interactively with:
+
+```
+abasic
 ```
 
 Or you can run a program:
 
 ```
-cargo run -- programs/chemist.bas
+abasic programs/chemist.bas
 ```
+
+Use `abasic --help` for more details.
 
 ## License
 
