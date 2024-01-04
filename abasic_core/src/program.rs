@@ -37,7 +37,13 @@ struct LoopInfo {
 pub struct Program {
     numbered_lines: HashMap<u64, Vec<Token>>,
     immediate_line: Vec<Token>,
+
+    /// According to Wikipedia, Applesoft BASIC stored lines as a linked list,
+    /// which meant that GOSUB/GOTO took linear time. This was likely due to
+    /// memory constraints. We don't have such constraints, so we'll use a
+    /// BTreeSet for faster lookup.
     sorted_line_numbers: BTreeSet<u64>,
+
     location: ProgramLocation,
     stack: Vec<ProgramLocation>,
     loop_stack: Vec<LoopInfo>,
