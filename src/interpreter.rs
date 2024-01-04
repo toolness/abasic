@@ -847,6 +847,25 @@ mod tests {
         assert_eval_output("print 5 > 4 = 1", "1\n");
     }
 
+    #[ignore]
+    #[test]
+    fn exponentiation_works() {
+        // TODO: Implement exponentiation.
+        assert_eval_output("print 5 ^ 2", "25\n");
+    }
+
+    #[ignore]
+    #[test]
+    fn logical_operators_work() {
+        // TODO: Implement logical operators.
+        assert_eval_output("print 5 AND 2", "1\n");
+        assert_eval_output("print 5 AND 0", "0\n");
+
+        assert_eval_output("print 5 OR 2", "1\n");
+        assert_eval_output("print 5 OR 0", "1\n");
+        assert_eval_output("print 0 OR 0", "0\n");
+    }
+
     #[test]
     fn abs_works() {
         assert_eval_output("print abs(5)", "5\n");
