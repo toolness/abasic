@@ -198,7 +198,7 @@ impl StdioInterpreter {
                         self.printer.print(string);
                     }
                     _ => {
-                        eprint!("{}", output.to_string().yellow())
+                        eprintln!("{}", output.to_string().yellow())
                     }
                 }
             }

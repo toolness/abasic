@@ -31,13 +31,13 @@ impl Display for InterpreterOutput {
                 let line_str = line.map(|line| format!(" IN {}", line));
                 write!(
                     f,
-                    "{}: {}\n",
+                    "{}: {}",
                     format!("WARNING{}", line_str.unwrap_or_default()),
                     message
                 )
             }
-            InterpreterOutput::ExtraIgnored => write!(f, "EXTRA IGNORED\n"),
-            InterpreterOutput::Reenter => write!(f, "REENTER\n"),
+            InterpreterOutput::ExtraIgnored => write!(f, "EXTRA IGNORED"),
+            InterpreterOutput::Reenter => write!(f, "REENTER"),
         }
     }
 }
@@ -721,6 +721,7 @@ mod tests {
     use crate::{
         interpreter_error::{OutOfMemoryError, TracedInterpreterError},
         syntax_error::SyntaxError,
+        InterpreterOutput,
     };
 
     use super::{Interpreter, InterpreterError, InterpreterState};
@@ -835,7 +836,10 @@ mod tests {
         interpreter
             .take_output()
             .into_iter()
-            .map(|output| output.to_string())
+            .map(|output| match output {
+                InterpreterOutput::Print(message) => message.to_string(),
+                _ => format!("{}\n", output.to_string()),
+            })
             .collect::<Vec<_>>()
             .join("")
     }
