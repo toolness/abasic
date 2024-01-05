@@ -40,6 +40,12 @@ struct LoopInfo {
     step_value: f64,
 }
 
+#[derive(Debug)]
+struct FunctionDefinition {
+    arguments: Vec<Rc<String>>,
+    location: ProgramLocation,
+}
+
 #[derive(Debug, Default)]
 pub struct Program {
     numbered_lines: HashMap<u64, Vec<Token>>,
@@ -56,6 +62,7 @@ pub struct Program {
     stack: Vec<StackFrame>,
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
+    functions: HashMap<Rc<String>, FunctionDefinition>,
 }
 
 impl Program {
@@ -253,6 +260,24 @@ impl Program {
 
     pub fn end(&mut self) {
         self.set_and_goto_immediate_line(vec![]);
+    }
+
+    pub fn define_function(
+        &mut self,
+        name: Rc<String>,
+        arguments: Vec<Rc<String>>,
+    ) -> Result<(), TracedInterpreterError> {
+        if self.location.line == ProgramLine::Immediate {
+            return Err(InterpreterError::IllegalDirect.into());
+        }
+        self.functions.insert(
+            name,
+            FunctionDefinition {
+                arguments,
+                location: self.location,
+            },
+        );
+        Ok(())
     }
 
     pub fn find_variable_value_in_stack(&self, variable_name: &Rc<String>) -> Option<Value> {

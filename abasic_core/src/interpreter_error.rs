@@ -33,6 +33,7 @@ pub enum InterpreterError {
     DivisionByZero,
     RedimensionedArray,
     CannotContinue,
+    IllegalDirect,
 }
 
 impl From<SyntaxError> for InterpreterError {
@@ -135,6 +136,9 @@ impl Display for TracedInterpreterError {
             }
             InterpreterError::CannotContinue => {
                 write!(f, "CAN'T CONTINUE ERROR")?;
+            }
+            InterpreterError::IllegalDirect => {
+                write!(f, "ILLEGAL DIRECT ERROR")?;
             }
         }
         if let Some(line) = self.line_number {

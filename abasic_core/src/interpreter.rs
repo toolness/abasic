@@ -592,6 +592,44 @@ impl Interpreter {
         self.program.break_at_current_location();
     }
 
+    fn evaluate_def_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(Token::Symbol(function_name)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        self.program.expect_next_token(Token::LeftParen)?;
+        let mut arg_names: Vec<Rc<String>> = vec![];
+        loop {
+            // Note that in Applesoft BASIC, all functions must have at least one argument.
+            let Some(Token::Symbol(arg_name)) = self.program.next_token() else {
+                return Err(SyntaxError::UnexpectedToken.into());
+            };
+            arg_names.push(arg_name);
+            match self.program.next_token() {
+                Some(Token::Comma) => {
+                    // Keep looping to parse additional arguments.
+                }
+                Some(Token::RightParen) => break,
+                _ => return Err(SyntaxError::UnexpectedToken.into()),
+            }
+        }
+        self.program.expect_next_token(Token::Equals)?;
+        self.program.define_function(function_name, arg_names)?;
+
+        // Skip past function body, as we'll evaluate that whenever the function
+        // is actually called. but stop if we encounter a colon, since we'll want
+        // to evaluate any additional statements immediately.
+        while let Some(token) = self.program.next_token() {
+            match token {
+                Token::Colon => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         if self.enable_tracing {
             if let Some(line_number) = self.program.get_line_number() {
@@ -611,6 +649,7 @@ impl Interpreter {
             Some(Token::For) => self.evaluate_for_statement(),
             Some(Token::Next) => self.evaluate_next_statement(),
             Some(Token::Restore) => Ok(self.program.reset_data_cursor()),
+            Some(Token::Def) => self.evaluate_def_statement(),
             Some(Token::Read) => self.evaluate_read_statement(),
             Some(Token::Remark(_)) => Ok(()),
             Some(Token::Colon) => Ok(()),
@@ -1573,6 +1612,16 @@ mod tests {
             20 read a
             "#,
             InterpreterError::DataTypeMismatch,
+        );
+    }
+
+    #[test]
+    fn functions_work() {
+        assert_program_output(
+            r#"
+            10 def fna(x) = x + 1:print "hi"
+            "#,
+            "hi\n",
         );
     }
 
