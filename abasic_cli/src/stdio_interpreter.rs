@@ -81,6 +81,7 @@ impl StdioInterpreter {
                 continue;
             };
             if !first_char.is_ascii_digit() {
+                // TODO: Log this in yellow.
                 eprintln!(
                     "WARNING: Line {} of '{}' is not a numbered line, ignoring it.",
                     i + 1,
@@ -88,6 +89,7 @@ impl StdioInterpreter {
                 );
                 continue;
             }
+            // TODO: It would be nice to also log a warning if a line is defined multiple times.
             if let Err(err) = self.interpreter.start_evaluating(line) {
                 println!("{}", err);
                 return Err(1);
