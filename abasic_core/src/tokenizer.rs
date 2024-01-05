@@ -18,6 +18,7 @@ pub enum Token {
     Colon,
     Semicolon,
     Comma,
+    QuestionMark,
     LeftParen,
     RightParen,
     Plus,
@@ -64,6 +65,7 @@ impl Display for Token {
             Token::Colon => write!(f, ":"),
             Token::Semicolon => write!(f, ";"),
             Token::Comma => write!(f, ","),
+            Token::QuestionMark => write!(f, "?"),
             Token::LeftParen => write!(f, "("),
             Token::RightParen => write!(f, ")"),
             Token::Plus => write!(f, "+"),
@@ -141,6 +143,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
                 b':' => Token::Colon,
                 b';' => Token::Semicolon,
                 b',' => Token::Comma,
+                b'?' => Token::QuestionMark,
                 b'(' => Token::LeftParen,
                 b')' => Token::RightParen,
                 b'+' => Token::Plus,
@@ -653,7 +656,7 @@ mod tests {
     #[test]
     fn parsing_single_illegal_character_returns_error() {
         assert_values_parse_to_tokens_wrapped(
-            &["?", " %", "😊", "\n", "$"],
+            &[" %", "😊", "\n", "$"],
             &[Err(SyntaxError::IllegalCharacter)],
         );
     }

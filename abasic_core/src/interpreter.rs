@@ -562,7 +562,7 @@ impl Interpreter {
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         match self.program.next_token() {
             Some(Token::Dim) => self.evaluate_dim_statement(),
-            Some(Token::Print) => self.evaluate_print_statement(),
+            Some(Token::Print) | Some(Token::QuestionMark) => self.evaluate_print_statement(),
             Some(Token::Input) => self.evaluate_input_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Goto) => self.evaluate_goto_statement(),
@@ -874,6 +874,16 @@ mod tests {
         assert_eval_output("print \"hello 😊\"", "hello 😊\n");
         assert_eval_output("print \"hello 😊\" 5", "hello 😊5\n");
         assert_eval_output("print \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
+    }
+
+    #[test]
+    fn print_as_question_mark_works() {
+        // This is a shortcut that Applesoft BASIC provides.
+        assert_eval_output("?", "\n");
+        assert_eval_output("? \"\"", "\n");
+        assert_eval_output("? \"hello 😊\"", "hello 😊\n");
+        assert_eval_output("? \"hello 😊\" 5", "hello 😊5\n");
+        assert_eval_output("? \"hello 😊\" 5 \"there\"", "hello 😊5there\n");
     }
 
     #[test]
