@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
-use abasic_core::{Interpreter, InterpreterOutput, InterpreterState};
+use abasic_core::{parse_line_number, Interpreter, InterpreterOutput, InterpreterState};
 use colored::*;
 use ctrlc;
 use rustyline::{error::ReadlineError, DefaultEditor};
@@ -77,21 +77,31 @@ impl StdioInterpreter {
         };
         let lines = code.split('\n');
         for (i, line) in lines.enumerate() {
-            let Some(first_char) = line.chars().next() else {
-                continue;
-            };
-            if !first_char.is_ascii_digit() {
-                // TODO: Log this in yellow.
-                eprintln!(
-                    "WARNING: Line {} of '{}' is not a numbered line, ignoring it.",
-                    i + 1,
-                    filename
-                );
+            if line.is_empty() {
                 continue;
             }
-            // TODO: It would be nice to also log a warning if a line is defined multiple times.
+            let file_line_number = i + 1;
+            let mut warn = |message: &str| {
+                self.printer.eprintln(
+                    format!(
+                        "Warning on line {} of '{}': {}",
+                        file_line_number, filename, message
+                    )
+                    .yellow(),
+                );
+            };
+            let Some((basic_line_number, end)) = parse_line_number(line) else {
+                warn("Line has no line number, ignoring it.");
+                continue;
+            };
+            if self.interpreter.has_line_number(basic_line_number) {
+                warn("Redefinition of pre-existing BASIC line.");
+            }
+            if line[end..].trim().is_empty() {
+                warn("Line contains no statements and will not be defined.");
+            }
             if let Err(err) = self.interpreter.start_evaluating(line) {
-                println!("{}", err);
+                self.printer.eprintln(err.to_string().red());
                 return Err(1);
             }
         }

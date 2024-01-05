@@ -775,6 +775,10 @@ impl Interpreter {
         }
     }
 
+    pub fn has_line_number(&self, line_number: u64) -> bool {
+        self.program.has_line_number(line_number)
+    }
+
     pub fn provide_input(&mut self, input: String) {
         assert_eq!(self.state, InterpreterState::AwaitingInput);
         self.input = Some(input);

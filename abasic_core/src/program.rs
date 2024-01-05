@@ -210,6 +210,10 @@ impl Program {
         Ok(new_value)
     }
 
+    pub fn has_line_number(&self, line_number: u64) -> bool {
+        self.numbered_lines.contains_key(&line_number)
+    }
+
     /// Go to the first numbered line. Resets the stack and the data cursor.
     pub fn goto_first_numbered_line(&mut self) {
         self.breakpoint = None;
