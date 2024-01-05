@@ -743,11 +743,15 @@ impl Interpreter {
         self.state
     }
 
-    fn maybe_process_command(
-        &mut self,
-        maybe_command: &str,
-    ) -> Result<bool, TracedInterpreterError> {
-        match maybe_command {
+    fn maybe_process_command(&mut self, line: &str) -> Result<bool, TracedInterpreterError> {
+        let Some(first_word) = line.split_ascii_whitespace().next() else {
+            return Ok(false);
+        };
+        // Note that here we're treating the first word of a line specially.
+        // In Applesoft BASIC, commands like LIST and RUN are actually full-fledged
+        // BASIC tokens and statements that can be executed through numbered lines.
+        // That feels like overkill so for now we're just doing this.
+        match first_word.to_ascii_uppercase().as_str() {
             "RUN" => {
                 self.program.goto_first_numbered_line();
                 self.run()?;
@@ -767,14 +771,10 @@ impl Interpreter {
                 self.program.continue_from_breakpoint()?;
                 self.run()?;
             }
-            // Note that Applesoft BASIC used "TRACE" and "NOTRACE", but we can't
-            // do the latter because the beginning of "NOTRACE" will be tokenized as
-            // "NOT RACE", and making separate tokens for each of these commands is
-            // a hassle so I'm just gonna use different command names instead for now.
-            "TRACEON" => {
+            "TRACE" => {
                 self.enable_tracing = true;
             }
-            "TRACEOFF" => {
+            "NOTRACE" => {
                 self.enable_tracing = false;
             }
             _ => {
@@ -847,6 +847,11 @@ impl Interpreter {
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
         let mut line_ref = line.as_ref();
+
+        if self.maybe_process_command(line_ref.to_uppercase().as_str())? {
+            return Ok(());
+        }
+
         let mut maybe_line_number: Option<u64> = None;
         if let Some((line_number, end_index)) = parse_line_number(line_ref) {
             maybe_line_number = Some(line_number);
@@ -858,16 +863,6 @@ impl Interpreter {
         if let Some(line_number) = maybe_line_number {
             self.program.set_numbered_line(line_number, tokens);
         } else {
-            // Note that here we're treating the first symbol of a line specially.
-            // In Applesoft BASIC, commands like LIST and RUN are actually full-fledged
-            // BASIC tokens and statements that can be executed through numbered lines.
-            // That feels like overkill so for now we're just doing this.
-            if let Some(Token::Symbol(maybe_command)) = tokens.first() {
-                if self.maybe_process_command(maybe_command.as_str())? {
-                    return Ok(());
-                }
-            }
-
             self.program.set_and_goto_immediate_line(tokens);
             self.run()?;
         }
