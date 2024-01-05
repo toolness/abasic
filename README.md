@@ -1,4 +1,4 @@
-ABASIC is a simple Rust-based, first-generation BASIC interpreter.
+ABASIC is a simple Rust-based BASIC interpreter.
 
 This interpreter was made primarily for learning and personal edification.
 It is [missing features](#limitations) from mainstream implementations
@@ -101,7 +101,7 @@ There's a lot of things that haven't been implemented, some of which include:
 * Integer types via the `%` suffix (e.g. `C% = 1`)
 * `MAT` (matrices)
 
-## Other notes
+## Other notes, learnings, etc.
 
 * BASIC was never standardized (attempts were made, but they never succeeded).
   Because of this, users inputting BASIC programs listed in books and
