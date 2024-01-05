@@ -8,6 +8,7 @@ use crate::{
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     syntax_error::SyntaxError,
     tokenizer::Token,
+    value::Value,
 };
 
 const STACK_LIMIT: usize = 256;
@@ -17,6 +18,12 @@ pub enum ProgramLine {
     #[default]
     Immediate,
     Line(u64),
+}
+
+#[derive(Debug)]
+struct StackFrame {
+    return_location: ProgramLocation,
+    variables: HashMap<Rc<String>, Value>,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -46,7 +53,7 @@ pub struct Program {
 
     location: ProgramLocation,
     breakpoint: Option<ProgramLocation>,
-    stack: Vec<ProgramLocation>,
+    stack: Vec<StackFrame>,
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
 }
@@ -228,16 +235,19 @@ impl Program {
         }
         let return_location = self.location;
         self.goto_line_number(line_number)?;
-        self.stack.push(return_location);
+        self.stack.push(StackFrame {
+            return_location,
+            variables: HashMap::new(),
+        });
         Ok(())
     }
 
     pub fn return_to_last_gosub(&mut self) -> Result<(), TracedInterpreterError> {
         self.breakpoint = None;
-        let Some(return_location) = self.stack.pop() else {
+        let Some(stack_frame) = self.stack.pop() else {
             return Err(InterpreterError::ReturnWithoutGosub.into());
         };
-        self.location = return_location;
+        self.location = stack_frame.return_location;
         Ok(())
     }
 
