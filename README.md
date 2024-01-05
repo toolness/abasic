@@ -65,14 +65,30 @@ Note that this list isn't exhaustive.
 * `GOTO`
 * `GOSUB`
 * `REM`
-* `PRINT`
+* `PRINT` / `?`
 * `INPUT`
 * `READ`, `RESTORE`, and `DATA`
 * `DIM` (arrays)
 * Arithmetic expressions (`+`, `-`, `*`, `/`, and `^`)
 * Logical operators (`AND`, `OR`, `NOT`)
 * Floating point and string values
-* Line crunching (e.g., `10PRINT123` is semantically identical to `10 PRINT 123`)
+* Line crunching (e.g., `10PRINT123` is semantically identical to
+  `10 PRINT 123`)
+* `:` (used to execute multiple statements in one line)
+
+The interpreter also supports a number of debugging features inspired by
+Applesoft BASIC:
+
+* `STOP` is similar to JavaScript's `debugger` instruction, and will pause
+  a program's execution. At this point, the program state can be inspected
+  and changed. `CONT` can be used to resume execution.
+
+* Pressing CTRL-C during execution will pause a program's execution at
+  whatever line it's currently on. At this point the program can be
+  inspected and resumed with `CONT`.
+
+* `TRACE` can be used to show the line number of each statement as it's
+  being executed.  To disable the feature, use `NOTRACE`.
 
 ## Limitations
 
