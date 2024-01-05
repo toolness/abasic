@@ -468,7 +468,7 @@ impl Interpreter {
             return Ok(());
         };
         if self.arrays.contains_key(&lvalue.symbol_name) {
-            return Err(InterpreterError::RedimensionedArrayError.into());
+            return Err(InterpreterError::RedimensionedArray.into());
         }
         let array = ValueArray::create(lvalue.symbol_name.as_str(), max_indices)?;
         self.arrays.insert(lvalue.symbol_name, array);
@@ -572,6 +572,11 @@ impl Interpreter {
             }
         }
         match self.program.next_token() {
+            Some(Token::Stop) => {
+                // TODO: Send break output
+                self.program.break_at_current_location();
+                Ok(())
+            }
             Some(Token::Dim) => self.evaluate_dim_statement(),
             Some(Token::Print) | Some(Token::QuestionMark) => self.evaluate_print_statement(),
             Some(Token::Input) => self.evaluate_input_statement(),
@@ -630,6 +635,9 @@ impl Interpreter {
             }
             "NEW" => {
                 self.state = InterpreterState::NewInterpreterRequested;
+            }
+            "CONT" => {
+                self.program.continue_from_breakpoint()?;
             }
             // Note that Applesoft BASIC used "TRACE" and "NOTRACE", but we can't
             // do the latter because the beginning of "NOTRACE" will be tokenized as
@@ -1307,10 +1315,7 @@ mod tests {
 
     #[test]
     fn redimensioned_array_error_works() {
-        assert_eval_error(
-            "dim a(1):dim a(1)",
-            InterpreterError::RedimensionedArrayError,
-        );
+        assert_eval_error("dim a(1):dim a(1)", InterpreterError::RedimensionedArray);
     }
 
     #[test]

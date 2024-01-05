@@ -39,6 +39,7 @@ pub enum Token {
     Then,
     Else,
     End,
+    Stop,
     For,
     To,
     Step,
@@ -86,6 +87,7 @@ impl Display for Token {
             Token::Then => write!(f, "THEN"),
             Token::Else => write!(f, "ELSE"),
             Token::End => write!(f, "END"),
+            Token::Stop => write!(f, "STOP"),
             Token::For => write!(f, "FOR"),
             Token::To => write!(f, "TO"),
             Token::Step => write!(f, "STEP"),
@@ -342,6 +344,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Not)
         } else if self.chomp_keyword("END") {
             Some(Token::End)
+        } else if self.chomp_keyword("STOP") {
+            Some(Token::Stop)
         } else if self.chomp_keyword("FOR") {
             Some(Token::For)
         } else if self.chomp_keyword("TO") {

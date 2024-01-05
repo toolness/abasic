@@ -45,6 +45,7 @@ pub struct Program {
     sorted_line_numbers: BTreeSet<u64>,
 
     location: ProgramLocation,
+    breakpoint: Option<ProgramLocation>,
     stack: Vec<ProgramLocation>,
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
@@ -54,9 +55,11 @@ impl Program {
     /// Set the content of the "immediate" line (i.e., the line that is being
     /// evaluated by the interpreter and has no line number) and go there.
     ///
-    /// Resets the stack.
+    /// Resets the stack (unless we're in a breakpoint).
     pub fn set_and_goto_immediate_line(&mut self, tokens: Vec<Token>) {
-        self.stack.clear();
+        if self.breakpoint.is_none() {
+            self.stack.clear();
+        }
         self.immediate_line = tokens;
         self.location = Default::default();
     }
@@ -116,6 +119,27 @@ impl Program {
         }
     }
 
+    pub fn break_at_current_location(&mut self) {
+        match self.location.line {
+            ProgramLine::Immediate => {
+                self.breakpoint = None;
+            }
+            ProgramLine::Line(_) => {
+                self.breakpoint = Some(self.location);
+            }
+        }
+        self.set_and_goto_immediate_line(vec![]);
+    }
+
+    pub fn continue_from_breakpoint(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(location) = self.breakpoint else {
+            return Err(InterpreterError::CannotContinue.into());
+        };
+        self.location = location;
+        self.breakpoint = None;
+        Ok(())
+    }
+
     pub fn start_loop(
         &mut self,
         symbol: Rc<String>,
@@ -169,6 +193,7 @@ impl Program {
 
     /// Go to the first numbered line. Resets the stack and the data cursor.
     pub fn goto_first_numbered_line(&mut self) {
+        self.breakpoint = None;
         self.reset_data_cursor();
         if let Some(&first_line) = self.sorted_line_numbers.first() {
             self.stack.clear();
@@ -184,6 +209,7 @@ impl Program {
     }
 
     pub fn goto_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
+        self.breakpoint = None;
         if self.sorted_line_numbers.contains(&line_number) {
             self.location = ProgramLocation {
                 line: ProgramLine::Line(line_number),
@@ -206,6 +232,7 @@ impl Program {
     }
 
     pub fn return_to_last_gosub(&mut self) -> Result<(), TracedInterpreterError> {
+        self.breakpoint = None;
         let Some(return_location) = self.stack.pop() else {
             return Err(InterpreterError::ReturnWithoutGosub.into());
         };
@@ -302,6 +329,7 @@ impl Program {
     }
 
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
+        self.breakpoint = None;
         if tokens.is_empty() {
             self.sorted_line_numbers.remove(&line_number);
             self.numbered_lines.remove(&line_number);
