@@ -255,6 +255,15 @@ impl Program {
         self.set_and_goto_immediate_line(vec![]);
     }
 
+    pub fn find_variable_value_in_stack(&self, variable_name: &Rc<String>) -> Option<Value> {
+        for frame in self.stack.iter().rev() {
+            if let Some(value) = frame.variables.get(variable_name) {
+                return Some(value.clone());
+            }
+        }
+        None
+    }
+
     /// Returns the line number currently being evaluated.
     pub fn get_line_number(&self) -> Option<u64> {
         if let ProgramLine::Line(line_number) = self.location.line {

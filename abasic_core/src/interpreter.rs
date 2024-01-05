@@ -231,6 +231,8 @@ impl Interpreter {
                     } else {
                         self.evaluate_value_at_array_index(symbol)
                     }
+                } else if let Some(value) = self.program.find_variable_value_in_stack(&symbol) {
+                    Ok(value)
                 } else if let Some(value) = self.variables.get(&symbol) {
                     Ok(value.clone())
                 } else {
