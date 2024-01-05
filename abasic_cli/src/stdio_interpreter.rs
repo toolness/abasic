@@ -37,8 +37,7 @@ pub struct StdioInterpreter {
 
 impl StdioInterpreter {
     pub fn new(args: CliArgs) -> Self {
-        let mut interpreter = Interpreter::new();
-        interpreter.enable_warnings = args.warnings;
+        let interpreter = args.create_interpreter();
         StdioInterpreter {
             args,
             printer: StdioPrinter::new(),
@@ -188,6 +187,10 @@ impl StdioInterpreter {
                             return Err(1);
                         }
                     }
+                }
+                InterpreterState::NewInterpreterRequested => {
+                    self.interpreter = self.args.create_interpreter();
+                    Ok(())
                 }
             };
 

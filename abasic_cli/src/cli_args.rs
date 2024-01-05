@@ -1,3 +1,4 @@
+use abasic_core::Interpreter;
 use clap::Parser;
 
 #[derive(Parser)]
@@ -18,5 +19,11 @@ pub struct CliArgs {
 impl CliArgs {
     pub fn is_interactive(&self) -> bool {
         self.source_filename.is_none() || self.interactive
+    }
+
+    pub fn create_interpreter(&self) -> Interpreter {
+        let mut interpreter = Interpreter::new();
+        interpreter.enable_warnings = self.warnings;
+        interpreter
     }
 }

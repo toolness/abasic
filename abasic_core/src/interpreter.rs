@@ -52,6 +52,7 @@ pub enum InterpreterState {
     Idle,
     Running,
     AwaitingInput,
+    NewInterpreterRequested,
 }
 
 pub struct Interpreter {
@@ -616,6 +617,9 @@ impl Interpreter {
                         .into_iter()
                         .map(|line| InterpreterOutput::Print(line)),
                 );
+            }
+            "NEW" => {
+                self.state = InterpreterState::NewInterpreterRequested;
             }
             _ => {
                 return Ok(false);
