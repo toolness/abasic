@@ -46,6 +46,7 @@ pub enum Token {
     Next,
     Read,
     Restore,
+    Def,
     Remark(Rc<String>),
     Symbol(Rc<String>),
     StringLiteral(Rc<String>),
@@ -94,6 +95,7 @@ impl Display for Token {
             Token::Next => write!(f, "NEXT"),
             Token::Read => write!(f, "READ"),
             Token::Restore => write!(f, "RESTORE"),
+            Token::Def => write!(f, "DEF"),
             Token::Remark(comment) => write!(f, "REM {}", comment),
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
@@ -358,6 +360,8 @@ impl<T: AsRef<str>> Tokenizer<T> {
             Some(Token::Read)
         } else if self.chomp_keyword("RESTORE") {
             Some(Token::Restore)
+        } else if self.chomp_keyword("DEF") {
+            Some(Token::Def)
         } else {
             None
         }
