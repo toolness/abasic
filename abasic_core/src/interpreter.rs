@@ -5,6 +5,7 @@ use crate::{
     data::parse_data_until_colon,
     dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
+    line_number_parser::parse_line_number,
     operators::{
         evaluate_exponent, evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp,
         MultiplyOrDivideOp, UnaryOp,
@@ -813,24 +814,16 @@ impl Interpreter {
 
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
-        let Some(char) = line.as_ref().chars().next() else {
-            return Ok(());
-        };
-        let mut tokenizer = Tokenizer::new(line);
-        let mut line_number: Option<u64> = None;
-        if char.is_numeric() {
-            let Some(num_result) = tokenizer.next() else {
-                panic!("Expected numbered line to tokenize");
-            };
-            let Token::NumericLiteral(number) = num_result? else {
-                panic!("Expected numbered line to start with numeric literal");
-            };
-            line_number = Some(number as u64);
+        let mut line_ref = line.as_ref();
+        let mut maybe_line_number: Option<u64> = None;
+        if let Some((line_number, end_index)) = parse_line_number(line_ref) {
+            maybe_line_number = Some(line_number);
+            line_ref = &line_ref[end_index..];
         }
 
-        let tokens = tokenizer.remaining_tokens()?;
+        let tokens = Tokenizer::new(line_ref).remaining_tokens()?;
 
-        if let Some(line_number) = line_number {
+        if let Some(line_number) = maybe_line_number {
             self.program.set_numbered_line(line_number, tokens);
         } else {
             // Note that here we're treating the first symbol of a line specially.
@@ -1431,6 +1424,30 @@ mod tests {
             20 print "dog"
             "#,
             "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn line_numbers_can_be_redefined() {
+        assert_program_output(
+            r#"
+            10 print "boop"
+            10 print "sup"
+            20 print "dog"
+            "#,
+            "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn empty_line_numbers_are_deleted() {
+        assert_program_error(
+            r#"
+            10 goto 20
+            20 print "sup"
+            20
+            "#,
+            InterpreterError::UndefinedStatement,
         );
     }
 

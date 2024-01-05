@@ -4,6 +4,7 @@ mod dim;
 mod interpreter;
 mod interpreter_error;
 mod line_cruncher;
+mod line_number_parser;
 mod operators;
 mod program;
 mod syntax_error;
