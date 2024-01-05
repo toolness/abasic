@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{fmt::Display, io::Write};
 
 /// If we don't get a newline for these many characters, flush the output
 /// to stdout.
@@ -58,9 +58,8 @@ impl StdioPrinter {
     ///
     /// This ensures that users see any partially printed output before
     /// error output in BASIC programs.
-    pub fn eprintln<T: AsRef<str>>(&mut self, value: T) {
+    pub fn eprintln<T: Display>(&mut self, value: T) {
         self.print_buffered_output();
-        std::io::stderr().write(value.as_ref().as_bytes()).unwrap();
-        std::io::stderr().write("\n".as_bytes()).unwrap();
+        eprintln!("{}", value);
     }
 }

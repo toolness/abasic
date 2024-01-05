@@ -198,13 +198,13 @@ impl StdioInterpreter {
                         self.printer.print(string);
                     }
                     _ => {
-                        eprintln!("{}", output.to_string().yellow())
+                        self.printer.eprintln(output.to_string().yellow());
                     }
                 }
             }
 
             if let Err(err) = result {
-                self.printer.eprintln(err.to_string());
+                self.printer.eprintln(err.to_string().red());
                 if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);
