@@ -59,6 +59,7 @@ I created this interpreter with the following goals:
 Note that this list isn't exhaustive.
 
 * `DEF` (user-definable functions)
+* `LET`
 * `IF ... THEN ... {ELSE}`
 * `FOR ... TO ... {STEP} ... NEXT`
 * `GOTO`

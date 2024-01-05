@@ -430,6 +430,14 @@ impl Interpreter {
         Ok(())
     }
 
+    fn evaluate_let_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        let Some(Token::Symbol(symbol_name)) = self.program.next_token() else {
+            return Err(SyntaxError::UnexpectedToken.into());
+        };
+        self.evaluate_assignment_statement(symbol_name)?;
+        Ok(())
+    }
+
     fn evaluate_assignment_statement(
         &mut self,
         symbol_name: Rc<String>,
@@ -698,6 +706,7 @@ impl Interpreter {
             Some(Token::Remark(_)) => Ok(()),
             Some(Token::Colon) => Ok(()),
             Some(Token::Data(_)) => Ok(()),
+            Some(Token::Let) => self.evaluate_let_statement(),
             Some(Token::Symbol(symbol)) => self.evaluate_assignment_statement(symbol),
             Some(_) => Err(SyntaxError::UnexpectedToken.into()),
             None => Ok(()),
@@ -1248,6 +1257,11 @@ mod tests {
         assert_eval_output("print a:print a(1)", "0\n0\n");
         assert_eval_output("a = 1:print a:print a(1)", "1\n0\n");
         assert_eval_output("print a(1):a = 1:print a:print a(1)", "0\n1\n0\n");
+    }
+
+    #[test]
+    fn assignment_works_with_let() {
+        assert_eval_output("let x=1:print x", "1\n");
     }
 
     #[test]
