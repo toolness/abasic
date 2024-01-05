@@ -438,7 +438,14 @@ impl Interpreter {
             symbol_name,
             array_index: self.parse_optional_array_index()?,
         };
+
+        // Dartmouth BASIC actually supported chained assignment,
+        // e.g. "LET A = B = C = 5" would assign A, B, and C to the
+        // value 5. Applesoft BASIC doesn't support this, though,
+        // as it just treats the remaining equal signs as equality
+        // operators. We follow Applesoft's behavior in this case.
         self.program.expect_next_token(Token::Equals)?;
+
         let value = self.evaluate_expression()?;
         self.assign_value(lvalue, value)?;
         Ok(())
