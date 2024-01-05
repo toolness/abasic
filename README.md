@@ -164,6 +164,26 @@ There's a lot of things that haven't been implemented, some of which include:
 
   This feature can be enabled via the `-w` flag on the command-line.
 
+* The core implementation of ABASIC (contained in the `abasic_core` crate)
+  was designed to have minimal dependencies and never block program execution
+  for any reason (e.g. accepting user input). This allows it to be ported to
+  the widest variety of platforms, including ones in which it may need to run
+  on a UI thread that can never block (e.g. WASM).
+
+  I had considered using Rust's `async`/`await` functionality to achieve this,
+  but it felt like overkill, so I opted for a "turn-taking" approach instead,
+  where the client asks the interpreter to evaluate one statement at a time,
+  and the interpreter lets it know if it's in a state where it needs
+  additional data (e.g., user input).
+
+  This effectivelys mean that BASIC statements can appear to "block" for any
+  reason, as their execution can be suspended at any statement boundary, but
+  BASIC _expressions_ cannot, as the recursive descent parser has no way of
+  ceding control to the client without unwinding its stack.
+
+  However, this seems to be compatible with the behavior of most BASIC
+  interpreters I've seen, so it doesn't seem to be a problem in practice.
+
 ## Other resources
 
 * [Dartmouth BASIC Fourth Edition language guide (1968)](https://archive.org/details/bitsavers_dartmouthB_3679804)
