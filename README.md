@@ -176,7 +176,7 @@ There's a lot of things that haven't been implemented, some of which include:
   and the interpreter lets it know if it's in a state where it needs
   additional data (e.g., user input).
 
-  This effectivelys mean that BASIC statements can appear to "block" for any
+  This effectively means that BASIC statements can appear to "block" for any
   reason, as their execution can be suspended at any statement boundary, but
   BASIC _expressions_ cannot, as the recursive descent parser has no way of
   ceding control to the client without unwinding its stack.
