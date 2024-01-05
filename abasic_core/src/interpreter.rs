@@ -702,6 +702,10 @@ impl Interpreter {
         if let Some(line_number) = line_number {
             self.program.set_numbered_line(line_number, tokens);
         } else {
+            // Note that here we're treating the first symbol of a line specially.
+            // In Applesoft BASIC, commands like LIST and RUN are actually full-fledged
+            // BASIC tokens and statements that can be executed through numbered lines.
+            // That feels like overkill so for now we're just doing this.
             if let Some(Token::Symbol(maybe_command)) = tokens.first() {
                 if self.maybe_process_command(maybe_command.as_str())? {
                     return Ok(());
