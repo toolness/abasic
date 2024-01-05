@@ -385,7 +385,7 @@ impl Interpreter {
         // cases; see the test suite for details.
         if conditional_value.to_bool() {
             // Evaluate the "then" clause.
-            self.evaluate_statement()?;
+            self.evaluate_statement_or_goto_line_number()?;
             if self.program.peek_next_token() == Some(Token::Else) {
                 // Skip the else clause, and anything else on this line.
                 self.program.discard_remaining_tokens();
@@ -401,7 +401,7 @@ impl Interpreter {
                         self.program.discard_remaining_tokens();
                     }
                     Token::Else => {
-                        self.evaluate_statement()?;
+                        self.evaluate_statement_or_goto_line_number()?;
                         return Ok(());
                     }
                     _ => {}
@@ -680,6 +680,14 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    fn evaluate_statement_or_goto_line_number(&mut self) -> Result<(), TracedInterpreterError> {
+        if let Some(Token::NumericLiteral(_)) = self.program.peek_next_token() {
+            self.evaluate_goto_statement()
+        } else {
+            self.evaluate_statement()
+        }
     }
 
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -1595,6 +1603,30 @@ mod tests {
             40 print "dog"
             "#,
             "sup\ndog\n",
+        );
+    }
+
+    #[test]
+    fn then_clause_works_with_only_line_number() {
+        assert_program_output(
+            r#"
+            20 if 1 then 40
+            30 print "THIS SHOULD NOT PRINT"
+            40 print "hi"
+            "#,
+            "hi\n",
+        );
+    }
+
+    #[test]
+    fn else_clause_works_with_only_line_number() {
+        assert_program_output(
+            r#"
+            20 if 0 then 30 else 40
+            30 print "THIS SHOULD NOT PRINT"
+            40 print "hi"
+            "#,
+            "hi\n",
         );
     }
 
