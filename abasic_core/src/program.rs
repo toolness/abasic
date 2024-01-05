@@ -11,7 +11,7 @@ use crate::{
     value::Value,
 };
 
-const STACK_LIMIT: usize = 256;
+const STACK_LIMIT: usize = 32;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub enum ProgramLine {
@@ -278,6 +278,42 @@ impl Program {
             },
         );
         Ok(())
+    }
+
+    pub fn get_function_argument_names(&mut self, name: &Rc<String>) -> Option<&Vec<Rc<String>>> {
+        self.functions.get(name).map(|f| &f.arguments)
+    }
+
+    /// Push the function with the given name onto the stack.
+    /// Note that a function with this name MUST exist, or else the program will panic.
+    /// You can use `get_function_argument_names` to validate this beforehand.
+    pub fn push_function_call_onto_stack_and_goto_it(
+        &mut self,
+        name: &Rc<String>,
+        bindings: HashMap<Rc<String>, Value>,
+    ) -> Result<(), TracedInterpreterError> {
+        if self.stack.len() == STACK_LIMIT {
+            return Err(OutOfMemoryError::StackOverflow.into());
+        }
+        self.stack.push(StackFrame {
+            return_location: self.location,
+            variables: bindings,
+        });
+        self.location = self
+            .functions
+            .get(name)
+            .expect("function must exist")
+            .location;
+        Ok(())
+    }
+
+    /// Pop the function with the given name off the stack.
+    ///
+    /// Note that this must be called after a successful `push_function_call_onto_stack`,
+    /// and the program will panic if the stack is empty.
+    pub fn pop_function_call_off_stack_and_return_from_it(&mut self) {
+        let frame = self.stack.pop().expect("stack must not be empty");
+        self.location = frame.return_location;
     }
 
     pub fn find_variable_value_in_stack(&self, variable_name: &Rc<String>) -> Option<Value> {

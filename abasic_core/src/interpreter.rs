@@ -124,16 +124,52 @@ impl Interpreter {
         f(arg)
     }
 
+    fn evaluate_user_defined_function_call(
+        &mut self,
+        function_name: &Rc<String>,
+    ) -> Result<Option<Value>, TracedInterpreterError> {
+        let Some(arg_names) = self
+            .program
+            .get_function_argument_names(function_name)
+            // Cloning this is a bit of a bummer but we don't expect user-defined
+            // function calls to happen very often, and we can always put the Vec
+            // behind an Rc to speed things up.
+            .cloned()
+        else {
+            return Ok(None);
+        };
+
+        self.program.expect_next_token(Token::LeftParen)?;
+        let arity = arg_names.len();
+        let mut bindings: HashMap<Rc<String>, Value> = HashMap::with_capacity(arity);
+        for (i, arg) in arg_names.into_iter().enumerate() {
+            let value = self.evaluate_expression()?;
+            value.validate_type_matches_variable_name(arg.as_str())?;
+            bindings.insert(arg, value);
+            if i < arity - 1 {
+                self.program.expect_next_token(Token::Comma)?;
+            }
+        }
+        self.program.expect_next_token(Token::RightParen)?;
+        self.program
+            .push_function_call_onto_stack_and_goto_it(function_name, bindings)?;
+        let value = self.evaluate_expression()?;
+        self.program
+            .pop_function_call_off_stack_and_return_from_it();
+
+        Ok(Some(value))
+    }
+
     fn evaluate_function_call(
         &mut self,
-        function_name: &str,
+        function_name: &Rc<String>,
     ) -> Result<Option<Value>, TracedInterpreterError> {
-        let result = match function_name {
+        let result = match function_name.as_str() {
             "ABS" => self.evaluate_unary_function(builtins::abs),
             "INT" => self.evaluate_unary_function(builtins::int),
             "RND" => self.evaluate_unary_function(builtins::rnd),
             _ => {
-                return Ok(None);
+                return self.evaluate_user_defined_function_call(function_name);
             }
         };
         result.map(|value| Some(value))
@@ -226,7 +262,7 @@ impl Interpreter {
                 let is_array_or_function_call =
                     self.program.peek_next_token() == Some(Token::LeftParen);
                 if is_array_or_function_call {
-                    if let Some(value) = self.evaluate_function_call(symbol.as_str())? {
+                    if let Some(value) = self.evaluate_function_call(&symbol)? {
                         Ok(value)
                     } else {
                         self.evaluate_value_at_array_index(symbol)
@@ -820,6 +856,7 @@ mod tests {
     use crate::{
         interpreter_error::{OutOfMemoryError, TracedInterpreterError},
         syntax_error::SyntaxError,
+        tokenizer::Token,
         InterpreterOutput,
     };
 
@@ -1616,12 +1653,80 @@ mod tests {
     }
 
     #[test]
-    fn functions_work() {
+    fn statements_are_processed_after_function_definitions() {
         assert_program_output(
             r#"
             10 def fna(x) = x + 1:print "hi"
+            20 print fna(1)
             "#,
-            "hi\n",
+            "hi\n2\n",
+        );
+    }
+
+    #[test]
+    fn functions_work() {
+        assert_program_output(
+            r#"
+            10 def fna(x) = x + 1
+            20 print fna(1)
+            "#,
+            "2\n",
+        );
+    }
+
+    #[test]
+    fn functions_with_multiple_arguments_work() {
+        assert_program_output(
+            r#"
+            10 def fna(x,y,z) = x + y + z + 1
+            20 print fna(1,2,3)
+            "#,
+            "7\n",
+        );
+    }
+
+    #[test]
+    fn nested_functions_work() {
+        assert_program_output(
+            r#"
+            10 def fna(x) = x + 1
+            20 def fnb(x) = fna(x) + 1
+            30 print fnb(1)
+            "#,
+            "3\n",
+        );
+    }
+
+    #[test]
+    fn function_calls_without_enough_arguments_fail() {
+        assert_program_error(
+            r#"
+            10 def fna(x,y,z) = x + y + z + 1
+            20 print fna(1,2)
+            "#,
+            SyntaxError::ExpectedToken(Token::Comma).into(),
+        );
+    }
+
+    #[test]
+    fn function_calls_with_too_many_arguments_fail() {
+        assert_program_error(
+            r#"
+            10 def fna(x,y,z) = x + y + z + 1
+            20 print fna(1,2,3,4)
+            "#,
+            SyntaxError::ExpectedToken(Token::RightParen).into(),
+        );
+    }
+
+    #[test]
+    fn infinite_recursion_causes_stack_overflow() {
+        assert_program_error(
+            r#"
+            10 def fna(x) = fna(x) + 1
+            20 print fna(1)
+            "#,
+            OutOfMemoryError::StackOverflow.into(),
         );
     }
 

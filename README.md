@@ -58,6 +58,7 @@ I created this interpreter with the following goals:
 
 Note that this list isn't exhaustive.
 
+* `DEF` (user-definable functions)
 * `IF ... THEN ... {ELSE}`
 * `FOR ... TO ... {STEP} ... NEXT`
 * `GOTO`
@@ -76,7 +77,6 @@ Note that this list isn't exhaustive.
 
 There's a lot of things that haven't been implemented, some of which include:
 
-* `DEF` (user-definable functions)
 * `WHILE ... WEND`, `REPEAT ... UNTIL`, `DO ... LOOP`
 * `ON ... GOTO/GOSUB`
 * Scientific notation (e.g. `1.3E-4`)
