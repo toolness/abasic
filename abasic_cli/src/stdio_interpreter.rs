@@ -45,16 +45,25 @@ impl StdioInterpreter {
         }
     }
 
-    fn break_interpreter(&mut self) -> Result<(), i32> {
-        // TODO: Applesoft BASIC actually lets the user use "CONT" to resume
-        // program execution after a break or "STOP" statement, it'd be nice
-        // to support that. Instead, we're currently just stopping the program
-        // and preventing it from being resumed.
-        if let Some(line_number) = self.interpreter.stop_evaluating() {
-            self.printer.eprintln(format!("BREAK IN {}", line_number));
-        } else {
-            self.printer.eprintln("BREAK");
+    fn show_interpreter_output(&mut self) {
+        for output in self.interpreter.take_output() {
+            match output {
+                InterpreterOutput::Print(string) => {
+                    self.printer.print(string);
+                }
+                InterpreterOutput::Trace(line) => {
+                    self.printer.print(format!("#{} ", line).blue().to_string());
+                }
+                _ => {
+                    self.printer.eprintln(output.to_string().yellow());
+                }
+            }
         }
+    }
+
+    fn break_interpreter(&mut self) -> Result<(), i32> {
+        self.interpreter.break_at_current_location();
+        self.show_interpreter_output();
         if !self.args.is_interactive() {
             return Err(1);
         }
@@ -195,19 +204,7 @@ impl StdioInterpreter {
             };
 
             // Regardless of whether an error occurred, show any buffered output.
-            for output in self.interpreter.take_output() {
-                match output {
-                    InterpreterOutput::Print(string) => {
-                        self.printer.print(string);
-                    }
-                    InterpreterOutput::Trace(line) => {
-                        self.printer.print(format!("#{} ", line).blue().to_string());
-                    }
-                    _ => {
-                        self.printer.eprintln(output.to_string().yellow());
-                    }
-                }
-            }
+            self.show_interpreter_output();
 
             if let Err(err) = result {
                 self.printer.eprintln(err.to_string().red());

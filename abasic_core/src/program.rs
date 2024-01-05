@@ -132,6 +132,7 @@ impl Program {
     }
 
     pub fn continue_from_breakpoint(&mut self) -> Result<(), TracedInterpreterError> {
+        self.set_and_goto_immediate_line(vec![]);
         let Some(location) = self.breakpoint else {
             return Err(InterpreterError::CannotContinue.into());
         };

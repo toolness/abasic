@@ -18,10 +18,17 @@ use crate::{
 #[derive(Debug)]
 pub enum InterpreterOutput {
     Print(String),
+    Break(Option<u64>),
     Warning(String, Option<u64>),
     Trace(u64),
     ExtraIgnored,
     Reenter,
+}
+
+impl InterpreterOutput {
+    fn get_in_line_number_string(line: &Option<u64>) -> String {
+        line.map(|line| format!(" IN {}", line)).unwrap_or_default()
+    }
 }
 
 impl Display for InterpreterOutput {
@@ -29,12 +36,18 @@ impl Display for InterpreterOutput {
         match self {
             InterpreterOutput::Print(string) => string.fmt(f),
             InterpreterOutput::Warning(message, line) => {
-                let line_str = line.map(|line| format!(" IN {}", line));
                 write!(
                     f,
-                    "{}: {}",
-                    format!("WARNING{}", line_str.unwrap_or_default()),
+                    "WARNING{}: {}",
+                    InterpreterOutput::get_in_line_number_string(line),
                     message
+                )
+            }
+            InterpreterOutput::Break(line) => {
+                write!(
+                    f,
+                    "BREAK{}",
+                    InterpreterOutput::get_in_line_number_string(line)
                 )
             }
             InterpreterOutput::ExtraIgnored => write!(f, "EXTRA IGNORED"),
@@ -565,6 +578,13 @@ impl Interpreter {
         Ok(())
     }
 
+    pub fn break_at_current_location(&mut self) {
+        self.state = InterpreterState::Idle;
+        self.output
+            .push(InterpreterOutput::Break(self.program.get_line_number()));
+        self.program.break_at_current_location();
+    }
+
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
         if self.enable_tracing {
             if let Some(line_number) = self.program.get_line_number() {
@@ -572,11 +592,7 @@ impl Interpreter {
             }
         }
         match self.program.next_token() {
-            Some(Token::Stop) => {
-                // TODO: Send break output
-                self.program.break_at_current_location();
-                Ok(())
-            }
+            Some(Token::Stop) => Ok(self.break_at_current_location()),
             Some(Token::Dim) => self.evaluate_dim_statement(),
             Some(Token::Print) | Some(Token::QuestionMark) => self.evaluate_print_statement(),
             Some(Token::Input) => self.evaluate_input_statement(),
@@ -638,6 +654,7 @@ impl Interpreter {
             }
             "CONT" => {
                 self.program.continue_from_breakpoint()?;
+                self.run()?;
             }
             // Note that Applesoft BASIC used "TRACE" and "NOTRACE", but we can't
             // do the latter because the beginning of "NOTRACE" will be tokenized as
