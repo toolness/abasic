@@ -1,8 +1,9 @@
-This is a simple Rust-based BASIC interpreter.
+ABASIC is a simple Rust-based first-generation BASIC interpreter.
 
-This interpreter was made primarily for personal edification. It is
-[missing features](#limitations) from most mainstream implementations of the language,
-so if you want a full-featured BASIC, you should probably look elsewhere.
+This interpreter was made primarily for learning and personal edification.
+It is [missing features](#limitations) from mainstream implementations
+of the language, so if you want a full-featured BASIC, you should probably
+look elsewhere.
 
 For more details, see [Rationale](#Rationale).
 
@@ -99,6 +100,69 @@ There's a lot of things that haven't been implemented, some of which include:
 * Scientific notation (e.g. `1.3E-4`)
 * Integer types via the `%` suffix (e.g. `C% = 1`)
 * `MAT` (matrices)
+
+## Other notes
+
+* BASIC was never standardized (attempts were made, but they never succeeded).
+  Because of this, users inputting BASIC programs listed in books and
+  magazines had to have some knowledge of BASIC: publications usually included
+  tips on modifications needed to make their programs work on individual
+  platforms, but always told users that they needed to read their platform's
+  BASIC manual and deal with idiosyncrasies as they encountered them.
+
+  This gave me a surprising amount of creative freedom in implementing ABASIC.
+  While I usually hewed to the behavior of Applesoft BASIC, I also examined
+  the behavior of Dartmouth BASIC and sometimes chose behavior based on
+  whatever seemed most user-friendly or historically accurate.
+
+* Reading about the history of BASIC made me realize that line numbers were
+  actually a vital affordance, as the language was invented during a time
+  when computers didn't have screens--they just had keyboards and printers.
+  Essentially, communicating with a computer back then was a bit like
+  talking via SMS text messaging today.
+
+  This meant that document editors couldn't really exist. In lieu of that,
+  assigning numbers to lines and allowing them to be redefined interactively
+  actually allowed for a surprisingly fast feedback loop.
+
+* ABASIC provides no limitations on variable and function names. This is
+  unlike most first-generation BASIC interpreters, which only permitted short
+  variable names, likely to preserve memory (Applesoft actually permitted
+  long names but ignored everything after the first two characters).
+
+  At first I assumed this was an unquestionably good thing, but then I
+  realized that since original BASIC ignores whitespace, long variable
+  names can lead to surprising syntax errors, because the likelihood of
+  a reserved word like `IF` or `NOT` appearing somewhere in a variable
+  name increases as its length grows. This is probably part of why
+  later BASICs abandoned line crunching.
+
+* ABASIC's interpreter uses a recursive descent parser, evaluating the code
+  as it's being parsed. In other words, there is no abstract syntax tree
+  (AST).
+
+  As far as I can tell, this appears to be how Applesoft BASIC works too; for
+  example, the following line runs fine:
+
+  ```basic
+  GOTO 10BLARGBLARGO#@$OWEJR
+  ```
+
+  If Applesoft had parsed the code into an AST before evaluating it, it would
+  have raised a syntax error. Instead, it seems to be seeing the `GOTO 20`
+  and immediately moving to line 20, ignoring the rest of the line.
+
+  ABASIC works in a similar way. I'm guessing that in Applesoft's case it was
+  done to preserve memory; in ABASIC's case, it was mostly done for
+  expediency, though I also liked the idea of preserving the behavior of
+  first-generation BASIC interpreters.
+
+* ABASIC has the optional ability to warn users about suspect code,
+  such as when a variable that has never been assigned to is used in an
+  expression (in such cases the variable defaults to zero or an empty string,
+  as per BASIC's traditional behavior).
+
+  This feature can be enabled via the `-w` flag on the command-line.
 
 ## License
 
