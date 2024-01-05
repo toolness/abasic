@@ -149,8 +149,8 @@ There's a lot of things that haven't been implemented, some of which include:
   ```
 
   If Applesoft had parsed the code into an AST before evaluating it, it would
-  have raised a syntax error. Instead, it seems to be seeing the `GOTO 20`
-  and immediately moving to line 20, ignoring the rest of the line.
+  have raised a syntax error. Instead, it seems to be seeing the `GOTO 10`
+  and immediately moving to line 10, ignoring the rest of the line.
 
   ABASIC works in a similar way. I'm guessing that in Applesoft's case it was
   done to preserve memory; in ABASIC's case, it was mostly done for
