@@ -379,7 +379,11 @@ impl Interpreter {
 
     fn evaluate_if_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let conditional_value = self.evaluate_expression()?;
+
+        // TODO: Dartmouth and Applesoft BASIC both support `IF X GOTO`,
+        // whereas we are enforcing the use of `THEN` here.
         self.program.expect_next_token(Token::Then)?;
+
         // Note that Applesoft BASIC doesn't seem to support ELSE,
         // but it's used in Tim Hartnell's book. We'll support very simple
         // cases; see the test suite for details.
