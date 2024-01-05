@@ -200,6 +200,9 @@ impl StdioInterpreter {
                     InterpreterOutput::Print(string) => {
                         self.printer.print(string);
                     }
+                    InterpreterOutput::Trace(line) => {
+                        self.printer.print(format!("#{} ", line).blue().to_string());
+                    }
                     _ => {
                         self.printer.eprintln(output.to_string().yellow());
                     }

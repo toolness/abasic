@@ -19,6 +19,7 @@ use crate::{
 pub enum InterpreterOutput {
     Print(String),
     Warning(String, Option<u64>),
+    Trace(u64),
     ExtraIgnored,
     Reenter,
 }
@@ -38,6 +39,7 @@ impl Display for InterpreterOutput {
             }
             InterpreterOutput::ExtraIgnored => write!(f, "EXTRA IGNORED"),
             InterpreterOutput::Reenter => write!(f, "REENTER"),
+            InterpreterOutput::Trace(line) => write!(f, "#{}", line),
         }
     }
 }
@@ -59,6 +61,7 @@ pub struct Interpreter {
     output: Vec<InterpreterOutput>,
     program: Program,
     pub enable_warnings: bool,
+    pub enable_tracing: bool,
     variables: HashMap<Rc<String>, Value>,
     arrays: HashMap<Rc<String>, ValueArray>,
     state: InterpreterState,
@@ -71,6 +74,7 @@ impl core::fmt::Debug for Interpreter {
             .field("output", &self.output)
             .field("program", &self.program)
             .field("enable_warnings", &self.enable_warnings)
+            .field("enable_tracing", &self.enable_tracing)
             .field("variables", &self.variables)
             .field("arrays", &self.arrays)
             .field("state", &self.state)
@@ -88,6 +92,7 @@ impl Interpreter {
             arrays: HashMap::new(),
             state: InterpreterState::Idle,
             enable_warnings: false,
+            enable_tracing: false,
             input: None,
         }
     }
@@ -561,6 +566,11 @@ impl Interpreter {
     }
 
     fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
+        if self.enable_tracing {
+            if let Some(line_number) = self.program.get_line_number() {
+                self.output.push(InterpreterOutput::Trace(line_number));
+            }
+        }
         match self.program.next_token() {
             Some(Token::Dim) => self.evaluate_dim_statement(),
             Some(Token::Print) | Some(Token::QuestionMark) => self.evaluate_print_statement(),
@@ -620,6 +630,16 @@ impl Interpreter {
             }
             "NEW" => {
                 self.state = InterpreterState::NewInterpreterRequested;
+            }
+            // Note that Applesoft BASIC used "TRACE" and "NOTRACE", but we can't
+            // do the latter because the beginning of "NOTRACE" will be tokenized as
+            // "NOT RACE", and making separate tokens for each of these commands is
+            // a hassle so I'm just gonna use different command names instead for now.
+            "TRACEON" => {
+                self.enable_tracing = true;
+            }
+            "TRACEOFF" => {
+                self.enable_tracing = false;
             }
             _ => {
                 return Ok(false);

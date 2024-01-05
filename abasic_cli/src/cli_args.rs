@@ -14,6 +14,10 @@ pub struct CliArgs {
     /// Enable warnings (e.g. use of undeclared variables).
     #[arg(short, long)]
     pub warnings: bool,
+
+    /// Enable line number tracing
+    #[arg(short, long)]
+    pub tracing: bool,
 }
 
 impl CliArgs {
@@ -24,6 +28,7 @@ impl CliArgs {
     pub fn create_interpreter(&self) -> Interpreter {
         let mut interpreter = Interpreter::new();
         interpreter.enable_warnings = self.warnings;
+        interpreter.enable_tracing = self.tracing;
         interpreter
     }
 }
