@@ -116,6 +116,10 @@ impl Program {
     ///
     ///   10 for i = 1 to 3
     ///   20 goto 10
+    ///
+    /// Finally, note that Dartmouth BASIC actually had a "FOR WITHOUT NEXT" error,
+    /// but this doesn't seem to be present in Applesoft BASIC, nor is it present in
+    /// our implementation.
     fn remove_loop_with_name(&mut self, symbol: &Rc<String>) -> Option<LoopInfo> {
         let mut found_index = None;
         for (i, loop_info) in self.loop_stack.iter().enumerate().rev() {
