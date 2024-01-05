@@ -473,6 +473,11 @@ impl Interpreter {
         }
     }
 
+    /// Note that Darthmouth BASIC actually treated DIM statements similarly to
+    /// DATA statements, in that they weren't actually executed at program run-time
+    /// and could be placed anywhere in a program. Applesoft BASIC doesn't seem to
+    /// treat DIM statements this way, though, perhaps in part because it allows
+    /// arrays to be dynamically sized based on user input and such.
     fn evaluate_dim_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let lvalue = self.parse_lvalue()?;
         let Some(max_indices) = lvalue.array_index else {
