@@ -164,6 +164,14 @@ There's a lot of things that haven't been implemented, some of which include:
 
   This feature can be enabled via the `-w` flag on the command-line.
 
+## Other resources
+
+* [Dartmouth BASIC Fourth Edition language guide (1968)](https://archive.org/details/bitsavers_dartmouthB_3679804)
+
+* [Applesoft II BASIC Reference Manual (1978)](https://archive.org/details/applesoft-ii-ref/page/n33/mode/2up)
+
+* [Wikipedia page on BASIC](https://en.wikipedia.org/wiki/BASIC)
+
 ## License
 
 Everything in this repository not expressly attributed to other sources is licensed under [CC0 1.0 Universal](./LICENSE.md) (public domain).
