@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>ABASIC</title>
+
+<body>
+    <script type="module">
+        import { default as wasm, greet } from "./pkg/abasic_web.js";
+
+        wasm().then((module) => {
+            console.log("COOL");
+            greet();
+        });
+    </script>
+</body>

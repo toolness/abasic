@@ -1,4 +1,4 @@
 [workspace]
 
 resolver = "2"
-members = ["abasic-core", "abasic-cli"]
+members = ["abasic-core", "abasic-cli", "abasic-web"]
