@@ -1,14 +1,18 @@
 [package]
-name = "abasic"
-version = "0.1.0"
+name = "abasic-cli"
+version = "0.1.1"
 edition = "2021"
 authors = ["Atul Varma <varmaa@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "abasic"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.4.12", features = ["derive"] }
 colored = "2.1.0"
 ctrlc = "3.4.2"
 rustyline = "13.0.0"
-abasic_core = { path = "../abasic_core" }
+abasic-core = { path = "../abasic-core" }

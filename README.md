@@ -14,7 +14,7 @@ Install the executable with:
 <!-- Note that the `cd` here is annoying, we can remove it if this ever gets fixed: https://github.com/rust-lang/cargo/issues/4101 -->
 
 ```
-cd abasic_core
+cd abasic-core
 cargo install --path=.
 ```
 
@@ -164,7 +164,7 @@ There's a lot of things that haven't been implemented, some of which include:
 
   This feature can be enabled via the `-w` flag on the command-line.
 
-* The core implementation of ABASIC (contained in the `abasic_core` crate)
+* The core implementation of ABASIC (contained in the `abasic-core` crate)
   was designed to have minimal dependencies and never block program execution
   for any reason (e.g. accepting user input). This allows it to be ported to
   the widest variety of platforms, including ones in which it may need to run

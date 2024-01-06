@@ -3,10 +3,10 @@
 version = 3
 
 [[package]]
-name = "abasic"
-version = "0.1.0"
+name = "abasic-cli"
+version = "0.1.1"
 dependencies = [
- "abasic_core",
+ "abasic-core",
  "clap",
  "colored",
  "ctrlc",
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "abasic_core"
+name = "abasic-core"
 version = "0.1.0"
 dependencies = [
  "fastrand",
