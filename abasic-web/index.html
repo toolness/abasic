@@ -1,7 +1,140 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<title>ABASIC</title>
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+<style>
+* {
+  box-sizing: border-box;
+}
 
+/* Safari on iOS has an incredibly annoying feature where
+   it obscures part of the window with its virtual keyboard,
+   but the underlying JS has no way of telling whether its
+   content is being obscured. This confounds our auto-scroll
+   functionality.
+
+   (I've verified that this isn't an issue on other mobile browsers,
+   such as Firefox and Chrome for Android.)
+
+   To get around this, we'll add the .ugh-ios class to the page
+   to make things a bit less horrible for the user, primarily by
+   sticking everything to the bottom of the page instead of the top.
+   The downside is that we lose the scrollback buffer but this is
+   better than the alternative. */
+html.ugh-ios, html.ugh-ios body {
+  height: 100%;
+}
+
+html.ugh-ios body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+html.ugh-ios a.github {
+  top: 8px;
+  bottom: auto;
+}
+
+body {
+  margin: 0;
+  padding: 8px 0;
+  font-family: Consolas, Monaco, monospace;
+}
+
+body, label, input {
+  color: white;
+  background: black;
+}
+
+#output-wrapper, #form-wrapper {
+  padding: 0 8px;
+}
+
+#output .prompt-response {
+  color: gray;
+}
+
+#output, #form {
+  max-width: 40em;
+  margin: 0 auto;
+}
+
+#output {
+  white-space: pre-wrap;
+}
+
+#form {
+  display: flex;
+  align-items: center;
+}
+
+/* Blerg, we're only using @supports here to exclude IE11, which
+   seems to have issues with this @media rule that cause it to
+   hide the text field entirely. */
+@supports (display: flex) {
+  @media (max-width: 640px) {
+    #form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+}
+
+#prompt {
+  white-space: pre;
+}
+
+label, input {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+#input {
+  flex: 1;
+  border: none;
+  outline: none;
+}
+
+a.github {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  opacity: 0.5;
+  transition: opacity 0.25s;
+}
+
+a.github:hover {
+  opacity: 0.8;
+}
+
+a.github:focus {
+  opacity: 1.0;
+}
+
+a.github img {
+  width: 2em;
+}
+
+/* http://webaim.org/techniques/css/invisiblecontent/ */
+.sr-only {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+</style>
+<title>ABASIC</title>
 <body>
+    <div id="output-wrapper"><div id="output" aria-hidden="true">Loading&hellip;<noscript>Alas, you need JavaScript enabled to play this game.</noscript></div></div>
+    <div id="form-wrapper"><form id="form"><label id="prompt" for="input"></label><input id="input" autofocus autocomplete="off"></form></div>
+    <a href="https://github.com/toolness/abasic#readme" class="github" target="_blank"><img src="GitHub-Mark-Light-120px-plus.png" alt="Learn more about this project on GitHub"></a>
+    <div id="a11y-output" role="log" aria-live="polite" class="sr-only">
+      Loading&hellip;
+      <noscript>Alas, you need JavaScript enabled to use this page.</noscript>
+    </div>
     <script type="module" src="main.js"></script>
 </body>
