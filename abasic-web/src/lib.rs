@@ -34,7 +34,7 @@ pub struct JsInterpreterOutput {
 
 #[wasm_bindgen]
 impl JsInterpreterOutput {
-    pub fn take_value(self) -> String {
+    pub fn into_string(self) -> String {
         self.value
     }
 }
