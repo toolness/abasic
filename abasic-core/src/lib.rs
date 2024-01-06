@@ -12,4 +12,5 @@ mod tokenizer;
 mod value;
 
 pub use interpreter::{Interpreter, InterpreterOutput, InterpreterState};
+pub use interpreter_error::{InterpreterError, TracedInterpreterError};
 pub use line_number_parser::parse_line_number;

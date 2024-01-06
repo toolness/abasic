@@ -24,6 +24,7 @@ dependencies = [
 name = "abasic-web"
 version = "0.1.0"
 dependencies = [
+ "abasic-core",
  "console_error_panic_hook",
  "wasm-bindgen",
  "wasm-bindgen-test",
