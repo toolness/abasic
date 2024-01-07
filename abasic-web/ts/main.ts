@@ -133,8 +133,15 @@ wasm().then(async (module) => {
 
   interpreter.start();
 
-  window.addEventListener("keydown", (event) => {
+  ui.onInputKeyDown((event, inputEl) => {
+    // We want to process CTRL-C, but we need to be careful not to break when
+    // users on some platforms (e.g. Windows) are just trying to copy text to
+    // the clipboard.
+    if (inputEl.selectionStart !== inputEl.selectionEnd) {
+      return;
+    }
     if (event.ctrlKey && event.key.toUpperCase() === "C") {
+      event.preventDefault();
       interpreter.break();
     }
   });

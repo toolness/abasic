@@ -61,6 +61,14 @@ export function commitCurrentPromptToOutput(additionalText = "") {
   scroll_output();
 }
 
+export function onInputKeyDown(
+  callback: (e: KeyboardEvent, el: HTMLInputElement) => void
+) {
+  inputEl.addEventListener("keydown", (e) => {
+    callback(e, inputEl);
+  });
+}
+
 export function onSubmitInput(callback: () => void) {
   formEl.addEventListener("submit", (e) => {
     e.preventDefault();
