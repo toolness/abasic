@@ -35,7 +35,7 @@ class Interpreter {
                     if (err === undefined) {
                         throw new Error("Assertion failure, take_latest_error() returned undefined!");
                     }
-                    ui.print(err);
+                    ui.print(`${err}\n`);
                     this.handleCurrentState();
                     break;
                 case JsInterpreterState.Running:
@@ -72,6 +72,10 @@ class Interpreter {
         const state = this.impl.get_state();
         return (state === JsInterpreterState.Idle ||
             state === JsInterpreterState.AwaitingInput);
+    }
+    canBreak() {
+        const state = this.impl.get_state();
+        return state !== JsInterpreterState.Idle;
     }
     submitUserInput(input) {
         const state = this.impl.get_state();
@@ -120,7 +124,7 @@ wasm().then(async (module) => {
     if (programPath) {
         const sourceCodeRequest = await fetch(programPath);
         if (!sourceCodeRequest.ok) {
-            ui.print(`Failed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`);
+            ui.print(`\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`);
             return;
         }
         const sourceCode = await sourceCodeRequest.text();
@@ -145,13 +149,14 @@ wasm().then(async (module) => {
     });
     ui.onSubmitInput(() => {
         const input = ui.getInput();
+        // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
+        // so we'll just treat this special emoji as the same thing.
+        if (interpreter.canBreak() && input === "💥") {
+            ui.clearInput();
+            interpreter.break();
+            return;
+        }
         if (!interpreter.canProcessUserInput()) {
-            // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
-            // so we'll just treat this special emoji as the same thing.
-            if (input === "💥") {
-                ui.clearInput();
-                interpreter.break();
-            }
             return;
         }
         ui.commitCurrentPromptToOutput(input);
