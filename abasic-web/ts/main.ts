@@ -8,7 +8,7 @@ import {
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 
 class Interpreter {
   constructor(private readonly impl: JsInterpreter) {}
