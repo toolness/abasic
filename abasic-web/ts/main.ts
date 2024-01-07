@@ -77,7 +77,7 @@ class Interpreter {
     this.handleCurrentState();
   }
 
-  break() {
+  breakAtCurrentLocation() {
     const state = this.impl.get_state();
     if (
       state === JsInterpreterState.AwaitingInput ||
@@ -94,11 +94,21 @@ class Interpreter {
   private showOutput() {
     const output = this.impl.take_latest_output();
     for (const item of output) {
-      if (item.output_type === JsInterpreterOutputType.Print) {
-        ui.print(item.into_string());
-      } else {
-        // TODO: Print this in a different color?
-        ui.print(`${item.into_string()}\n`);
+      switch (item.output_type) {
+        case JsInterpreterOutputType.Print:
+          ui.print(item.into_string());
+          break;
+        case JsInterpreterOutputType.Trace:
+          ui.printSpanWithClass(`${item.into_string()} `, "info");
+          break;
+        case JsInterpreterOutputType.Break:
+        case JsInterpreterOutputType.ExtraIgnored:
+        case JsInterpreterOutputType.Reenter:
+        case JsInterpreterOutputType.Warning:
+          ui.printSpanWithClass(`${item.into_string()}\n`, "warning");
+          break;
+        default:
+          unreachable(item.output_type);
       }
     }
   }
@@ -124,7 +134,7 @@ class Interpreter {
             "Assertion failure, take_latest_error() returned undefined!"
           );
         }
-        ui.print(`${err}\n`);
+        ui.printSpanWithClass(`${err}\n`, "error");
         this.handleCurrentState();
         break;
       case JsInterpreterState.Running:
@@ -147,8 +157,9 @@ wasm().then(async (module) => {
   if (programPath) {
     const sourceCodeRequest = await fetch(programPath);
     if (!sourceCodeRequest.ok) {
-      ui.print(
-        `\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`
+      ui.printSpanWithClass(
+        `\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`,
+        "error"
       );
       return;
     }
@@ -170,7 +181,7 @@ wasm().then(async (module) => {
     }
     if (event.ctrlKey && event.key.toUpperCase() === "C") {
       event.preventDefault();
-      interpreter.break();
+      interpreter.breakAtCurrentLocation();
     }
   });
 
@@ -181,7 +192,7 @@ wasm().then(async (module) => {
     // so we'll just treat this special emoji as the same thing.
     if (interpreter.canBreak() && input === "💥") {
       ui.clearInput();
-      interpreter.break();
+      interpreter.breakAtCurrentLocation();
       return;
     }
 

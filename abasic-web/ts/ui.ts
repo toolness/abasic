@@ -6,17 +6,37 @@ const promptEl = getHTMLElement("label", "#prompt");
 const inputEl = getHTMLElement("input", "#input");
 const formEl = getHTMLElement("form", "#form");
 
-let latestPartialLine: Text[] = [];
+let latestPartialLine: Node[] = [];
 
-export function print(msg: string) {
-  const textNode = document.createTextNode(msg);
-  if (msg.endsWith("\n")) {
+/**
+ * These should all be defined in the CSS.
+ */
+type SpanClassName = "error" | "warning" | "info";
+
+export function printSpanWithClass(msg: string, className: SpanClassName) {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = msg;
+  print(span);
+}
+
+export function print(msg: string | HTMLSpanElement) {
+  let node: Node;
+  let text: string;
+  if (typeof msg === "string") {
+    text = msg;
+    node = document.createTextNode(msg);
+  } else {
+    node = msg;
+    text = msg.textContent || "";
+  }
+  if (text.endsWith("\n")) {
     latestPartialLine = [];
   } else {
-    latestPartialLine.push(textNode);
+    latestPartialLine.push(node);
   }
-  outputEl.appendChild(textNode);
-  a11yOutputEl.appendChild(textNode.cloneNode());
+  outputEl.appendChild(node);
+  a11yOutputEl.appendChild(node.cloneNode());
   scroll_output();
 }
 
