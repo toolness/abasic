@@ -1,4 +1,0 @@
-#! /usr/bin/env sh
-
-cd abasic-web
-wasm-pack build --target web

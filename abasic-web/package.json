@@ -1,16 +1,12 @@
 {
   "name": "abasic-web",
   "version": "1.0.0",
-  "description": "<div align=\"center\">",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "description": "Web front-end for the ABASIC interpreter.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "wasm": "wasm-pack build --target web"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Atul Varma <varmaa@gmail.com>",
+  "license": "CC0-1.0",
   "dependencies": {
     "prettier": "3.1.1",
     "typescript": "^5.3.3"
