@@ -69,6 +69,11 @@ cargo run
 
 ### Web
 
+**Note:** If you're on Windows, to use the dev server you will
+need to enable support for symlinks. See
+[this StackOverflow post](https://stackoverflow.com/a/59761201)
+for more details.
+
 To develop for the Web you will need to `cd` into `abasic-web`.
 
 Whenever you make any changes to Rust code, you will need to rebuild the
@@ -84,12 +89,12 @@ Iterating on the rest of the Web front-end can be done by running:
 npm run dev
 ```
 
-Then navigate to http://localhost:8080/abasic-web/.
+Then navigate to http://localhost:8080/.
 
 You can run individual programs by using the `p` querystring argument
 set to the relative path to a program, e.g.:
 
-http://localhost:8080/abasic-web/?p=../programs/chemist.bas
+http://localhost:8080/?p=programs/chemist.bas
 
 To deploy the Web frontend, you can run:
 

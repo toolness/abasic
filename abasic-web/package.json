@@ -4,7 +4,7 @@
   "description": "Web front-end for the ABASIC interpreter.",
   "scripts": {
     "wasm": "wasm-pack build --target web",
-    "dev": "concurrently --kill-others \"http-server -c-1 ..\" \"tsc --watch --preserveWatchOutput\"",
+    "dev": "concurrently --kill-others \"http-server -c-1 .\" \"tsc --watch --preserveWatchOutput\"",
     "copy-to-dist": "rimraf dist && npx copyfiles index.html img/*.* ts/*.js pkg/*.js pkg/*.wasm dist && npx copyfiles -u 1 ../programs/*.bas dist",
     "publish": "npm run wasm && tsc && npm run copy-to-dist && gh-pages -d dist"
   },
