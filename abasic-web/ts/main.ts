@@ -1,5 +1,6 @@
 import {
   default as wasm,
+  init_and_set_rnd_seed,
   JsInterpreter,
   JsInterpreterState,
   JsInterpreterOutputType,
@@ -109,6 +110,8 @@ class Interpreter {
 }
 
 wasm().then(async (module) => {
+  init_and_set_rnd_seed(BigInt(Date.now()));
+
   const interpreter = new Interpreter(JsInterpreter.new());
 
   const searchParams = new URLSearchParams(window.location.search);

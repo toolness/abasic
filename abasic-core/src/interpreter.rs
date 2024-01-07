@@ -875,6 +875,7 @@ impl Interpreter {
 mod tests {
     use crate::{
         interpreter_error::{OutOfMemoryError, TracedInterpreterError},
+        set_rnd_seed,
         syntax_error::SyntaxError,
         tokenizer::Token,
         InterpreterOutput,
@@ -1156,7 +1157,7 @@ mod tests {
 
     #[test]
     fn rnd_works() {
-        fastrand::seed(0);
+        set_rnd_seed(0);
         assert_eval_output(
             "for i = 1 to 3:print int(rnd(1) * 50):next i",
             "3\n40\n19\n",
