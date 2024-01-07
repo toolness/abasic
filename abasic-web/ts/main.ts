@@ -8,6 +8,8 @@ import {
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
 
+const VERSION = "0.1.0";
+
 class Interpreter {
   constructor(private readonly impl: JsInterpreter) {}
 
@@ -40,6 +42,9 @@ class Interpreter {
   }
 
   start() {
+    if (this.isFullyInteractive) {
+      ui.print(`Welcome to Atul's BASIC Interpreter v${VERSION}.\n`);
+    }
     this.handleCurrentState();
   }
 
