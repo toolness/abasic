@@ -44,10 +44,10 @@ function scroll_output() {
     });
 }
 
-function setPrompt(prompt: string) {
+const setPrompt = (prompt: string) => {
     promptEl.textContent = prompt;
     a11yOutputEl.appendChild(document.createTextNode(prompt));
-}
+};
 
 class Interpreter {
     constructor(private readonly impl: JsInterpreter) {
@@ -57,12 +57,19 @@ class Interpreter {
         this.handleCurrentState();
     }
 
+    canProcessUserInput(): boolean {
+        const state = this.impl.get_state();
+        return state === JsInterpreterState.Idle || state === JsInterpreterState.AwaitingInput
+    }
+
     submitUserInput(input: string) {
         const state = this.impl.get_state();
         if (state === JsInterpreterState.Idle) {
             this.impl.start_evaluating(input);
+            setPrompt("");
         } else if (state === JsInterpreterState.AwaitingInput) {
             this.impl.provide_input(input);
+            setPrompt("");
         } else {
             throw new Error(`submitUserInput called when state is ${JsInterpreterState[state]}!`);
         }
@@ -97,7 +104,7 @@ class Interpreter {
                     throw new Error("Assertion failure, take_latest_error() returned undefined!")
                 }
                 print(err);
-                window.setTimeout(this.handleCurrentState, 5);
+                this.handleCurrentState();
                 break;
             case JsInterpreterState.Running:
                 this.impl.continue_evaluating();
@@ -122,6 +129,10 @@ wasm().then((module) => {
 
     formEl.addEventListener('submit', e => {
         e.preventDefault();
+
+        if (!interpreter.canProcessUserInput()) {
+            return;
+        }
 
         const el = document.createElement('div');
 
