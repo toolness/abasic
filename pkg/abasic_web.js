@@ -138,10 +138,10 @@ function getArrayJsValueFromWasm0(ptr, len) {
 }
 /**
 */
-export const JsInterpreterOutputType = Object.freeze({ Print:0,"0":"Print",Break:1,"1":"Break",Warning:2,"2":"Warning",Trace:3,"3":"Trace",ExtraIgnored:4,"4":"ExtraIgnored",Reenter:5,"5":"Reenter", });
+export const JsInterpreterState = Object.freeze({ Idle:0,"0":"Idle",Running:1,"1":"Running",AwaitingInput:2,"2":"AwaitingInput",Errored:3,"3":"Errored", });
 /**
 */
-export const JsInterpreterState = Object.freeze({ Idle:0,"0":"Idle",Running:1,"1":"Running",AwaitingInput:2,"2":"AwaitingInput",Errored:3,"3":"Errored", });
+export const JsInterpreterOutputType = Object.freeze({ Print:0,"0":"Print",Break:1,"1":"Break",Warning:2,"2":"Warning",Trace:3,"3":"Trace",ExtraIgnored:4,"4":"ExtraIgnored",Reenter:5,"5":"Reenter", });
 /**
 */
 export class JsInterpreter {

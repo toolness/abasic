@@ -5,16 +5,31 @@ const promptEl = getHTMLElement("label", "#prompt");
 const inputEl = getHTMLElement("input", "#input");
 const formEl = getHTMLElement("form", "#form");
 let latestPartialLine = [];
+export function printSpanWithClass(msg, className) {
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = msg;
+    print(span);
+}
 export function print(msg) {
-    const textNode = document.createTextNode(msg);
-    if (msg.endsWith("\n")) {
+    let node;
+    let text;
+    if (typeof msg === "string") {
+        text = msg;
+        node = document.createTextNode(msg);
+    }
+    else {
+        node = msg;
+        text = msg.textContent || "";
+    }
+    if (text.endsWith("\n")) {
         latestPartialLine = [];
     }
     else {
-        latestPartialLine.push(textNode);
+        latestPartialLine.push(node);
     }
-    outputEl.appendChild(textNode);
-    a11yOutputEl.appendChild(textNode.cloneNode());
+    outputEl.appendChild(node);
+    a11yOutputEl.appendChild(node.cloneNode());
     scroll_output();
 }
 export function clearScreen() {

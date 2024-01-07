@@ -1,7 +1,7 @@
 import { default as wasm, init_and_set_rnd_seed, JsInterpreter, JsInterpreterState, JsInterpreterOutputType, } from "../pkg/abasic_web.js";
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 class Interpreter {
     constructor(impl) {
         this.impl = impl;
@@ -35,7 +35,7 @@ class Interpreter {
                     if (err === undefined) {
                         throw new Error("Assertion failure, take_latest_error() returned undefined!");
                     }
-                    ui.print(`${err}\n`);
+                    ui.printSpanWithClass(`${err}\n`, "error");
                     this.handleCurrentState();
                     break;
                 case JsInterpreterState.Running:
@@ -92,7 +92,7 @@ class Interpreter {
         }
         this.handleCurrentState();
     }
-    break() {
+    breakAtCurrentLocation() {
         const state = this.impl.get_state();
         if (state === JsInterpreterState.AwaitingInput ||
             state === JsInterpreterState.Running) {
@@ -106,25 +106,53 @@ class Interpreter {
     showOutput() {
         const output = this.impl.take_latest_output();
         for (const item of output) {
-            if (item.output_type === JsInterpreterOutputType.Print) {
-                ui.print(item.into_string());
-            }
-            else {
-                // TODO: Print this in a different color?
-                ui.print(`${item.into_string()}\n`);
+            switch (item.output_type) {
+                case JsInterpreterOutputType.Print:
+                    ui.print(item.into_string());
+                    break;
+                case JsInterpreterOutputType.Trace:
+                    ui.printSpanWithClass(`${item.into_string()} `, "info");
+                    break;
+                case JsInterpreterOutputType.Break:
+                case JsInterpreterOutputType.ExtraIgnored:
+                case JsInterpreterOutputType.Reenter:
+                case JsInterpreterOutputType.Warning:
+                    ui.printSpanWithClass(`${item.into_string()}\n`, "warning");
+                    break;
+                default:
+                    unreachable(item.output_type);
             }
         }
     }
+}
+/**
+ * Programs to run can be specified via a relative path or just the
+ * stem of the program to run. If it's the latter, we'll expand it
+ * to a relative path ourselves.
+ *
+ * Note: we don't actually check to make sure the path is a relative
+ * URL or anything; users could pass in an absolute URL and who
+ * knows what will happen. This is not that big a deal since this is
+ * just a fun experiment.
+ */
+function normalizeProgramPath(path) {
+    if (!path?.trim()) {
+        return null;
+    }
+    if (/^[A-Za-z0-9]+$/.test(path)) {
+        return `programs/${path}.bas`;
+    }
+    return path;
 }
 wasm().then(async (module) => {
     init_and_set_rnd_seed(BigInt(Date.now()));
     const interpreter = new Interpreter(JsInterpreter.new());
     const searchParams = new URLSearchParams(window.location.search);
-    const programPath = searchParams.get("p");
+    const programPath = normalizeProgramPath(searchParams.get("p"));
     if (programPath) {
         const sourceCodeRequest = await fetch(programPath);
         if (!sourceCodeRequest.ok) {
-            ui.print(`\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`);
+            ui.printSpanWithClass(`\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`, "error");
             return;
         }
         const sourceCode = await sourceCodeRequest.text();
@@ -144,7 +172,7 @@ wasm().then(async (module) => {
         }
         if (event.ctrlKey && event.key.toUpperCase() === "C") {
             event.preventDefault();
-            interpreter.break();
+            interpreter.breakAtCurrentLocation();
         }
     });
     ui.onSubmitInput(() => {
@@ -153,7 +181,7 @@ wasm().then(async (module) => {
         // so we'll just treat this special emoji as the same thing.
         if (interpreter.canBreak() && input === "💥") {
             ui.clearInput();
-            interpreter.break();
+            interpreter.breakAtCurrentLocation();
             return;
         }
         if (!interpreter.canProcessUserInput()) {
