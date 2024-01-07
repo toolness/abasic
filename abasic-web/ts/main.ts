@@ -147,13 +147,34 @@ class Interpreter {
   };
 }
 
+/**
+ * Programs to run can be specified via a relative path or just the
+ * stem of the program to run. If it's the latter, we'll expand it
+ * to a relative path ourselves.
+ *
+ * Note: we don't actually check to make sure the path is a relative
+ * URL or anything; users could pass in an absolute URL and who
+ * knows what will happen. This is not that big a deal since this is
+ * just a fun experiment.
+ */
+function normalizeProgramPath(path: string | null): string | null {
+  if (!path?.trim()) {
+    return null;
+  }
+
+  if (/^[A-Za-z0-9]+$/.test(path)) {
+    return `programs/${path}.bas`;
+  }
+  return path;
+}
+
 wasm().then(async (module) => {
   init_and_set_rnd_seed(BigInt(Date.now()));
 
   const interpreter = new Interpreter(JsInterpreter.new());
 
   const searchParams = new URLSearchParams(window.location.search);
-  const programPath = searchParams.get("p");
+  const programPath = normalizeProgramPath(searchParams.get("p"));
   if (programPath) {
     const sourceCodeRequest = await fetch(programPath);
     if (!sourceCodeRequest.ok) {
