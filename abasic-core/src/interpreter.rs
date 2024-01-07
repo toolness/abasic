@@ -709,6 +709,8 @@ impl Interpreter {
             Some(Token::Goto) => self.evaluate_goto_statement(),
             Some(Token::Gosub) => self.evaluate_gosub_statement(),
             Some(Token::Return) => self.program.return_to_last_gosub(),
+            // Dartmouth BASIC only allowed END at the very end of a program,
+            // while Applesoft allowed it anywhere. We'll do the latter.
             Some(Token::End) => Ok(self.program.end()),
             Some(Token::For) => self.evaluate_for_statement(),
             Some(Token::Next) => self.evaluate_next_statement(),
