@@ -5,13 +5,15 @@
   "scripts": {
     "wasm": "wasm-pack build --target web",
     "dev": "concurrently --kill-others \"http-server ..\" \"tsc --watch --preserveWatchOutput\"",
-    "copy-to-dist": "rimraf dist && npx copyfiles index.html img/*.* ts/*.js pkg/*.js pkg/*.wasm dist && npx copyfiles -u 1 ../programs/*.bas dist"
+    "copy-to-dist": "rimraf dist && npx copyfiles index.html img/*.* ts/*.js pkg/*.js pkg/*.wasm dist && npx copyfiles -u 1 ../programs/*.bas dist",
+    "publish": "npm run wasm && tsc && npm run copy-to-dist && gh-pages -d dist"
   },
   "author": "Atul Varma <varmaa@gmail.com>",
   "license": "CC0-1.0",
   "dependencies": {
     "concurrently": "^8.2.2",
     "copyfiles": "^2.4.1",
+    "gh-pages": "^6.1.1",
     "http-server": "^14.1.1",
     "prettier": "3.1.1",
     "rimraf": "^5.0.5",
