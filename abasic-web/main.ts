@@ -109,6 +109,7 @@ class Interpreter {
     break() {
         const state = this.impl.get_state();
         if (state === JsInterpreterState.AwaitingInput || state === JsInterpreterState.Running) {
+            commitCurrentPromptToOutput();
             setPrompt("");
             this.impl.break_at_current_location();
             this.handleCurrentState();
@@ -198,14 +199,17 @@ wasm().then(async (module) => {
             return;
         }
 
-        const el = document.createElement('div');
-
-        el.setAttribute('class', 'prompt-response');
-        el.textContent = `${promptEl.textContent}${inputEl.value}`;
-        outputEl.appendChild(el);
-        scroll_output();
-
+        commitCurrentPromptToOutput(inputEl.value);
         interpreter.submitUserInput(inputEl.value);
         inputEl.value = "";
     });
 });
+
+const commitCurrentPromptToOutput = (additionalText = "") => {
+    const el = document.createElement('div');
+
+    el.setAttribute('class', 'prompt-response');
+    el.textContent = `${promptEl.textContent}${additionalText}`;
+    outputEl.appendChild(el);
+    scroll_output();
+};
