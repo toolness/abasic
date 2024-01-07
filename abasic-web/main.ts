@@ -4,70 +4,8 @@ import {
   JsInterpreterState,
   JsInterpreterOutputType,
 } from "./pkg/abasic_web.js";
-
-const a11yOutputEl = el_with_id("a11y-output");
-const outputEl = el_with_id("output");
-const promptEl = el_with_id("prompt");
-const inputEl = el_with_id("input");
-const formEl = el_with_id("form");
-
-if (!(inputEl instanceof HTMLInputElement))
-  throw new Error("Expected inputEl to be an <input>");
-
-if (!(formEl instanceof HTMLFormElement))
-  throw new Error("Expected formEl to be a <form>");
-
-let latestPartialLines: Text[] = [];
-
-function print(msg: string) {
-  const textNode = document.createTextNode(msg);
-  if (msg.endsWith("\n")) {
-    latestPartialLines = [];
-  } else {
-    latestPartialLines.push(textNode);
-  }
-  outputEl.appendChild(textNode);
-  a11yOutputEl.appendChild(textNode.cloneNode());
-  scroll_output();
-}
-
-function clearScreen() {
-  outputEl.textContent = "";
-  scroll_output();
-}
-
-// See our CSS for .ugh-ios for details on why we're doing this.
-const IS_IOS =
-  /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
-if (IS_IOS) {
-  document.documentElement.classList.add("ugh-ios");
-}
-
-function el_with_id(id: string): HTMLElement {
-  const el = document.getElementById(id);
-  if (el === null) throw new Error(`Element with id "${id}" not found!`);
-  return el;
-}
-
-function scroll_output() {
-  // Different browsers use different elements for scrolling. :(
-  [document.documentElement, document.body].forEach((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-}
-
-const setPrompt = (prompt: string) => {
-  let prefix = "";
-  if (latestPartialLines.length > 0) {
-    for (const chunk of latestPartialLines) {
-      prefix += chunk.textContent;
-      outputEl.removeChild(chunk);
-    }
-    latestPartialLines = [];
-  }
-  promptEl.textContent = prefix + prompt;
-  a11yOutputEl.appendChild(document.createTextNode(prompt));
-};
+import * as ui from "./ui.js";
+import { unreachable } from "./util.js";
 
 class Interpreter {
   constructor(private readonly impl: JsInterpreter) {}
@@ -103,10 +41,10 @@ class Interpreter {
     const state = this.impl.get_state();
     if (state === JsInterpreterState.Idle) {
       this.impl.start_evaluating(input);
-      setPrompt("");
+      ui.setPrompt("");
     } else if (state === JsInterpreterState.AwaitingInput) {
       this.impl.provide_input(input);
-      setPrompt("");
+      ui.setPrompt("");
     } else {
       throw new Error(
         `submitUserInput called when state is ${JsInterpreterState[state]}!`
@@ -121,8 +59,8 @@ class Interpreter {
       state === JsInterpreterState.AwaitingInput ||
       state === JsInterpreterState.Running
     ) {
-      commitCurrentPromptToOutput();
-      setPrompt("");
+      ui.commitCurrentPromptToOutput();
+      ui.setPrompt("");
       this.impl.break_at_current_location();
       this.handleCurrentState();
     }
@@ -132,10 +70,10 @@ class Interpreter {
     const output = this.impl.take_latest_output();
     for (const item of output) {
       if (item.output_type === JsInterpreterOutputType.Print) {
-        print(item.into_string());
+        ui.print(item.into_string());
       } else {
         // TODO: Print this in a different color?
-        print(`${item.into_string()}\n`);
+        ui.print(`${item.into_string()}\n`);
       }
     }
   }
@@ -145,10 +83,10 @@ class Interpreter {
     const state = this.impl.get_state();
     switch (state) {
       case JsInterpreterState.Idle:
-        setPrompt("] ");
+        ui.setPrompt("] ");
         break;
       case JsInterpreterState.AwaitingInput:
-        setPrompt("? ");
+        ui.setPrompt("? ");
         break;
       case JsInterpreterState.Errored:
         const err = this.impl.take_latest_error();
@@ -157,7 +95,7 @@ class Interpreter {
             "Assertion failure, take_latest_error() returned undefined!"
           );
         }
-        print(err);
+        ui.print(err);
         this.handleCurrentState();
         break;
       case JsInterpreterState.Running:
@@ -170,10 +108,6 @@ class Interpreter {
   };
 }
 
-function unreachable(arg: never) {
-  throw new Error(`Assertion failure, unreachable(${arg}) was called!`);
-}
-
 wasm().then(async (module) => {
   const interpreter = new Interpreter(JsInterpreter.new());
 
@@ -182,16 +116,16 @@ wasm().then(async (module) => {
   if (programPath) {
     const sourceCodeRequest = await fetch(programPath);
     if (!sourceCodeRequest.ok) {
-      print(
+      ui.print(
         `Failed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`
       );
       return;
     }
     const sourceCode = await sourceCodeRequest.text();
-    clearScreen();
+    ui.clearScreen();
     interpreter.loadAndRunSourceCode(sourceCode);
   } else {
-    clearScreen();
+    ui.clearScreen();
   }
 
   interpreter.start();
@@ -202,30 +136,21 @@ wasm().then(async (module) => {
     }
   });
 
-  formEl.addEventListener("submit", (e) => {
-    e.preventDefault();
+  ui.onSubmitInput(() => {
+    const input = ui.getInput();
 
     if (!interpreter.canProcessUserInput()) {
       // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
       // so we'll just treat this special emoji as the same thing.
-      if (inputEl.value === "💥") {
-        inputEl.value = "";
+      if (input === "💥") {
+        ui.clearInput();
         interpreter.break();
       }
       return;
     }
 
-    commitCurrentPromptToOutput(inputEl.value);
-    interpreter.submitUserInput(inputEl.value);
-    inputEl.value = "";
+    ui.commitCurrentPromptToOutput(input);
+    interpreter.submitUserInput(input);
+    ui.clearInput();
   });
 });
-
-const commitCurrentPromptToOutput = (additionalText = "") => {
-  const el = document.createElement("div");
-
-  el.setAttribute("class", "prompt-response");
-  el.textContent = `${promptEl.textContent}${additionalText}`;
-  outputEl.appendChild(el);
-  scroll_output();
-};
