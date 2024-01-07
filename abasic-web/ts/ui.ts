@@ -84,3 +84,9 @@ export function getInput(): string {
 export function clearInput() {
   inputEl.value = "";
 }
+
+export function clearPromptAndDisableInput() {
+  setPrompt("");
+  clearInput();
+  inputEl.disabled = true;
+}

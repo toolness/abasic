@@ -11,7 +11,20 @@ import { unreachable } from "./util.js";
 class Interpreter {
   constructor(private readonly impl: JsInterpreter) {}
 
+  /**
+   * If we're not fully interactive, then reaching the end of
+   * program execution normally will stop the interpreter and
+   * not allow further user input. However, pressing CTRL-C
+   * to break the program is still allowed, at which point we
+   * will be fully interactive.
+   *
+   * When we're fully interactive, we will present the user
+   * with a BASIC prompt at the end of program execution.
+   */
+  isFullyInteractive = true;
+
   loadAndRunSourceCode(sourceCode: string) {
+    this.isFullyInteractive = false;
     let lines = sourceCode.split("\n");
     for (const line of lines) {
       if (!line.trim()) {
@@ -60,6 +73,7 @@ class Interpreter {
       state === JsInterpreterState.AwaitingInput ||
       state === JsInterpreterState.Running
     ) {
+      this.isFullyInteractive = true;
       ui.commitCurrentPromptToOutput();
       ui.setPrompt("");
       this.impl.break_at_current_location();
@@ -84,6 +98,10 @@ class Interpreter {
     const state = this.impl.get_state();
     switch (state) {
       case JsInterpreterState.Idle:
+        if (!this.isFullyInteractive) {
+          ui.clearPromptAndDisableInput();
+          return;
+        }
         ui.setPrompt("] ");
         break;
       case JsInterpreterState.AwaitingInput:
