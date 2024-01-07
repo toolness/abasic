@@ -9,6 +9,16 @@ For more details, see [Rationale](#Rationale).
 
 ## Quick start
 
+### Web
+
+You can use the web version at https://toolness.github.io/abasic/.
+
+Here are some programs you can run with it:
+
+* [Chemist](https://toolness.github.io/abasic/?p=programs/chemist.bas)
+
+### Command-line
+
 Install the executable with:
 
 <!-- Note that the `cd` here is annoying, we can remove it if this ever gets fixed: https://github.com/rust-lang/cargo/issues/4101 -->
@@ -31,6 +41,59 @@ abasic programs/chemist.bas
 ```
 
 Use `abasic --help` for more details.
+
+## Development
+
+The root directory is a workspace with a few different packages:
+
+* `abasic-core` is the core BASIC interpreter. It doesn't do anything
+  UI-related.
+* `abasic-cli` is the command-line version of the interpreter.
+* `abasic-web` is the Web version of the interpreter.
+
+### Command-line
+
+To run tests, from the root of the project, use:
+
+```
+cargo test
+```
+
+To run the command-line interpreter, use:
+
+```
+cargo run
+```
+
+### Web
+
+To develop for the Web you will need to `cd` into `abasic-web`.
+
+Whenever you make any changes to Rust code, you will need to rebuild the
+WebAssembly binary and its associated JS and TypeScript typings:
+
+```
+npm run wasm
+```
+
+Iterating on the rest of the Web front-end can be done by running:
+
+```
+npm run dev
+```
+
+Then navigate to http://localhost:8080/abasic-web/.
+
+You can run individual programs by using the `p` querystring argument
+set to the relative path to a program, e.g.:
+
+http://localhost:8080/abasic-web/?p=../programs/chemist.bas
+
+To deploy the Web frontend, you can run:
+
+```
+npm run publish
+```
 
 ## Rationale
 
