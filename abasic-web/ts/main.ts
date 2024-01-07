@@ -48,6 +48,14 @@ class Interpreter {
     this.handleCurrentState();
   }
 
+  canProcessUserInput(): boolean {
+    const state = this.impl.get_state();
+    return (
+      state === JsInterpreterState.Idle ||
+      state === JsInterpreterState.AwaitingInput
+    );
+  }
+
   canBreak(): boolean {
     const state = this.impl.get_state();
     return state !== JsInterpreterState.Idle;
@@ -116,7 +124,7 @@ class Interpreter {
             "Assertion failure, take_latest_error() returned undefined!"
           );
         }
-        ui.print(err);
+        ui.print(`${err}\n`);
         this.handleCurrentState();
         break;
       case JsInterpreterState.Running:
@@ -169,13 +177,15 @@ wasm().then(async (module) => {
   ui.onSubmitInput(() => {
     const input = ui.getInput();
 
-    if (interpreter.canBreak()) {
-      // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
-      // so we'll just treat this special emoji as the same thing.
-      if (input === "💥") {
-        ui.clearInput();
-        interpreter.break();
-      }
+    // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
+    // so we'll just treat this special emoji as the same thing.
+    if (interpreter.canBreak() && input === "💥") {
+      ui.clearInput();
+      interpreter.break();
+      return;
+    }
+
+    if (!interpreter.canProcessUserInput()) {
       return;
     }
 
