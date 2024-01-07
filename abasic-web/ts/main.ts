@@ -140,7 +140,7 @@ wasm().then(async (module) => {
     const sourceCodeRequest = await fetch(programPath);
     if (!sourceCodeRequest.ok) {
       ui.print(
-        `Failed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`
+        `\nFailed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`
       );
       return;
     }
