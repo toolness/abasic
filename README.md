@@ -16,7 +16,7 @@ You can use the web version at https://toolness.github.io/abasic/.
 Here are some programs you can run with it:
 
 * [Chemist](https://toolness.github.io/abasic/?p=programs/chemist.bas)
-* [Hammurabi](https://toolness.github.io/abasic/?p=programs/hamurabi.bas)
+* [Hamurabi](https://toolness.github.io/abasic/?p=programs/hamurabi.bas) - For more on this game's history, see its [Wikipedia page](https://en.wikipedia.org/wiki/Hamurabi_(video_game)).
 
 ### Command-line
 
