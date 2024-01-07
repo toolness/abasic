@@ -48,12 +48,9 @@ class Interpreter {
     this.handleCurrentState();
   }
 
-  canProcessUserInput(): boolean {
+  canBreak(): boolean {
     const state = this.impl.get_state();
-    return (
-      state === JsInterpreterState.Idle ||
-      state === JsInterpreterState.AwaitingInput
-    );
+    return state !== JsInterpreterState.Idle;
   }
 
   submitUserInput(input: string) {
@@ -172,7 +169,7 @@ wasm().then(async (module) => {
   ui.onSubmitInput(() => {
     const input = ui.getInput();
 
-    if (!interpreter.canProcessUserInput()) {
+    if (interpreter.canBreak()) {
       // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
       // so we'll just treat this special emoji as the same thing.
       if (input === "💥") {
