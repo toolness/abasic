@@ -92,9 +92,9 @@ npm run dev
 Then navigate to http://localhost:8080/.
 
 You can run individual programs by using the `p` querystring argument
-set to the relative path to a program, e.g.:
+set to the stem of a file in the `programs` subdirectory, e.g.:
 
-http://localhost:8080/?p=programs/chemist.bas
+http://localhost:8080/?p=chemist
 
 To deploy the Web frontend, you can run:
 
