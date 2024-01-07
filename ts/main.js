@@ -1,14 +1,30 @@
 import { default as wasm, init_and_set_rnd_seed, JsInterpreter, JsInterpreterState, JsInterpreterOutputType, } from "../pkg/abasic_web.js";
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
+const VERSION = "0.1.0";
 class Interpreter {
     constructor(impl) {
         this.impl = impl;
+        /**
+         * If we're not fully interactive, then reaching the end of
+         * program execution normally will stop the interpreter and
+         * not allow further user input. However, pressing CTRL-C
+         * to break the program is still allowed, at which point we
+         * will be fully interactive.
+         *
+         * When we're fully interactive, we will present the user
+         * with a BASIC prompt at the end of program execution.
+         */
+        this.isFullyInteractive = true;
         this.handleCurrentState = () => {
             this.showOutput();
             const state = this.impl.get_state();
             switch (state) {
                 case JsInterpreterState.Idle:
+                    if (!this.isFullyInteractive) {
+                        ui.clearPromptAndDisableInput();
+                        return;
+                    }
                     ui.setPrompt("] ");
                     break;
                 case JsInterpreterState.AwaitingInput:
@@ -32,6 +48,7 @@ class Interpreter {
         };
     }
     loadAndRunSourceCode(sourceCode) {
+        this.isFullyInteractive = false;
         let lines = sourceCode.split("\n");
         for (const line of lines) {
             if (!line.trim()) {
@@ -46,6 +63,9 @@ class Interpreter {
         this.impl.start_evaluating("RUN");
     }
     start() {
+        if (this.isFullyInteractive) {
+            ui.print(`Welcome to Atul's BASIC Interpreter v${VERSION}.\n`);
+        }
         this.handleCurrentState();
     }
     canProcessUserInput() {
@@ -72,6 +92,7 @@ class Interpreter {
         const state = this.impl.get_state();
         if (state === JsInterpreterState.AwaitingInput ||
             state === JsInterpreterState.Running) {
+            this.isFullyInteractive = true;
             ui.commitCurrentPromptToOutput();
             ui.setPrompt("");
             this.impl.break_at_current_location();

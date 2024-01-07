@@ -68,3 +68,8 @@ export function getInput() {
 export function clearInput() {
     inputEl.value = "";
 }
+export function clearPromptAndDisableInput() {
+    setPrompt("");
+    clearInput();
+    inputEl.disabled = true;
+}
