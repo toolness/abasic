@@ -13,15 +13,40 @@ wasm().then((module) => {
     if (!(formEl instanceof HTMLFormElement))
         throw new Error("Expected formEl to be a <form>");
 
+    function print(msg: string) {
+        const textNode = document.createTextNode(msg);
+        outputEl.appendChild(textNode);
+        a11yOutputEl.appendChild(textNode.cloneNode());
+        scroll_output();
+    }
+
+    function clearScreen() {
+        outputEl.textContent = "";
+        scroll_output();
+    }
+
+    // See our CSS for .ugh-ios for details on why we're doing this.
+    const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+    if (IS_IOS) {
+        document.documentElement.classList.add('ugh-ios');
+    }
+
+    clearScreen();
+
     let interpreter = JsInterpreter.new();
     interpreter.start_evaluating('PRINT "HELLO " 1+2');
     if (interpreter.get_state() === JsInterpreterState.Errored) {
-        console.log("ERROR", interpreter.take_latest_error());
+        print(interpreter.take_latest_error() ?? "");
         return
     }
     const output = interpreter.take_latest_output();
     for (const item of output) {
-        console.log(JsInterpreterOutputType[item.output_type], item.into_string());
+        if (item.output_type  === JsInterpreterOutputType.Print) {
+            print(item.into_string());
+        } else {
+            // TODO: Print this in a different color?
+            print(`${item.into_string()}\n`);
+        }
     }
 });
 
@@ -30,4 +55,11 @@ function el_with_id(id: string): HTMLElement {
     if (el === null)
         throw new Error(`Element with id "${id}" not found!`);
     return el;
+}
+
+function scroll_output() {
+    // Different browsers use different elements for scrolling. :(
+    [document.documentElement, document.body].forEach(el => {
+        el.scrollTop = el.scrollHeight;
+    });
 }
