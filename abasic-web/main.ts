@@ -12,8 +12,15 @@ if (!(inputEl instanceof HTMLInputElement))
 if (!(formEl instanceof HTMLFormElement))
     throw new Error("Expected formEl to be a <form>");
 
+let latestPartialLines: Text[] = [];
+
 function print(msg: string) {
     const textNode = document.createTextNode(msg);
+    if (msg.endsWith('\n')) {
+        latestPartialLines = []
+    } else {
+        latestPartialLines.push(textNode);
+    }
     outputEl.appendChild(textNode);
     a11yOutputEl.appendChild(textNode.cloneNode());
     scroll_output();
@@ -45,7 +52,15 @@ function scroll_output() {
 }
 
 const setPrompt = (prompt: string) => {
-    promptEl.textContent = prompt;
+    let prefix = "";
+    if (latestPartialLines.length > 0) {
+        for (const chunk of latestPartialLines) {
+            prefix += chunk.textContent;
+            outputEl.removeChild(chunk);
+        }
+        latestPartialLines = [];
+    }
+    promptEl.textContent = prefix + prompt;
     a11yOutputEl.appendChild(document.createTextNode(prompt));
 };
 
