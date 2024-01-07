@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "description": "Web front-end for the ABASIC interpreter.",
   "scripts": {
-    "wasm": "wasm-pack build --target web"
+    "wasm": "wasm-pack build --target web",
+    "dev": "concurrently --kill-others \"http-server ..\" \"tsc --watch --preserveWatchOutput\""
   },
   "author": "Atul Varma <varmaa@gmail.com>",
   "license": "CC0-1.0",
   "dependencies": {
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1",
     "prettier": "3.1.1",
     "typescript": "^5.3.3"
   }
