@@ -68,7 +68,7 @@ class Interpreter {
     constructor(private readonly impl: JsInterpreter) {
     }
 
-    loadSourceCode(sourceCode: string) {
+    loadAndRunSourceCode(sourceCode: string) {
         let lines = sourceCode.split('\n');
         for (const line of lines) {
             if (!line.trim()) {
@@ -80,6 +80,7 @@ class Interpreter {
             }
             this.impl.start_evaluating(line);
         }
+        this.impl.start_evaluating("RUN");
     }
 
     start() {
@@ -170,11 +171,11 @@ wasm().then(async (module) => {
             return;
         }
         const sourceCode = await sourceCodeRequest.text();
-        interpreter.loadSourceCode(sourceCode);
-        interpreter.submitUserInput("RUN");
+        clearScreen();
+        interpreter.loadAndRunSourceCode(sourceCode);
+    } else {
+        clearScreen();
     }
-
-    clearScreen();
 
     interpreter.start();
 
