@@ -16,6 +16,7 @@ You can use the web version at https://toolness.github.io/abasic/.
 Here are some programs you can run with it:
 
 * [Chemist](https://toolness.github.io/abasic/?p=programs/chemist.bas)
+* [Hammurabi](https://toolness.github.io/abasic/?p=programs/hamurabi.bas)
 
 ### Command-line
 
