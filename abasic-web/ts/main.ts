@@ -3,7 +3,7 @@ import {
   JsInterpreter,
   JsInterpreterState,
   JsInterpreterOutputType,
-} from "./pkg/abasic_web.js";
+} from "../pkg/abasic_web.js";
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
 
