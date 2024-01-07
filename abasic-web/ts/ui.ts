@@ -60,16 +60,16 @@ function scroll_output() {
 }
 
 export function setPrompt(prompt: string) {
-  let prefix = "";
+  let prefix: Node[] = [];
+  promptEl.textContent = "";
   if (latestPartialLine.length > 0) {
     for (const chunk of latestPartialLine) {
-      prefix += chunk.textContent;
-      outputEl.removeChild(chunk);
+      promptEl.appendChild(chunk);
     }
     latestPartialLine = [];
   }
-  promptEl.textContent = prefix + prompt;
-  a11yOutputEl.appendChild(document.createTextNode(prompt));
+  promptEl.appendChild(document.createTextNode(prompt));
+  a11yOutputEl.appendChild(promptEl.cloneNode(true));
 }
 
 export function commitCurrentPromptToOutput(additionalText = "") {
