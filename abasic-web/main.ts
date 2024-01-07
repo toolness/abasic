@@ -146,6 +146,12 @@ wasm().then((module) => {
         e.preventDefault();
 
         if (!interpreter.canProcessUserInput()) {
+            // If the user is on a phone or tablet, they're not going to be able to press CTRL-C,
+            // so we'll just treat this special emoji as the same thing.
+            if (inputEl.value === "💥") {
+                inputEl.value = "";
+                interpreter.break();
+            }
             return;
         }
 
