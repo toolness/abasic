@@ -92,6 +92,10 @@ impl JsInterpreter {
         self.latest_error.take()
     }
 
+    pub fn break_at_current_location(&mut self) {
+        self.interpreter.break_at_current_location();
+    }
+
     pub fn start_evaluating(&mut self, line: String) {
         assert!(self.latest_error.is_none());
         if let Err(err) = self.interpreter.start_evaluating(line) {

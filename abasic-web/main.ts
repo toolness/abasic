@@ -76,6 +76,15 @@ class Interpreter {
         this.handleCurrentState();
     }
 
+    break() {
+        const state = this.impl.get_state();
+        if (state === JsInterpreterState.AwaitingInput || state === JsInterpreterState.Running) {
+            setPrompt("");
+            this.impl.break_at_current_location();
+            this.handleCurrentState();
+        }
+    }
+
     private showOutput() {
         const output = this.impl.take_latest_output();
         for (const item of output) {
@@ -126,6 +135,12 @@ wasm().then((module) => {
     const interpreter = new Interpreter(JsInterpreter.new());
 
     interpreter.start();
+
+    window.addEventListener('keydown', event => {
+        if (event.ctrlKey && event.key.toUpperCase() === 'C') {
+            interpreter.break();
+        }
+    });
 
     formEl.addEventListener('submit', e => {
         e.preventDefault();
