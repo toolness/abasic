@@ -28,6 +28,8 @@ cd abasic-core
 cargo install --path=.
 ```
 
+(Alternatively, you can run the `install` script in the root directory.)
+
 You can run the BASIC interpreter interactively with:
 
 ```
