@@ -60,7 +60,6 @@ function scroll_output() {
 }
 
 export function setPrompt(prompt: string) {
-  let prefix: Node[] = [];
   promptEl.textContent = "";
   if (latestPartialLine.length > 0) {
     for (const chunk of latestPartialLine) {
