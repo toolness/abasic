@@ -5,7 +5,7 @@
   "scripts": {
     "wasm": "wasm-pack build --target web",
     "dev": "concurrently --kill-others \"http-server ..\" \"tsc --watch --preserveWatchOutput\"",
-    "copy-to-dist": "rimraf dist && npx copyfiles index.html img/*.* ts/*.js pkg/*.js pkg/*.wasm dist && npx copyfiles -u 1 ../programs/*.bas dist",
+    "copy-to-dist": "rimraf dist && npx copyfiles index.html img/*.* ts/*.js pkg/*.js pkg/*.wasm dist && npx copyfiles -u 1 ../programs/*.bas dist"
   },
   "author": "Atul Varma <varmaa@gmail.com>",
   "license": "CC0-1.0",
