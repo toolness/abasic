@@ -68,6 +68,20 @@ class Interpreter {
     constructor(private readonly impl: JsInterpreter) {
     }
 
+    loadSourceCode(sourceCode: string) {
+        let lines = sourceCode.split('\n');
+        for (const line of lines) {
+            if (!line.trim()) {
+                continue;
+            }
+            if (!/^[0-9]/.test(line)) {
+                console.warn("Skipping line, as it's not numbered:", line);
+                continue;
+            }
+            this.impl.start_evaluating(line);
+        }
+    }
+
     start() {
         this.handleCurrentState();
     }
@@ -144,10 +158,23 @@ function unreachable(arg: never) {
     throw new Error(`Assertion failure, unreachable(${arg}) was called!`);
 }
 
-wasm().then((module) => {
-    clearScreen();
-
+wasm().then(async (module) => {
     const interpreter = new Interpreter(JsInterpreter.new());
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const programPath = searchParams.get('p');
+    if (programPath) {
+        const sourceCodeRequest = await fetch(programPath);
+        if (!sourceCodeRequest.ok) {
+            print(`Failed to load ${programPath} (HTTP ${sourceCodeRequest.status}).\n`);
+            return;
+        }
+        const sourceCode = await sourceCodeRequest.text();
+        interpreter.loadSourceCode(sourceCode);
+        interpreter.submitUserInput("RUN");
+    }
+
+    clearScreen();
 
     interpreter.start();
 
