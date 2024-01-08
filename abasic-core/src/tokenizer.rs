@@ -1,7 +1,8 @@
-use std::{collections::HashSet, fmt::Display, rc::Rc};
+use std::{fmt::Display, rc::Rc};
 
 use crate::{
     data::{data_elements_to_string, parse_data_until_colon, DataElement},
+    interner::StringInterner,
     line_cruncher::LineCruncher,
     syntax_error::SyntaxError,
 };
@@ -109,7 +110,7 @@ pub struct Tokenizer<T: AsRef<str>> {
     string: T,
     index: usize,
     errored: bool,
-    interned_strings: HashSet<Rc<String>>,
+    interner: StringInterner,
 }
 
 impl<T: AsRef<str>> Tokenizer<T> {
@@ -118,7 +119,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             string,
             index: 0,
             errored: false,
-            interned_strings: HashSet::new(),
+            interner: StringInterner::default(),
         }
     }
 
@@ -236,7 +237,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // but better safe (and slightly inefficient) than sorry for now.
             let string = String::from_utf8(chars).unwrap();
 
-            Some(Ok(Token::Symbol(self.interned(string))))
+            Some(Ok(Token::Symbol(self.interner.get(string))))
         }
     }
 
@@ -293,7 +294,9 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // and I'm not sure what BASIC conventions for this are, if any. It'd
             // be nice to somehow support this.
             if let Some(end_quote_index) = remaining_str.find('"') {
-                let string = self.interned(String::from(&remaining_str[..end_quote_index]));
+                let string = self
+                    .interner
+                    .get(String::from(&remaining_str[..end_quote_index]));
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
@@ -301,23 +304,6 @@ impl<T: AsRef<str>> Tokenizer<T> {
             }
         } else {
             None
-        }
-    }
-
-    fn interned(&mut self, string: String) -> Rc<String> {
-        // This probably isn't really worth the trouble since the only strings
-        // we're likely to repeat are symbol names like variables and functions,
-        // and those are probably going to be pretty short, but still, it's a
-        // fun exercise, and there's something inherently satisfying about it.
-        let result = self.interned_strings.get(&string);
-
-        match result {
-            Some(interned_string) => interned_string.clone(),
-            None => {
-                let interned_string = Rc::new(string);
-                self.interned_strings.insert(interned_string.clone());
-                interned_string
-            }
         }
     }
 
@@ -330,7 +316,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             let comment = std::str::from_utf8(bytes).unwrap().to_string();
 
             self.index += comment.len();
-            Some(Ok(Token::Remark(self.interned(comment))))
+            Some(Ok(Token::Remark(self.interner.get(comment))))
         } else {
             None
         }
