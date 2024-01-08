@@ -374,11 +374,19 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
     fn chomp_data(&mut self) -> Option<Token> {
         if self.chomp_keyword("DATA") {
+            // Note that we're not inlining remaining_bytes() here because we
+            // also want to get a mutable reference to our interner, and Rust's
+            // borrow checker will complain if we use the method directly, because
+            // using the method marks the entire struct as borrowed, rather than
+            // just one field.
+            let remaining_bytes = &self.string.as_ref().as_bytes()[self.index..];
+
             // We can technically do this using String::from_utf8_unchecked(),
             // but better safe (and slightly inefficient) than sorry for now.
-            let remaining = std::str::from_utf8(self.remaining_bytes()).unwrap();
+            let remaining = std::str::from_utf8(remaining_bytes).unwrap();
 
-            let (elements, bytes_chomped) = parse_data_until_colon(remaining);
+            let (elements, bytes_chomped) =
+                parse_data_until_colon(remaining, Some(&mut self.interner));
 
             self.index += bytes_chomped;
 
