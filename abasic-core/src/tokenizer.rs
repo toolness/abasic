@@ -100,7 +100,7 @@ impl Display for Token {
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
-            Token::Data(elements) => write!(f, "{}", data_elements_to_string(elements)),
+            Token::Data(elements) => write!(f, "DATA {}", data_elements_to_string(elements)),
         }
     }
 }
@@ -523,6 +523,22 @@ mod tests {
                 tokens
             );
         }
+    }
+
+    fn assert_roundtrip_works(value: &str) {
+        let first_parse = get_tokens(value);
+        let stringified = first_parse
+            .iter()
+            .map(|token| token.to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        let second_parse = get_tokens(stringified.as_str());
+        assert_eq!(first_parse, second_parse, "parsing '{}', then stringifying it to '{}', then re-parsing it results in the same tokens", value, stringified);
+    }
+
+    #[test]
+    fn roundtrip_of_data_works() {
+        assert_roundtrip_works("DATA 1, 2, 3");
     }
 
     #[test]
