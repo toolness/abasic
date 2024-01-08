@@ -1,6 +1,6 @@
-use std::{borrow::BorrowMut, rc::Rc};
+use std::rc::Rc;
 
-use crate::{interner::StringInterner, program::ProgramLine};
+use crate::program::ProgramLine;
 
 #[derive(Debug)]
 pub struct DataChunk {
@@ -83,23 +83,15 @@ enum ParseState {
 }
 
 #[derive(Default)]
-struct DataParser<'a> {
+struct DataParser {
     state: ParseState,
     elements: Vec<DataElement>,
     bytes_chomped: usize,
     current_element: String,
     is_finished: bool,
-    interner: Option<&'a mut StringInterner>,
 }
 
-impl<'a> DataParser<'a> {
-    fn maybe_intern(&mut self, string: String) -> Rc<String> {
-        match self.interner.borrow_mut() {
-            Some(interner) => interner.get(string),
-            None => Rc::new(string),
-        }
-    }
-
+impl DataParser {
     fn push_current_element(&mut self) {
         let mut string_value = std::mem::take(&mut self.current_element);
 
@@ -108,10 +100,10 @@ impl<'a> DataParser<'a> {
             if let Ok(number) = string_value.parse::<f64>() {
                 DataElement::Number(number)
             } else {
-                DataElement::String(self.maybe_intern(string_value))
+                DataElement::String(Rc::new(string_value))
             }
         } else {
-            DataElement::String(self.maybe_intern(string_value))
+            DataElement::String(Rc::new(string_value))
         };
 
         self.elements.push(element);
@@ -178,14 +170,8 @@ impl<'a> DataParser<'a> {
 /// Note that this will never return an empty `Vec`: even if the string
 /// is empty, it will still return a single-element `Vec` with an empty
 /// string in it.
-pub fn parse_data_until_colon(
-    value: &str,
-    interner: Option<&mut StringInterner>,
-) -> (Vec<DataElement>, usize) {
-    let mut parser = DataParser {
-        interner,
-        ..Default::default()
-    };
+pub fn parse_data_until_colon(value: &str) -> (Vec<DataElement>, usize) {
+    let mut parser = DataParser::default();
 
     for char in value.chars() {
         parser.parse_char(char);
@@ -230,7 +216,7 @@ mod tests {
 
     fn assert_parse_all_data(value: &'static str, expect: &[DataElement]) {
         assert_eq!(
-            parse_data_until_colon(value, None),
+            parse_data_until_colon(value),
             (Vec::from(expect), value.len()),
             "Parsing '{}'",
             value
@@ -244,7 +230,7 @@ mod tests {
         expect_unchomped_str: &'static str,
     ) {
         assert_eq!(
-            parse_data_until_colon(value, None),
+            parse_data_until_colon(value),
             (Vec::from(expect_elements), expect_bytes_chomped),
             "Parsing '{}' (expecting partial data)",
             value

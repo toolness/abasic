@@ -1,7 +1,6 @@
 mod builtins;
 mod data;
 mod dim;
-mod interner;
 mod interpreter;
 mod interpreter_error;
 mod line_cruncher;

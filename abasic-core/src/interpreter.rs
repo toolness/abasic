@@ -503,7 +503,7 @@ impl Interpreter {
         if let Some(input) = self.input.take() {
             // TODO: Support multiple comma-separated items.
             let lvalue = self.parse_lvalue()?;
-            let (data, bytes_read) = parse_data_until_colon(input.as_str(), None);
+            let (data, bytes_read) = parse_data_until_colon(input.as_str());
             // We're guaranteed to have at least one item in here, even if the input was an empty string.
             let first_element = &data[0];
             let has_excess_data = data.len() > 1 || bytes_read < input.len();

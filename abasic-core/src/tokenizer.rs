@@ -2,7 +2,6 @@ use std::{fmt::Display, rc::Rc};
 
 use crate::{
     data::{data_elements_to_string, parse_data_until_colon, DataElement},
-    interner::StringInterner,
     line_cruncher::LineCruncher,
     syntax_error::SyntaxError,
 };
@@ -110,7 +109,6 @@ pub struct Tokenizer<T: AsRef<str>> {
     string: T,
     index: usize,
     errored: bool,
-    interner: StringInterner,
 }
 
 impl<T: AsRef<str>> Tokenizer<T> {
@@ -119,7 +117,6 @@ impl<T: AsRef<str>> Tokenizer<T> {
             string,
             index: 0,
             errored: false,
-            interner: StringInterner::default(),
         }
     }
 
@@ -237,7 +234,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // but better safe (and slightly inefficient) than sorry for now.
             let string = String::from_utf8(chars).unwrap();
 
-            Some(Ok(Token::Symbol(self.interner.get(string))))
+            Some(Ok(Token::Symbol(Rc::new(string))))
         }
     }
 
@@ -294,9 +291,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // and I'm not sure what BASIC conventions for this are, if any. It'd
             // be nice to somehow support this.
             if let Some(end_quote_index) = remaining_str.find('"') {
-                let string = self
-                    .interner
-                    .get(String::from(&remaining_str[..end_quote_index]));
+                let string = Rc::new(String::from(&remaining_str[..end_quote_index]));
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
@@ -316,7 +311,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             let comment = std::str::from_utf8(bytes).unwrap().to_string();
 
             self.index += comment.len();
-            Some(Ok(Token::Remark(self.interner.get(comment))))
+            Some(Ok(Token::Remark(Rc::new(comment))))
         } else {
             None
         }
@@ -374,19 +369,11 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
     fn chomp_data(&mut self) -> Option<Token> {
         if self.chomp_keyword("DATA") {
-            // Note that we're not inlining remaining_bytes() here because we
-            // also want to get a mutable reference to our interner, and Rust's
-            // borrow checker will complain if we use the method directly, because
-            // using the method marks the entire struct as borrowed, rather than
-            // just one field.
-            let remaining_bytes = &self.string.as_ref().as_bytes()[self.index..];
-
             // We can technically do this using String::from_utf8_unchecked(),
             // but better safe (and slightly inefficient) than sorry for now.
-            let remaining = std::str::from_utf8(remaining_bytes).unwrap();
+            let remaining = std::str::from_utf8(self.remaining_bytes()).unwrap();
 
-            let (elements, bytes_chomped) =
-                parse_data_until_colon(remaining, Some(&mut self.interner));
+            let (elements, bytes_chomped) = parse_data_until_colon(remaining);
 
             self.index += bytes_chomped;
 
