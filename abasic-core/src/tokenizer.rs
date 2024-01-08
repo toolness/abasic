@@ -96,7 +96,7 @@ impl Display for Token {
             Token::Read => write!(f, "READ"),
             Token::Restore => write!(f, "RESTORE"),
             Token::Def => write!(f, "DEF"),
-            Token::Remark(comment) => write!(f, "REM {}", comment),
+            Token::Remark(comment) => write!(f, "REM{}", comment),
             Token::Symbol(name) => write!(f, "{}", name),
             Token::StringLiteral(string) => write!(f, "\"{}\"", string),
             Token::NumericLiteral(number) => write!(f, "{}", number),
@@ -539,6 +539,34 @@ mod tests {
     #[test]
     fn roundtrip_of_data_works() {
         assert_roundtrip_works("DATA 1, 2, 3");
+        assert_roundtrip_works("DATA BEEP, BOOP, BOP, 91.2");
+    }
+
+    #[test]
+    fn roundtrip_remarks_works() {
+        assert_roundtrip_works("REM BLARG BLARG 😊 ?!@?#?,#@%?f/sa");
+    }
+
+    #[test]
+    fn roundtrip_symbols_works() {
+        assert_roundtrip_works("zzz, kkkkkk, ppppp");
+    }
+
+    #[test]
+    fn roundtrip_string_literals_works() {
+        assert_roundtrip_works(r#""hello", "there", "bub""#);
+    }
+
+    #[test]
+    fn roundtrip_numeric_literals_works() {
+        assert_roundtrip_works("1.0, 2.5, 34");
+    }
+
+    #[test]
+    fn roundtrip_of_misc_tokens_works() {
+        assert_roundtrip_works(
+            r#"dim let print input goto gosub return :;,?()+-*/^=<><<=>>= and or not if then else end stop for to step next read restore def"#,
+        );
     }
 
     #[test]
