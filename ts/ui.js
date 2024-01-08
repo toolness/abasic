@@ -48,7 +48,6 @@ function scroll_output() {
     });
 }
 export function setPrompt(prompt) {
-    let prefix = [];
     promptEl.textContent = "";
     if (latestPartialLine.length > 0) {
         for (const chunk of latestPartialLine) {
