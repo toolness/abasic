@@ -7,6 +7,7 @@ mod line_cruncher;
 mod line_number_parser;
 mod operators;
 mod program;
+mod program_lines;
 mod syntax_error;
 mod tokenizer;
 mod value;

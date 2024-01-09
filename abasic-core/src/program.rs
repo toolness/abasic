@@ -1,12 +1,10 @@
-use std::{
-    collections::{BTreeSet, HashMap},
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    data::{DataChunk, DataElement, DataIterator},
+    data::{DataElement, DataIterator},
     dim::ValueArray,
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
+    program_lines::ProgramLines,
     syntax_error::SyntaxError,
     tokenizer::Token,
     value::Value,
@@ -49,15 +47,8 @@ struct FunctionDefinition {
 
 #[derive(Debug, Default)]
 pub struct Program {
-    numbered_lines: HashMap<u64, Vec<Token>>,
+    numbered_lines: ProgramLines,
     immediate_line: Vec<Token>,
-
-    /// According to Wikipedia, Applesoft BASIC stored lines as a linked list,
-    /// which meant that GOSUB/GOTO took linear time. This was likely due to
-    /// memory constraints. We don't have such constraints, so we'll use a
-    /// BTreeSet for faster lookup.
-    sorted_line_numbers: BTreeSet<u64>,
-
     location: ProgramLocation,
     breakpoint: Option<ProgramLocation>,
     stack: Vec<StackFrame>,
@@ -218,14 +209,14 @@ impl Program {
     }
 
     pub fn has_line_number(&self, line_number: u64) -> bool {
-        self.numbered_lines.contains_key(&line_number)
+        self.numbered_lines.has(line_number)
     }
 
     /// Go to the first numbered line. Resets the stack and the data cursor.
     pub fn goto_first_numbered_line(&mut self) {
         self.breakpoint = None;
         self.reset_data_cursor();
-        if let Some(&first_line) = self.sorted_line_numbers.first() {
+        if let Some(first_line) = self.numbered_lines.first() {
             self.stack.clear();
             self.location = ProgramLocation {
                 line: ProgramLine::Line(first_line),
@@ -240,7 +231,7 @@ impl Program {
 
     pub fn goto_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
         self.breakpoint = None;
-        if self.sorted_line_numbers.contains(&line_number) {
+        if self.numbered_lines.has(line_number) {
             self.location = ProgramLocation {
                 line: ProgramLine::Line(line_number),
                 token_index: 0,
@@ -371,17 +362,9 @@ impl Program {
     }
 
     pub fn next_data_element(&mut self) -> Option<DataElement> {
-        let iterator = self.data_iterator.get_or_insert_with(|| {
-            let mut chunks = vec![];
-            for line in self.sorted_line_numbers.iter() {
-                for token in self.numbered_lines.get(line).unwrap() {
-                    if let Token::Data(data) = token {
-                        chunks.push(DataChunk::new(ProgramLine::Line(*line), data.clone()));
-                    }
-                }
-            }
-            DataIterator::new(chunks)
-        });
+        let iterator = self
+            .data_iterator
+            .get_or_insert_with(|| self.numbered_lines.data_iterator());
         iterator.next()
     }
 
@@ -395,8 +378,7 @@ impl Program {
                 false
             }
             ProgramLine::Line(current_line) => {
-                if let Some(&next_line) = self.sorted_line_numbers.range(current_line + 1..).next()
-                {
+                if let Some(next_line) = self.numbered_lines.after(current_line) {
                     self.location = ProgramLocation {
                         line: ProgramLine::Line(next_line),
                         token_index: 0,
@@ -410,41 +392,19 @@ impl Program {
     }
 
     pub fn list(&self) -> Vec<String> {
-        let mut lines: Vec<String> = Vec::with_capacity(self.numbered_lines.len());
-
-        for line_number in &self.sorted_line_numbers {
-            let line = self
-                .numbered_lines
-                .get(line_number)
-                .unwrap()
-                .iter()
-                .map(|token| token.to_string())
-                .collect::<Vec<String>>()
-                .join(" ");
-
-            let line_source = format!("{} {}\n", line_number, line);
-            lines.push(line_source);
-        }
-
-        lines
+        self.numbered_lines.list()
     }
 
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
         self.breakpoint = None;
-        if tokens.is_empty() {
-            self.sorted_line_numbers.remove(&line_number);
-            self.numbered_lines.remove(&line_number);
-        } else {
-            self.sorted_line_numbers.insert(line_number);
-            self.numbered_lines.insert(line_number, tokens);
-        }
+        self.numbered_lines.set(line_number, tokens);
         self.reset_data_cursor();
     }
 
     fn tokens(&self) -> &Vec<Token> {
         match self.location.line {
             ProgramLine::Immediate => &self.immediate_line,
-            ProgramLine::Line(number) => self.numbered_lines.get(&number).unwrap(),
+            ProgramLine::Line(number) => self.numbered_lines.get(number).unwrap(),
         }
     }
 
