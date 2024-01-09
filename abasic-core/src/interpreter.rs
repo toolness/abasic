@@ -1713,6 +1713,21 @@ mod tests {
     }
 
     #[test]
+    fn nested_functions_weirdly_look_at_the_stack_of_their_callers() {
+        // THIS IS EXTREMELY WEIRD but it's what Applesoft BASIC does. Not
+        // sure whether it's a feature or a bug.
+        assert_program_output(
+            r#"
+            1 y = 0
+            10 def fna(x) = x + y + 1
+            20 def fnb(y) = fna(y)
+            30 print fnb(1)
+            "#,
+            "3\n",
+        );
+    }
+
+    #[test]
     fn function_calls_without_enough_arguments_fail() {
         assert_program_error(
             r#"
