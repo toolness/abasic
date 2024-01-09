@@ -1,6 +1,5 @@
 import {
   default as wasm,
-  init_and_set_rnd_seed,
   JsInterpreter,
   JsInterpreterState,
   JsInterpreterOutputType,
@@ -11,7 +10,9 @@ import { unreachable } from "./util.js";
 const VERSION = "0.2.1";
 
 class Interpreter {
-  constructor(private readonly impl: JsInterpreter) {}
+  constructor(private readonly impl: JsInterpreter) {
+    this.impl.randomize(BigInt(Date.now()));
+  }
 
   /**
    * If we're not fully interactive, then reaching the end of
@@ -169,8 +170,6 @@ function normalizeProgramPath(path: string | null): string | null {
 }
 
 wasm().then(async (module) => {
-  init_and_set_rnd_seed(BigInt(Date.now()));
-
   const interpreter = new Interpreter(JsInterpreter.new());
 
   const searchParams = new URLSearchParams(window.location.search);

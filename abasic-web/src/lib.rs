@@ -1,6 +1,6 @@
 mod utils;
 
-use abasic_core::{set_rnd_seed, Interpreter, InterpreterOutput, InterpreterState};
+use abasic_core::{Interpreter, InterpreterOutput, InterpreterState};
 use wasm_bindgen::prelude::*;
 
 use crate::utils::set_panic_hook;
@@ -55,12 +55,6 @@ fn convert_interpreter_output_for_js(value: InterpreterOutput) -> JsInterpreterO
 }
 
 #[wasm_bindgen]
-pub fn init_and_set_rnd_seed(seed: u64) {
-    set_panic_hook();
-    set_rnd_seed(seed);
-}
-
-#[wasm_bindgen]
 pub struct JsInterpreter {
     interpreter: Interpreter,
     latest_error: Option<String>,
@@ -69,6 +63,7 @@ pub struct JsInterpreter {
 #[wasm_bindgen]
 impl JsInterpreter {
     pub fn new() -> Self {
+        set_panic_hook();
         JsInterpreter {
             interpreter: Interpreter::new(),
             latest_error: None,
@@ -79,6 +74,10 @@ impl JsInterpreter {
         if self.interpreter.get_state() == InterpreterState::NewInterpreterRequested {
             self.interpreter = Interpreter::new();
         }
+    }
+
+    pub fn randomize(&mut self, seed: u64) {
+        self.interpreter.randomize(seed);
     }
 
     pub fn provide_input(&mut self, input: String) {

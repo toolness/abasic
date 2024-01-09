@@ -5,6 +5,7 @@ use crate::{
     dim::ValueArray,
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     program_lines::ProgramLines,
+    random::Rng,
     syntax_error::SyntaxError,
     tokenizer::Token,
     value::Value,
@@ -57,6 +58,7 @@ pub struct Program {
     functions: HashMap<Rc<String>, FunctionDefinition>,
     variables: HashMap<Rc<String>, Value>,
     arrays: HashMap<Rc<String>, ValueArray>,
+    rng: Rng,
 }
 
 impl Program {
@@ -585,5 +587,26 @@ impl Program {
 
     pub fn has_variable(&self, name: &Rc<String>) -> bool {
         self.variables.contains_key(name)
+    }
+
+    pub fn randomize(&mut self, seed: u64) {
+        self.rng = Rng::new(seed);
+    }
+
+    pub fn random(&mut self, number: f64) -> Result<f64, TracedInterpreterError> {
+        // Applesoft BASIC would always return the most recent random with the argument '0', and
+        // predefined items in the sequence with '-1', but in practice all the code I've seen
+        // just calls it with '1', and *any* positive number is supposed to return a random number
+        // in the interval [0, 1).
+        if number < 0.0 {
+            // None of the code I've seen actually uses this, and
+            // I don't fully understand what it means, so just don't
+            // support it for now.
+            Err(InterpreterError::Unimplemented.into())
+        } else if number == 0.0 {
+            Ok(self.rng.latest_random())
+        } else {
+            Ok(self.rng.random())
+        }
     }
 }

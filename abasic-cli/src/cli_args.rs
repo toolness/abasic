@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use abasic_core::Interpreter;
 use clap::Parser;
 
@@ -29,6 +31,11 @@ impl CliArgs {
         let mut interpreter = Interpreter::new();
         interpreter.enable_warnings = self.warnings;
         interpreter.enable_tracing = self.tracing;
+
+        let now = SystemTime::now();
+        let seed = now.elapsed().unwrap().as_millis() as u64;
+        interpreter.randomize(seed);
+
         interpreter
     }
 }

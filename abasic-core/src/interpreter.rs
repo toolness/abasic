@@ -108,13 +108,18 @@ impl Interpreter {
         std::mem::take(&mut self.output)
     }
 
+    fn evaluate_unary_function_arg(&mut self) -> Result<Value, TracedInterpreterError> {
+        self.program.expect_next_token(Token::LeftParen)?;
+        let arg = self.evaluate_expression()?;
+        self.program.expect_next_token(Token::RightParen)?;
+        Ok(arg)
+    }
+
     fn evaluate_unary_function<F: Fn(Value) -> Result<Value, TracedInterpreterError>>(
         &mut self,
         f: F,
     ) -> Result<Value, TracedInterpreterError> {
-        self.program.expect_next_token(Token::LeftParen)?;
-        let arg = self.evaluate_expression()?;
-        self.program.expect_next_token(Token::RightParen)?;
+        let arg = self.evaluate_unary_function_arg()?;
         f(arg)
     }
 
@@ -160,7 +165,10 @@ impl Interpreter {
         let result = match function_name.as_str() {
             "ABS" => self.evaluate_unary_function(builtins::abs),
             "INT" => self.evaluate_unary_function(builtins::int),
-            "RND" => self.evaluate_unary_function(builtins::rnd),
+            "RND" => {
+                let number = self.evaluate_unary_function_arg()?;
+                Ok(self.program.random(number.try_into()?)?.into())
+            }
             _ => {
                 return self.evaluate_user_defined_function_call(function_name);
             }
@@ -810,13 +818,16 @@ impl Interpreter {
 
         Ok(())
     }
+
+    pub fn randomize(&mut self, seed: u64) {
+        self.program.randomize(seed);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         interpreter_error::{OutOfMemoryError, TracedInterpreterError},
-        set_rnd_seed,
         syntax_error::SyntaxError,
         tokenizer::Token,
         InterpreterOutput,
@@ -1097,15 +1108,29 @@ mod tests {
     }
 
     #[test]
-    fn rnd_works() {
-        set_rnd_seed(0);
+    fn rnd_with_positive_number_works() {
         assert_eval_output(
             "for i = 1 to 3:print int(rnd(1) * 50):next i",
-            "3\n40\n19\n",
+            "5\n31\n20\n",
         );
 
+        assert_eval_output(
+            "for i = 1 to 3:print int(rnd(i) * 50):next i",
+            "5\n31\n20\n",
+        );
+    }
+
+    #[test]
+    fn rnd_with_zero_works() {
+        assert_eval_output(
+            "print int(rnd(1) * 50):for i = 1 to 2:print int(rnd(0) * 50):next i",
+            "5\n5\n5\n",
+        );
+    }
+
+    #[test]
+    fn rnd_with_negative_number_is_unimplemented() {
         assert_eval_error("print rnd(-1)", InterpreterError::Unimplemented);
-        assert_eval_error("print rnd(0)", InterpreterError::Unimplemented);
     }
 
     #[ignore]
