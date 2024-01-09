@@ -1728,6 +1728,17 @@ mod tests {
     }
 
     #[test]
+    fn function_calls_with_badly_typed_arguments_fail() {
+        assert_program_error(
+            r#"
+            10 def fna(x) = x
+            20 print fna("boop")
+            "#,
+            InterpreterError::TypeMismatch.into(),
+        );
+    }
+
+    #[test]
     fn function_calls_without_enough_arguments_fail() {
         assert_program_error(
             r#"
