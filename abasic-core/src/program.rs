@@ -450,7 +450,10 @@ impl Program {
     /// Return the next token in the stream, advancing our
     /// position in it.  If there are no more tokens, return an error.
     pub fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {
-        unwrap_token(self.next_token())
+        match self.next_token() {
+            Some(token) => Ok(token),
+            None => Err(SyntaxError::UnexpectedEndOfInput.into()),
+        }
     }
 
     /// Expect the next token to be the given token, and advance our position
@@ -582,12 +585,5 @@ impl Program {
 
     pub fn has_variable(&self, name: &Rc<String>) -> bool {
         self.variables.contains_key(name)
-    }
-}
-
-fn unwrap_token(token: Option<Token>) -> Result<Token, TracedInterpreterError> {
-    match token {
-        Some(token) => Ok(token),
-        None => Err(SyntaxError::UnexpectedEndOfInput.into()),
     }
 }
