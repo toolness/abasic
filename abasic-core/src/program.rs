@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     data::{DataChunk, DataElement, DataIterator},
+    dim::ValueArray,
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     syntax_error::SyntaxError,
     tokenizer::Token,
@@ -63,6 +64,8 @@ pub struct Program {
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
     functions: HashMap<Rc<String>, FunctionDefinition>,
+    variables: HashMap<Rc<String>, Value>,
+    arrays: HashMap<Rc<String>, ValueArray>,
 }
 
 impl Program {
@@ -162,6 +165,7 @@ impl Program {
     pub fn start_loop(
         &mut self,
         symbol: Rc<String>,
+        from_value: f64,
         to_value: f64,
         step_value: f64,
     ) -> Result<(), TracedInterpreterError> {
@@ -171,18 +175,20 @@ impl Program {
         }
         self.loop_stack.push(LoopInfo {
             location: self.location,
-            symbol,
+            symbol: symbol.clone(),
             to_value,
             step_value,
         });
+        self.variables.insert(symbol, from_value.into());
         Ok(())
     }
 
-    pub fn end_loop(
-        &mut self,
-        symbol: Rc<String>,
-        current_value: f64,
-    ) -> Result<f64, TracedInterpreterError> {
+    pub fn end_loop(&mut self, symbol: Rc<String>) -> Result<(), TracedInterpreterError> {
+        let Some(current_value) = self.variables.get(&symbol) else {
+            return Err(InterpreterError::NextWithoutFor.into());
+        };
+        let current_number: f64 = current_value.clone().try_into()?;
+
         let Some(loop_info) = self.remove_loop_with_name(&symbol) else {
             return Err(InterpreterError::NextWithoutFor.into());
         };
@@ -191,7 +197,7 @@ impl Program {
             return Err(InterpreterError::NextWithoutFor.into());
         }
 
-        let new_value = current_value + loop_info.step_value;
+        let new_value = current_number + loop_info.step_value;
 
         // I obtained this logic through experimentation with
         // Applesoft BASIC, but it's also mentioned in the Dartmouth
@@ -207,7 +213,8 @@ impl Program {
             self.loop_stack.push(loop_info);
         }
 
-        Ok(new_value)
+        self.variables.insert(symbol, new_value.into());
+        Ok(())
     }
 
     pub fn has_line_number(&self, line_number: u64) -> bool {
@@ -302,6 +309,9 @@ impl Program {
     ) -> Result<(), TracedInterpreterError> {
         if self.stack.len() == STACK_LIMIT {
             return Err(OutOfMemoryError::StackOverflow.into());
+        }
+        for (arg_name, arg_value) in bindings.iter() {
+            arg_value.validate_type_matches_variable_name(arg_name.as_str())?;
         }
         self.stack.push(StackFrame {
             return_location: self.location,
@@ -531,6 +541,85 @@ impl Program {
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
         self.location.token_index = self.tokens().len();
+    }
+
+    fn maybe_create_default_array(
+        &mut self,
+        array_name: &Rc<String>,
+        dimensions: usize,
+    ) -> Result<(), TracedInterpreterError> {
+        // It seems we can't use hash_map::Entry here to provide a default value,
+        // because we might actually error when creating the default value.
+        if !self.arrays.contains_key(array_name) {
+            let array = ValueArray::default_for_variable_and_dimensionality(
+                &array_name.as_str(),
+                dimensions,
+            )?;
+            self.arrays.insert(array_name.clone(), array);
+        }
+        Ok(())
+    }
+
+    pub fn create_array(
+        &mut self,
+        array_name: Rc<String>,
+        max_indices: Vec<usize>,
+    ) -> Result<(), TracedInterpreterError> {
+        if self.has_array(&array_name) {
+            return Err(InterpreterError::RedimensionedArray.into());
+        }
+        let array = ValueArray::create(array_name.as_str(), max_indices)?;
+        self.arrays.insert(array_name, array);
+        Ok(())
+    }
+
+    pub fn get_value_at_array_index(
+        &mut self,
+        array_name: &Rc<String>,
+        index: &Vec<usize>,
+    ) -> Result<Value, TracedInterpreterError> {
+        self.maybe_create_default_array(array_name, index.len())?;
+        let array = self.arrays.get(array_name).unwrap();
+
+        Ok(array.get(index)?)
+    }
+
+    pub fn set_value_at_array_index(
+        &mut self,
+        array_name: &Rc<String>,
+        index: &Vec<usize>,
+        value: Value,
+    ) -> Result<(), TracedInterpreterError> {
+        value.validate_type_matches_variable_name(array_name.as_str())?;
+        self.maybe_create_default_array(array_name, index.len())?;
+        let array = self.arrays.get_mut(array_name).unwrap();
+        array.set(index, value)?;
+        Ok(())
+    }
+
+    pub fn has_array(&self, array_name: &Rc<String>) -> bool {
+        self.arrays.contains_key(array_name)
+    }
+
+    pub fn get_variable_value(&self, name: &Rc<String>) -> Value {
+        match self.variables.get(name) {
+            Some(value) => value.clone(),
+            None => Value::default_for_variable(name.as_str()),
+        }
+    }
+
+    pub fn set_variable_value(
+        &mut self,
+        name: Rc<String>,
+        value: Value,
+    ) -> Result<(), TracedInterpreterError> {
+        value.validate_type_matches_variable_name(name.as_str())?;
+        self.variables.insert(name, value);
+        Ok(())
+    }
+
+    pub fn has_variable(&self, name: &Rc<String>) -> bool {
+        self.variables.contains_key(name)
     }
 }
 

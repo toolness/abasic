@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt::Display, rc::Rc};
 use crate::{
     builtins,
     data::parse_data_until_colon,
-    dim::ValueArray,
     interpreter_error::{InterpreterError, TracedInterpreterError},
     line_number_parser::parse_line_number,
     operators::{
@@ -76,8 +75,6 @@ pub struct Interpreter {
     program: Program,
     pub enable_warnings: bool,
     pub enable_tracing: bool,
-    variables: HashMap<Rc<String>, Value>,
-    arrays: HashMap<Rc<String>, ValueArray>,
     state: InterpreterState,
     input: Option<String>,
 }
@@ -89,8 +86,6 @@ impl core::fmt::Debug for Interpreter {
             .field("program", &self.program)
             .field("enable_warnings", &self.enable_warnings)
             .field("enable_tracing", &self.enable_tracing)
-            .field("variables", &self.variables)
-            .field("arrays", &self.arrays)
             .field("state", &self.state)
             .field("input", &self.input)
             .finish()
@@ -102,8 +97,6 @@ impl Interpreter {
         Interpreter {
             output: vec![],
             program: Default::default(),
-            variables: HashMap::new(),
-            arrays: HashMap::new(),
             state: InterpreterState::Idle,
             enable_warnings: false,
             enable_tracing: false,
@@ -145,7 +138,6 @@ impl Interpreter {
         let mut bindings: HashMap<Rc<String>, Value> = HashMap::with_capacity(arity);
         for (i, arg) in arg_names.into_iter().enumerate() {
             let value = self.evaluate_expression()?;
-            value.validate_type_matches_variable_name(arg.as_str())?;
             bindings.insert(arg, value);
             if i < arity - 1 {
                 self.program.expect_next_token(Token::Comma)?;
@@ -212,47 +204,10 @@ impl Interpreter {
         Ok(indices)
     }
 
-    fn maybe_create_default_array(
-        &mut self,
-        array_name: &Rc<String>,
-        dimensions: usize,
-    ) -> Result<(), TracedInterpreterError> {
-        // It seems we can't use hash_map::Entry here to provide a default value,
-        // because we might actually error when creating the default value.
-        if !self.arrays.contains_key(array_name) {
-            if self.enable_warnings {
-                self.warn(format!("Use of undeclared array '{}'.", array_name));
-            }
-            let array = ValueArray::default_for_variable_and_dimensionality(
-                &array_name.as_str(),
-                dimensions,
-            )?;
-            self.arrays.insert(array_name.clone(), array);
+    fn maybe_log_warning_about_undeclared_array_use(&mut self, array_name: &Rc<String>) {
+        if self.enable_warnings && !self.program.has_array(array_name) {
+            self.warn(format!("Use of undeclared array '{}'.", array_name));
         }
-        Ok(())
-    }
-
-    fn set_value_at_array_index(
-        &mut self,
-        array_name: &Rc<String>,
-        index: &Vec<usize>,
-        value: Value,
-    ) -> Result<(), TracedInterpreterError> {
-        self.maybe_create_default_array(&array_name, index.len())?;
-        let array = self.arrays.get_mut(array_name).unwrap();
-        array.set(index, value)
-    }
-
-    fn evaluate_value_at_array_index(
-        &mut self,
-        array_name: Rc<String>,
-    ) -> Result<Value, TracedInterpreterError> {
-        let index = self.parse_array_index()?;
-
-        self.maybe_create_default_array(&array_name, index.len())?;
-        let array = self.arrays.get(&array_name).unwrap();
-
-        Ok(array.get(&index)?)
     }
 
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
@@ -266,17 +221,17 @@ impl Interpreter {
                     if let Some(value) = self.evaluate_function_call(&symbol)? {
                         Ok(value)
                     } else {
-                        self.evaluate_value_at_array_index(symbol)
+                        let index = self.parse_array_index()?;
+                        self.maybe_log_warning_about_undeclared_array_use(&symbol);
+                        self.program.get_value_at_array_index(&symbol, &index)
                     }
                 } else if let Some(value) = self.program.find_variable_value_in_stack(&symbol) {
                     Ok(value)
-                } else if let Some(value) = self.variables.get(&symbol) {
-                    Ok(value.clone())
                 } else {
-                    if self.enable_warnings {
+                    if self.enable_warnings && !self.program.has_variable(&symbol) {
                         self.warn(format!("Use of undeclared variable '{}'.", symbol));
                     }
-                    Ok(Value::default_for_variable(symbol.as_str()))
+                    Ok(self.program.get_variable_value(&symbol))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken.into()),
@@ -420,18 +375,14 @@ impl Interpreter {
         lvalue: LValue,
         rvalue: Value,
     ) -> Result<(), TracedInterpreterError> {
-        rvalue.validate_type_matches_variable_name(lvalue.symbol_name.as_str())?;
-
         match lvalue.array_index {
             Some(index) => {
-                self.set_value_at_array_index(&lvalue.symbol_name, &index, rvalue)?;
+                self.maybe_log_warning_about_undeclared_array_use(&lvalue.symbol_name);
+                self.program
+                    .set_value_at_array_index(&lvalue.symbol_name, &index, rvalue)
             }
-            None => {
-                self.variables.insert(lvalue.symbol_name, rvalue);
-            }
+            None => self.program.set_variable_value(lvalue.symbol_name, rvalue),
         }
-
-        Ok(())
     }
 
     fn evaluate_let_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -543,12 +494,7 @@ impl Interpreter {
             // just no-ops...
             return Ok(());
         };
-        if self.arrays.contains_key(&lvalue.symbol_name) {
-            return Err(InterpreterError::RedimensionedArray.into());
-        }
-        let array = ValueArray::create(lvalue.symbol_name.as_str(), max_indices)?;
-        self.arrays.insert(lvalue.symbol_name, array);
-        Ok(())
+        self.program.create_array(lvalue.symbol_name, max_indices)
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -623,8 +569,7 @@ impl Interpreter {
         };
 
         self.program
-            .start_loop(symbol.clone(), to_number, step_number)?;
-        self.variables.insert(symbol, from_number.into());
+            .start_loop(symbol.clone(), from_number, to_number, step_number)?;
         Ok(())
     }
 
@@ -632,13 +577,7 @@ impl Interpreter {
         let Some(Token::Symbol(symbol)) = self.program.next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
-        let Some(current_value) = self.variables.get(&symbol) else {
-            return Err(InterpreterError::NextWithoutFor.into());
-        };
-        let current_number: f64 = current_value.clone().try_into()?;
-        let new_number = self.program.end_loop(symbol.clone(), current_number)?;
-        self.variables.insert(symbol, new_number.into());
-        Ok(())
+        self.program.end_loop(symbol)
     }
 
     pub fn break_at_current_location(&mut self) {
