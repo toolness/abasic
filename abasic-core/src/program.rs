@@ -335,6 +335,8 @@ impl Program {
     }
 
     pub fn find_variable_value_in_stack(&self, variable_name: &Rc<String>) -> Option<Value> {
+        // Yes, it's really weird that we're crawling up the function call stack to look up
+        // variables. This is not normal. But it's how Applesoft BASIC seems to work?
         for frame in self.stack.iter().rev() {
             if let Some(value) = frame.variables.get(variable_name) {
                 return Some(value.clone());
