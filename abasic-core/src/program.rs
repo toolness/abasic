@@ -214,12 +214,17 @@ impl Program {
         self.numbered_lines.has(line_number)
     }
 
-    /// Go to the first numbered line. Resets the stack and the data cursor.
-    pub fn goto_first_numbered_line(&mut self) {
+    /// Go to the first numbered line. Resets virtually everything in the program
+    /// except for the actual code.
+    pub fn run_from_first_numbered_line(&mut self) {
         self.breakpoint = None;
         self.reset_data_cursor();
+        self.functions.clear();
+        self.variables.clear();
+        self.arrays.clear();
+        self.stack.clear();
+        self.loop_stack.clear();
         if let Some(first_line) = self.numbered_lines.first() {
-            self.stack.clear();
             self.location = ProgramLocation {
                 line: ProgramLine::Line(first_line),
                 token_index: 0,
@@ -397,10 +402,19 @@ impl Program {
         self.numbered_lines.list()
     }
 
+    /// Sets the given numbered line to the given BASIC code.
+    ///
+    /// This actually ends up resetting a lot of the state of the program,
+    /// because so much of it refers to what's in the BASIC program,
+    /// which has now been changed in unknown ways.
     pub fn set_numbered_line(&mut self, line_number: u64, tokens: Vec<Token>) {
-        self.breakpoint = None;
         self.numbered_lines.set(line_number, tokens);
+        self.breakpoint = None;
         self.reset_data_cursor();
+        self.functions.clear();
+        self.stack.clear();
+        self.loop_stack.clear();
+        self.end();
     }
 
     fn tokens(&self) -> &Vec<Token> {

@@ -702,7 +702,7 @@ impl Interpreter {
         // That feels like overkill so for now we're just doing this.
         match first_word.to_ascii_uppercase().as_str() {
             "RUN" => {
-                self.program.goto_first_numbered_line();
+                self.program.run_from_first_numbered_line();
                 self.run()?;
             }
             "LIST" => {
