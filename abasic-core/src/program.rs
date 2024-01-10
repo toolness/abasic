@@ -27,9 +27,47 @@ struct StackFrame {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
+struct NumberedProgramLocation {
+    line: u64,
+    token_index: usize,
+}
+
+impl TryFrom<ProgramLocation> for NumberedProgramLocation {
+    type Error = InterpreterError;
+
+    fn try_from(value: ProgramLocation) -> Result<Self, Self::Error> {
+        match value.as_numbered() {
+            Some(nloc) => Ok(nloc),
+            None => Err(InterpreterError::IllegalDirect),
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
 struct ProgramLocation {
     line: ProgramLine,
     token_index: usize,
+}
+
+impl ProgramLocation {
+    pub fn as_numbered(&self) -> Option<NumberedProgramLocation> {
+        match self.line {
+            ProgramLine::Immediate => None,
+            ProgramLine::Line(line) => Some(NumberedProgramLocation {
+                line,
+                token_index: self.token_index,
+            }),
+        }
+    }
+}
+
+impl From<NumberedProgramLocation> for ProgramLocation {
+    fn from(value: NumberedProgramLocation) -> Self {
+        ProgramLocation {
+            line: ProgramLine::Line(value.line),
+            token_index: value.token_index,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -43,7 +81,7 @@ struct LoopInfo {
 #[derive(Debug)]
 struct FunctionDefinition {
     arguments: Vec<Rc<String>>,
-    location: ProgramLocation,
+    location: NumberedProgramLocation,
 }
 
 #[derive(Debug, Default)]
@@ -51,7 +89,7 @@ pub struct Program {
     numbered_lines: ProgramLines,
     immediate_line: Vec<Token>,
     location: ProgramLocation,
-    breakpoint: Option<ProgramLocation>,
+    breakpoint: Option<NumberedProgramLocation>,
     stack: Vec<StackFrame>,
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
@@ -134,12 +172,12 @@ impl Program {
     }
 
     pub fn break_at_current_location(&mut self) {
-        match self.location.line {
-            ProgramLine::Immediate => {
+        match self.location.as_numbered() {
+            None => {
                 self.breakpoint = None;
             }
-            ProgramLine::Line(_) => {
-                self.breakpoint = Some(self.location);
+            Some(nloc) => {
+                self.breakpoint = Some(nloc);
             }
         }
         self.set_and_goto_immediate_line(vec![]);
@@ -150,7 +188,7 @@ impl Program {
         let Some(location) = self.breakpoint else {
             return Err(InterpreterError::CannotContinue.into());
         };
-        self.location = location;
+        self.location = location.into();
         self.breakpoint = None;
         Ok(())
     }
@@ -280,14 +318,11 @@ impl Program {
         name: Rc<String>,
         arguments: Vec<Rc<String>>,
     ) -> Result<(), TracedInterpreterError> {
-        if self.location.line == ProgramLine::Immediate {
-            return Err(InterpreterError::IllegalDirect.into());
-        }
         self.functions.insert(
             name,
             FunctionDefinition {
                 arguments,
-                location: self.location,
+                location: self.location.try_into()?,
             },
         );
         Ok(())
@@ -319,7 +354,8 @@ impl Program {
             .functions
             .get(name)
             .expect("function must exist")
-            .location;
+            .location
+            .into();
         Ok(())
     }
 

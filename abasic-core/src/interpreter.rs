@@ -1704,6 +1704,11 @@ mod tests {
     }
 
     #[test]
+    fn immediate_functions_do_not_work() {
+        assert_eval_error("def fna(x) = x + 1", InterpreterError::IllegalDirect);
+    }
+
+    #[test]
     fn functions_work() {
         assert_program_output(
             r#"
