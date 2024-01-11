@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use crate::{
     data::{DataElement, DataIterator},
@@ -6,6 +6,7 @@ use crate::{
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     program_lines::ProgramLines,
     random::Rng,
+    symbol::Symbol,
     syntax_error::SyntaxError,
     tokenizer::Token,
     value::Value,
@@ -23,7 +24,7 @@ pub enum ProgramLine {
 #[derive(Debug)]
 struct StackFrame {
     return_location: ProgramLocation,
-    variables: HashMap<Rc<String>, Value>,
+    variables: HashMap<Symbol, Value>,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -70,17 +71,17 @@ impl From<NumberedProgramLocation> for ProgramLocation {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct LoopInfo {
     location: ProgramLocation,
-    symbol: Rc<String>,
+    symbol: Symbol,
     to_value: f64,
     step_value: f64,
 }
 
 #[derive(Debug)]
 struct FunctionDefinition {
-    arguments: Vec<Rc<String>>,
+    arguments: Vec<Symbol>,
     location: NumberedProgramLocation,
 }
 
@@ -93,9 +94,9 @@ pub struct Program {
     stack: Vec<StackFrame>,
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
-    functions: HashMap<Rc<String>, FunctionDefinition>,
-    variables: HashMap<Rc<String>, Value>,
-    arrays: HashMap<Rc<String>, ValueArray>,
+    functions: HashMap<Symbol, FunctionDefinition>,
+    variables: HashMap<Symbol, Value>,
+    arrays: HashMap<Symbol, ValueArray>,
     rng: Rng,
 }
 
@@ -154,7 +155,7 @@ impl Program {
     /// Finally, note that Dartmouth BASIC actually had a "FOR WITHOUT NEXT" error,
     /// but this doesn't seem to be present in Applesoft BASIC, nor is it present in
     /// our implementation.
-    fn remove_loop_with_name(&mut self, symbol: &Rc<String>) -> Option<LoopInfo> {
+    fn remove_loop_with_name(&mut self, symbol: &Symbol) -> Option<LoopInfo> {
         let mut found_index = None;
         for (i, loop_info) in self.loop_stack.iter().enumerate().rev() {
             if &loop_info.symbol == symbol {
@@ -195,7 +196,7 @@ impl Program {
 
     pub fn start_loop(
         &mut self,
-        symbol: Rc<String>,
+        symbol: Symbol,
         from_value: f64,
         to_value: f64,
         step_value: f64,
@@ -214,7 +215,7 @@ impl Program {
         Ok(())
     }
 
-    pub fn end_loop(&mut self, symbol: Rc<String>) -> Result<(), TracedInterpreterError> {
+    pub fn end_loop(&mut self, symbol: Symbol) -> Result<(), TracedInterpreterError> {
         let Some(current_value) = self.variables.get(&symbol) else {
             return Err(InterpreterError::NextWithoutFor.into());
         };
@@ -315,8 +316,8 @@ impl Program {
 
     pub fn define_function(
         &mut self,
-        name: Rc<String>,
-        arguments: Vec<Rc<String>>,
+        name: Symbol,
+        arguments: Vec<Symbol>,
     ) -> Result<(), TracedInterpreterError> {
         self.functions.insert(
             name,
@@ -328,7 +329,7 @@ impl Program {
         Ok(())
     }
 
-    pub fn get_function_argument_names(&mut self, name: &Rc<String>) -> Option<&Vec<Rc<String>>> {
+    pub fn get_function_argument_names(&mut self, name: &Symbol) -> Option<&Vec<Symbol>> {
         self.functions.get(name).map(|f| &f.arguments)
     }
 
@@ -337,8 +338,8 @@ impl Program {
     /// You can use `get_function_argument_names` to validate this beforehand.
     pub fn push_function_call_onto_stack_and_goto_it(
         &mut self,
-        name: &Rc<String>,
-        bindings: HashMap<Rc<String>, Value>,
+        name: &Symbol,
+        bindings: HashMap<Symbol, Value>,
     ) -> Result<(), TracedInterpreterError> {
         if self.stack.len() == STACK_LIMIT {
             return Err(OutOfMemoryError::StackOverflow.into());
@@ -368,7 +369,7 @@ impl Program {
         self.location = frame.return_location;
     }
 
-    pub fn find_variable_value_in_stack(&self, variable_name: &Rc<String>) -> Option<Value> {
+    pub fn find_variable_value_in_stack(&self, variable_name: &Symbol) -> Option<Value> {
         // Yes, it's really weird that we're crawling up the function call stack to look up
         // variables. This is not normal. But it's how Applesoft BASIC seems to work?
         for frame in self.stack.iter().rev() {
@@ -562,7 +563,7 @@ impl Program {
 
     fn maybe_create_default_array(
         &mut self,
-        array_name: &Rc<String>,
+        array_name: &Symbol,
         dimensions: usize,
     ) -> Result<(), TracedInterpreterError> {
         // It seems we can't use hash_map::Entry here to provide a default value,
@@ -579,7 +580,7 @@ impl Program {
 
     pub fn create_array(
         &mut self,
-        array_name: Rc<String>,
+        array_name: Symbol,
         max_indices: Vec<usize>,
     ) -> Result<(), TracedInterpreterError> {
         if self.has_array(&array_name) {
@@ -592,7 +593,7 @@ impl Program {
 
     pub fn get_value_at_array_index(
         &mut self,
-        array_name: &Rc<String>,
+        array_name: &Symbol,
         index: &Vec<usize>,
     ) -> Result<Value, TracedInterpreterError> {
         self.maybe_create_default_array(array_name, index.len())?;
@@ -603,7 +604,7 @@ impl Program {
 
     pub fn set_value_at_array_index(
         &mut self,
-        array_name: &Rc<String>,
+        array_name: &Symbol,
         index: &Vec<usize>,
         value: Value,
     ) -> Result<(), TracedInterpreterError> {
@@ -614,11 +615,11 @@ impl Program {
         Ok(())
     }
 
-    pub fn has_array(&self, array_name: &Rc<String>) -> bool {
+    pub fn has_array(&self, array_name: &Symbol) -> bool {
         self.arrays.contains_key(array_name)
     }
 
-    pub fn get_variable_value(&self, name: &Rc<String>) -> Value {
+    pub fn get_variable_value(&self, name: &Symbol) -> Value {
         match self.variables.get(name) {
             Some(value) => value.clone(),
             None => Value::default_for_variable(name.as_str()),
@@ -627,7 +628,7 @@ impl Program {
 
     pub fn set_variable_value(
         &mut self,
-        name: Rc<String>,
+        name: Symbol,
         value: Value,
     ) -> Result<(), TracedInterpreterError> {
         value.validate_type_matches_variable_name(name.as_str())?;
@@ -635,7 +636,7 @@ impl Program {
         Ok(())
     }
 
-    pub fn has_variable(&self, name: &Rc<String>) -> bool {
+    pub fn has_variable(&self, name: &Symbol) -> bool {
         self.variables.contains_key(name)
     }
 

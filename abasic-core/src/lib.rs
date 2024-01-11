@@ -9,6 +9,7 @@ mod operators;
 mod program;
 mod program_lines;
 mod random;
+mod symbol;
 mod syntax_error;
 mod tokenizer;
 mod value;

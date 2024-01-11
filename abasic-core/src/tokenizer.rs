@@ -3,6 +3,7 @@ use std::{fmt::Display, rc::Rc};
 use crate::{
     data::{data_elements_to_string, parse_data_until_colon, DataElement},
     line_cruncher::LineCruncher,
+    symbol::Symbol,
     syntax_error::SyntaxError,
 };
 
@@ -48,7 +49,7 @@ pub enum Token {
     Restore,
     Def,
     Remark(Rc<String>),
-    Symbol(Rc<String>),
+    Symbol(Symbol),
     StringLiteral(Rc<String>),
     NumericLiteral(f64),
     Data(Rc<Vec<DataElement>>),
@@ -234,7 +235,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // but better safe (and slightly inefficient) than sorry for now.
             let string = String::from_utf8(chars).unwrap();
 
-            Some(Ok(Token::Symbol(Rc::new(string))))
+            Some(Ok(Token::Symbol(string.into())))
         }
     }
 
@@ -470,7 +471,7 @@ mod tests {
     }
 
     fn symbol(value: &'static str) -> Token {
-        Token::Symbol(Rc::new(String::from(value)))
+        Token::Symbol(value.into())
     }
 
     fn remark(value: &'static str) -> Token {

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, rc::Rc};
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     builtins,
@@ -10,6 +10,7 @@ use crate::{
         MultiplyOrDivideOp, UnaryOp,
     },
     program::Program,
+    symbol::Symbol,
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
     value::Value,
@@ -58,7 +59,7 @@ impl Display for InterpreterOutput {
 }
 
 struct LValue {
-    symbol_name: Rc<String>,
+    symbol_name: Symbol,
     array_index: Option<Vec<usize>>,
 }
 
@@ -125,7 +126,7 @@ impl Interpreter {
 
     fn evaluate_user_defined_function_call(
         &mut self,
-        function_name: &Rc<String>,
+        function_name: &Symbol,
     ) -> Result<Option<Value>, TracedInterpreterError> {
         let Some(arg_names) = self
             .program
@@ -140,7 +141,7 @@ impl Interpreter {
 
         self.program.expect_next_token(Token::LeftParen)?;
         let arity = arg_names.len();
-        let mut bindings: HashMap<Rc<String>, Value> = HashMap::with_capacity(arity);
+        let mut bindings: HashMap<Symbol, Value> = HashMap::with_capacity(arity);
         for (i, arg) in arg_names.into_iter().enumerate() {
             let value = self.evaluate_expression()?;
             bindings.insert(arg, value);
@@ -160,7 +161,7 @@ impl Interpreter {
 
     fn evaluate_function_call(
         &mut self,
-        function_name: &Rc<String>,
+        function_name: &Symbol,
     ) -> Result<Option<Value>, TracedInterpreterError> {
         let result = match function_name.as_str() {
             "ABS" => self.evaluate_unary_function(builtins::abs),
@@ -212,7 +213,7 @@ impl Interpreter {
         Ok(indices)
     }
 
-    fn maybe_log_warning_about_undeclared_array_use(&mut self, array_name: &Rc<String>) {
+    fn maybe_log_warning_about_undeclared_array_use(&mut self, array_name: &Symbol) {
         if self.enable_warnings && !self.program.has_array(array_name) {
             self.warn(format!("Use of undeclared array '{}'.", array_name));
         }
@@ -403,7 +404,7 @@ impl Interpreter {
 
     fn evaluate_assignment_statement(
         &mut self,
-        symbol_name: Rc<String>,
+        symbol_name: Symbol,
     ) -> Result<(), TracedInterpreterError> {
         let lvalue = LValue {
             symbol_name,
@@ -600,7 +601,7 @@ impl Interpreter {
             return Err(SyntaxError::UnexpectedToken.into());
         };
         self.program.expect_next_token(Token::LeftParen)?;
-        let mut arg_names: Vec<Rc<String>> = vec![];
+        let mut arg_names: Vec<Symbol> = vec![];
         loop {
             // Note that in Applesoft BASIC, all functions must have at least one argument.
             let Some(Token::Symbol(arg_name)) = self.program.next_token() else {
