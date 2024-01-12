@@ -675,7 +675,7 @@ impl Interpreter {
         }
     }
 
-    fn run(&mut self) -> Result<(), TracedInterpreterError> {
+    fn run_next_statement(&mut self) -> Result<(), TracedInterpreterError> {
         self.state = InterpreterState::Running;
         if self.program.has_next_token() {
             self.evaluate_statement()?;
@@ -704,7 +704,7 @@ impl Interpreter {
         match first_word.to_ascii_uppercase().as_str() {
             "RUN" => {
                 self.program.run_from_first_numbered_line();
-                self.run()?;
+                self.run_next_statement()?;
             }
             "LIST" => {
                 self.output.extend(
@@ -719,7 +719,7 @@ impl Interpreter {
             }
             "CONT" => {
                 self.program.continue_from_breakpoint()?;
-                self.run()?;
+                self.run_next_statement()?;
             }
             "TRACE" => {
                 self.enable_tracing = true;
@@ -765,7 +765,7 @@ impl Interpreter {
 
     pub fn continue_evaluating(&mut self) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Running);
-        let result = self.run();
+        let result = self.run_next_statement();
         self.postprocess_result(result)
     }
 
@@ -790,7 +790,7 @@ impl Interpreter {
     pub fn stop_evaluating(&mut self) -> Option<u64> {
         let line_number = self.program.get_line_number();
         self.program.set_and_goto_immediate_line(vec![]);
-        self.run().unwrap();
+        self.run_next_statement().unwrap();
         line_number
     }
 
@@ -814,7 +814,7 @@ impl Interpreter {
             self.program.set_numbered_line(line_number, tokens);
         } else {
             self.program.set_and_goto_immediate_line(tokens);
-            self.run()?;
+            self.run_next_statement()?;
         }
 
         Ok(())
