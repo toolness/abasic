@@ -10,6 +10,7 @@ use crate::{
         MultiplyOrDivideOp, UnaryOp,
     },
     program::Program,
+    string_manager::StringManager,
     symbol::Symbol,
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
@@ -78,6 +79,7 @@ pub struct Interpreter {
     pub enable_tracing: bool,
     state: InterpreterState,
     input: Option<String>,
+    string_manager: StringManager,
 }
 
 impl core::fmt::Debug for Interpreter {
@@ -89,6 +91,7 @@ impl core::fmt::Debug for Interpreter {
             .field("enable_tracing", &self.enable_tracing)
             .field("state", &self.state)
             .field("input", &self.input)
+            .field("string_manager", &self.string_manager)
             .finish()
     }
 }
@@ -102,6 +105,7 @@ impl Interpreter {
             enable_warnings: false,
             enable_tracing: false,
             input: None,
+            string_manager: StringManager::default(),
         }
     }
 
@@ -540,7 +544,7 @@ impl Interpreter {
         if !ends_with_semicolon {
             strings.push(String::from("\n"));
         }
-        self.output.push(InterpreterOutput::Print(strings.join("")));
+        self.print(strings.join(""));
         Ok(())
     }
 
@@ -727,6 +731,11 @@ impl Interpreter {
             "NOTRACE" => {
                 self.enable_tracing = false;
             }
+            "INTERNALS" => self.print(format!("{:#?}\n", self)),
+            "STATS" => self.print(format!(
+                "Total string data: {} bytes\n",
+                self.string_manager.total_bytes()
+            )),
             _ => {
                 return Ok(false);
             }
@@ -751,6 +760,10 @@ impl Interpreter {
         } else {
             result
         }
+    }
+
+    fn print(&mut self, string: String) {
+        self.output.push(InterpreterOutput::Print(string));
     }
 
     pub fn has_line_number(&self, line_number: u64) -> bool {
@@ -808,11 +821,15 @@ impl Interpreter {
             line_ref = &line_ref[end_index..];
         }
 
-        let tokens = Tokenizer::new(line_ref).remaining_tokens()?;
+        let (tokens, string_manager) =
+            Tokenizer::with_string_manager(line_ref, std::mem::take(&mut self.string_manager))
+                .remaining_tokens()?;
+        self.string_manager = string_manager;
 
         if let Some(line_number) = maybe_line_number {
             self.program.set_numbered_line(line_number, tokens);
         } else {
+            self.string_manager.gc();
             self.program.set_and_goto_immediate_line(tokens);
             self.run_next_statement()?;
         }

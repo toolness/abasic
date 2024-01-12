@@ -1,6 +1,6 @@
 use std::{collections::HashSet, rc::Rc};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct StringManager {
     strings: HashSet<Rc<String>>,
     total_bytes: usize,
@@ -8,6 +8,8 @@ pub struct StringManager {
 
 impl StringManager {
     pub fn from_str<T: AsRef<str>>(&mut self, value: T) -> Rc<String> {
+        // It's annoying that we're doing this O(n) but it doesn't seem like
+        // we can get the item with just a &str, which is too bad.
         for string in &self.strings {
             if string.as_str() == value.as_ref() {
                 return string.clone();

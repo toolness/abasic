@@ -3,6 +3,7 @@ use std::{fmt::Display, rc::Rc};
 use crate::{
     data::{data_elements_to_string, parse_data_until_colon, DataElement},
     line_cruncher::LineCruncher,
+    string_manager::StringManager,
     symbol::Symbol,
     syntax_error::SyntaxError,
 };
@@ -110,14 +111,21 @@ pub struct Tokenizer<T: AsRef<str>> {
     string: T,
     index: usize,
     errored: bool,
+    string_manager: StringManager,
 }
 
 impl<T: AsRef<str>> Tokenizer<T> {
+    #[cfg(test)]
     pub fn new(string: T) -> Self {
+        Self::with_string_manager(string, StringManager::default())
+    }
+
+    pub fn with_string_manager(string: T, string_manager: StringManager) -> Self {
         Tokenizer {
             string,
             index: 0,
             errored: false,
+            string_manager,
         }
     }
 
@@ -270,7 +278,9 @@ impl<T: AsRef<str>> Tokenizer<T> {
     }
 
     fn chomp_string(&mut self) -> Option<Result<Token, SyntaxError>> {
-        let bytes = self.remaining_bytes();
+        // Can't use self.remaining_bytes() b/c we want to mutably borrow other
+        // parts of our struct.
+        let bytes = &self.string.as_ref().as_bytes()[self.index..];
 
         assert_ne!(bytes.len(), 0, "we must have remaining bytes to read");
 
@@ -292,7 +302,10 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // and I'm not sure what BASIC conventions for this are, if any. It'd
             // be nice to somehow support this.
             if let Some(end_quote_index) = remaining_str.find('"') {
-                let string = Rc::new(String::from(&remaining_str[..end_quote_index]));
+                //let string = Rc::new(String::from(&remaining_str[..end_quote_index]));
+                let string = self
+                    .string_manager
+                    .from_str(&remaining_str[..end_quote_index]);
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
@@ -312,7 +325,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             let comment = std::str::from_utf8(bytes).unwrap().to_string();
 
             self.index += comment.len();
-            Some(Ok(Token::Remark(Rc::new(comment))))
+            Some(Ok(Token::Remark(self.string_manager.from_string(comment))))
         } else {
             None
         }
@@ -425,12 +438,12 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
-    pub fn remaining_tokens(self) -> Result<Vec<Token>, SyntaxError> {
+    pub fn remaining_tokens(mut self) -> Result<(Vec<Token>, StringManager), SyntaxError> {
         let mut tokens: Vec<Token> = vec![];
-        for token in self {
+        for token in &mut self {
             tokens.push(token?);
         }
-        Ok(tokens)
+        Ok((tokens, self.string_manager))
     }
 }
 
