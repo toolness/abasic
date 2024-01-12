@@ -243,7 +243,9 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // but better safe (and slightly inefficient) than sorry for now.
             let string = String::from_utf8(chars).unwrap();
 
-            Some(Ok(Token::Symbol(string.into())))
+            Some(Ok(Token::Symbol(
+                self.string_manager.from_string(string).into(),
+            )))
         }
     }
 
@@ -484,7 +486,7 @@ mod tests {
     }
 
     fn symbol(value: &'static str) -> Token {
-        Token::Symbol(value.into())
+        Token::Symbol(Rc::new(value.to_string()).into())
     }
 
     fn remark(value: &'static str) -> Token {

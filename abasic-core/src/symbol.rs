@@ -20,14 +20,8 @@ impl Display for Symbol {
     }
 }
 
-impl Into<Symbol> for String {
+impl Into<Symbol> for Rc<String> {
     fn into(self) -> Symbol {
-        Symbol(Rc::new(self))
-    }
-}
-
-impl Into<Symbol> for &str {
-    fn into(self) -> Symbol {
-        Symbol(String::from(self).into())
+        Symbol(self)
     }
 }
