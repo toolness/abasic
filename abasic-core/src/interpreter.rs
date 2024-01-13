@@ -687,7 +687,7 @@ impl Interpreter {
         }
         if !self.program.has_next_token() {
             if !self.program.next_line() {
-                self.state = InterpreterState::Idle;
+                self.return_to_idle_state();
             }
         }
 
@@ -756,11 +756,17 @@ impl Interpreter {
             if let Some(line_number) = line_number {
                 err.set_line_number(line_number);
             }
-            self.state = InterpreterState::Idle;
+            self.return_to_idle_state();
             Err(err)
         } else {
             result
         }
+    }
+
+    fn return_to_idle_state(&mut self) {
+        self.program.set_and_goto_immediate_line(vec![]);
+        self.string_manager.gc();
+        self.state = InterpreterState::Idle;
     }
 
     fn print(&mut self, string: String) {
@@ -828,7 +834,11 @@ impl Interpreter {
         self.string_manager = string_manager;
 
         if let Some(line_number) = maybe_line_number {
+            let had_existing_line = self.program.has_line_number(line_number);
             self.program.set_numbered_line(line_number, tokens);
+            if had_existing_line {
+                self.string_manager.gc();
+            }
         } else {
             self.string_manager.gc();
             self.program.set_and_goto_immediate_line(tokens);
