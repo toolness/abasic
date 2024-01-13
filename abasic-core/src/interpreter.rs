@@ -828,10 +828,7 @@ impl Interpreter {
             line_ref = &line_ref[end_index..];
         }
 
-        let (tokens, string_manager) =
-            Tokenizer::with_string_manager(line_ref, std::mem::take(&mut self.string_manager))
-                .remaining_tokens()?;
-        self.string_manager = string_manager;
+        let tokens = Tokenizer::new(line_ref, &mut self.string_manager).remaining_tokens()?;
 
         if let Some(line_number) = maybe_line_number {
             let had_existing_line = self.program.has_line_number(line_number);

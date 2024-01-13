@@ -107,20 +107,15 @@ impl Display for Token {
     }
 }
 
-pub struct Tokenizer<T: AsRef<str>> {
+pub struct Tokenizer<'a, T: AsRef<str>> {
     string: T,
     index: usize,
     errored: bool,
-    string_manager: StringManager,
+    string_manager: &'a mut StringManager,
 }
 
-impl<T: AsRef<str>> Tokenizer<T> {
-    #[cfg(test)]
-    pub fn new(string: T) -> Self {
-        Self::with_string_manager(string, StringManager::default())
-    }
-
-    pub fn with_string_manager(string: T, string_manager: StringManager) -> Self {
+impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
+    pub fn new(string: T, string_manager: &'a mut StringManager) -> Self {
         Tokenizer {
             string,
             index: 0,
@@ -449,16 +444,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
         }
     }
 
-    pub fn remaining_tokens(mut self) -> Result<(Vec<Token>, StringManager), SyntaxError> {
+    pub fn remaining_tokens(mut self) -> Result<Vec<Token>, SyntaxError> {
         let mut tokens: Vec<Token> = vec![];
         for token in &mut self {
             tokens.push(token?);
         }
-        Ok((tokens, self.string_manager))
+        Ok(tokens)
     }
 }
 
-impl<T: AsRef<str>> Iterator for Tokenizer<T> {
+impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {
     type Item = Result<Token, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -486,7 +481,7 @@ impl<T: AsRef<str>> Iterator for Tokenizer<T> {
 mod tests {
     use std::rc::Rc;
 
-    use crate::syntax_error::SyntaxError;
+    use crate::{string_manager::StringManager, syntax_error::SyntaxError};
 
     use super::{Token, Tokenizer};
 
@@ -503,12 +498,14 @@ mod tests {
     }
 
     fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
-        let tokenizer = Tokenizer::new(value);
+        let mut manager = StringManager::default();
+        let tokenizer = Tokenizer::new(value, &mut manager);
         tokenizer.into_iter().collect::<Vec<_>>()
     }
 
     fn get_tokens(value: &str) -> Vec<Token> {
-        let tokenizer = Tokenizer::new(value);
+        let mut manager = StringManager::default();
+        let tokenizer = Tokenizer::new(value, &mut manager);
         tokenizer
             .into_iter()
             .map(|t| match t {
@@ -750,6 +747,6 @@ mod tests {
     fn parsing_borrowed_str_works() {
         let value = String::from("one\ntwo\nthree");
         let first_line = value.split('\n').next().unwrap();
-        Tokenizer::new(first_line);
+        Tokenizer::new(first_line, &mut StringManager::default());
     }
 }
