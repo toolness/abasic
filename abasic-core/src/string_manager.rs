@@ -1,5 +1,16 @@
 use std::{collections::HashSet, rc::Rc};
 
+/// This struct helps us de-dupe string allocations, so that all
+/// references to the same string all refer to the same location
+/// in memory. Aside from saving a bit of memory, it also allows
+/// us to have a concrete idea of how much memory we're using.
+///
+/// This is _not_ full string interning, which (as I understand it)
+/// assigns an ID to each string, making equality comparisons
+/// extremely fast. (I considered doing that, but felt that fully
+/// decoupling a string's content from its identifier made
+/// development much more annoying, without much of a benefit
+/// for my use cases.)
 #[derive(Default, Debug)]
 pub struct StringManager {
     strings: HashSet<Rc<String>>,
