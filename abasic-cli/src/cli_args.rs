@@ -28,7 +28,7 @@ impl CliArgs {
     }
 
     pub fn create_interpreter(&self) -> Interpreter {
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = Interpreter::default();
         interpreter.enable_warnings = self.warnings;
         interpreter.enable_tracing = self.tracing;
 

@@ -23,14 +23,16 @@ struct LValue {
     array_index: Option<Vec<usize>>,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Default, Debug, PartialEq, Copy, Clone)]
 pub enum InterpreterState {
+    #[default]
     Idle,
     Running,
     AwaitingInput,
     NewInterpreterRequested,
 }
 
+#[derive(Default)]
 pub struct Interpreter {
     output: Vec<InterpreterOutput>,
     program: Program,
@@ -56,18 +58,6 @@ impl core::fmt::Debug for Interpreter {
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
-        Interpreter {
-            output: vec![],
-            program: Default::default(),
-            state: InterpreterState::Idle,
-            enable_warnings: false,
-            enable_tracing: false,
-            input: None,
-            string_manager: StringManager::default(),
-        }
-    }
-
     pub fn take_output(&mut self) -> Vec<InterpreterOutput> {
         std::mem::take(&mut self.output)
     }
@@ -840,7 +830,7 @@ mod tests {
     }
 
     fn create_interpreter() -> Interpreter {
-        Interpreter::new()
+        Interpreter::default()
     }
 
     fn evaluate_while_running(interpreter: &mut Interpreter) -> Result<(), TracedInterpreterError> {

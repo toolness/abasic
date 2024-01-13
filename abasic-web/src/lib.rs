@@ -55,6 +55,7 @@ fn convert_interpreter_output_for_js(value: InterpreterOutput) -> JsInterpreterO
 }
 
 #[wasm_bindgen]
+#[derive(Default)]
 pub struct JsInterpreter {
     interpreter: Interpreter,
     latest_error: Option<String>,
@@ -64,15 +65,12 @@ pub struct JsInterpreter {
 impl JsInterpreter {
     pub fn new() -> Self {
         set_panic_hook();
-        JsInterpreter {
-            interpreter: Interpreter::new(),
-            latest_error: None,
-        }
+        JsInterpreter::default()
     }
 
     fn maybe_replace_interpreter(&mut self) {
         if self.interpreter.get_state() == InterpreterState::NewInterpreterRequested {
-            self.interpreter = Interpreter::new();
+            self.interpreter = Interpreter::default();
         }
     }
 
