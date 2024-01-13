@@ -1,0 +1,53 @@
+{
+  "name": "abasic-lsp",
+  "version": "1.0.0",
+  "displayName": "abasic-lsp",
+  "description": "ABASIC Language Server",
+  "main": "./ts/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "engines": {
+    "vscode": "^1.52.0"
+  },
+  "activationEvents": ["onLanguage:abasic"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "abasic",
+        "extensions": [
+          ".bas"
+        ],
+        "aliases": ["ABASIC"]
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Example configuration",
+      "properties": {
+        "abasicLanguageServer.trace.server": {
+          "scope": "window",
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
