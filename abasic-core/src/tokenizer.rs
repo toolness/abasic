@@ -282,11 +282,15 @@ impl<T: AsRef<str>> Tokenizer<T> {
     fn chomp_string(&mut self) -> Option<Result<Token, SyntaxError>> {
         // Can't use self.remaining_bytes() b/c we want to mutably borrow other
         // parts of our struct.
-        let bytes = &self.string.as_ref().as_bytes()[self.index..];
+        let remaining_bytes = &self.string.as_ref().as_bytes()[self.index..];
 
-        assert_ne!(bytes.len(), 0, "we must have remaining bytes to read");
+        assert_ne!(
+            remaining_bytes.len(),
+            0,
+            "we must have remaining bytes to read"
+        );
 
-        let first_byte = bytes[0];
+        let first_byte = remaining_bytes[0];
 
         assert!(
             !LineCruncher::is_basic_whitespace(first_byte),
@@ -298,7 +302,7 @@ impl<T: AsRef<str>> Tokenizer<T> {
             // the rest of the string is valid UTF-8, which it *should* be based on
             // how we've been processing the bytes that came before, but better
             // safe than sorry I guess.
-            let remaining_str = std::str::from_utf8(&bytes[1..]).unwrap();
+            let remaining_str = std::str::from_utf8(&remaining_bytes[1..]).unwrap();
 
             // TODO: There doesn't seem to be any way to escape a double-quote,
             // and I'm not sure what BASIC conventions for this are, if any. It'd
@@ -385,11 +389,16 @@ impl<T: AsRef<str>> Tokenizer<T> {
 
     fn chomp_data(&mut self) -> Option<Token> {
         if self.chomp_keyword("DATA") {
+            // Can't use self.remaining_bytes() b/c we want to mutably borrow other
+            // parts of our struct.
+            let remaining_bytes = &self.string.as_ref().as_bytes()[self.index..];
+
             // We can technically do this using String::from_utf8_unchecked(),
             // but better safe (and slightly inefficient) than sorry for now.
-            let remaining = std::str::from_utf8(self.remaining_bytes()).unwrap();
+            let remaining = std::str::from_utf8(remaining_bytes).unwrap();
 
-            let (elements, bytes_chomped) = parse_data_until_colon(remaining);
+            let (elements, bytes_chomped) =
+                parse_data_until_colon(remaining, Some(&mut self.string_manager));
 
             self.index += bytes_chomped;
 
