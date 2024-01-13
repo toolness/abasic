@@ -2,14 +2,16 @@ use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::{
-    request::GotoDefinition, GotoDefinitionResponse, InitializeParams, OneOf, ServerCapabilities,
+    request::GotoDefinition, GotoDefinitionResponse, InitializeParams, OneOf, ServerCapabilities, Location, Range, Position,
 };
 
 // This is mostly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     eprintln!("Starting LSP server.");
 
-    let (connection, io_threads) = Connection::stdio();
+    let (connection, io_threads) = Connection::listen("127.0.0.1:5007")?;
+
+    eprintln!("Got connection.");
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
@@ -51,7 +53,9 @@ fn main_loop(
                 match cast::<GotoDefinition>(req) {
                     Ok((id, params)) => {
                         eprintln!("Go gotoDefinition request #{id}: {params:?}");
-                        let result = Some(GotoDefinitionResponse::Array(Vec::new()));
+                        let uri = params.text_document_position_params.text_document.uri;
+
+                        let result = Some(GotoDefinitionResponse::Scalar(Location::new(uri, Range::new(Position::new(1, 1), Position::new(1,1)))));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
                             id,
