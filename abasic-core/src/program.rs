@@ -10,6 +10,7 @@ use crate::{
     syntax_error::SyntaxError,
     tokenizer::Token,
     value::Value,
+    variables::Variables,
 };
 
 const STACK_LIMIT: usize = 32;
@@ -24,7 +25,7 @@ pub enum ProgramLine {
 #[derive(Debug)]
 struct StackFrame {
     return_location: ProgramLocation,
-    variables: HashMap<Symbol, Value>,
+    variables: Variables,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -95,7 +96,7 @@ pub struct Program {
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
     functions: HashMap<Symbol, FunctionDefinition>,
-    variables: HashMap<Symbol, Value>,
+    pub variables: Variables,
     arrays: HashMap<Symbol, ValueArray>,
     rng: Rng,
 }
@@ -211,14 +212,12 @@ impl Program {
             to_value,
             step_value,
         });
-        self.variables.insert(symbol, from_value.into());
+        self.variables.set(symbol, from_value.into())?;
         Ok(())
     }
 
     pub fn end_loop(&mut self, symbol: Symbol) -> Result<(), TracedInterpreterError> {
-        let Some(current_value) = self.variables.get(&symbol) else {
-            return Err(InterpreterError::NextWithoutFor.into());
-        };
+        let current_value = self.variables.get(&symbol);
         let current_number: f64 = current_value.clone().try_into()?;
 
         let Some(loop_info) = self.remove_loop_with_name(&symbol) else {
@@ -245,7 +244,7 @@ impl Program {
             self.loop_stack.push(loop_info);
         }
 
-        self.variables.insert(symbol, new_value.into());
+        self.variables.set(symbol, new_value.into())?;
         Ok(())
     }
 
@@ -259,7 +258,7 @@ impl Program {
         self.breakpoint = None;
         self.reset_data_cursor();
         self.functions.clear();
-        self.variables.clear();
+        self.variables = Variables::default();
         self.arrays.clear();
         self.stack.clear();
         self.loop_stack.clear();
@@ -296,7 +295,7 @@ impl Program {
         self.goto_line_number(line_number)?;
         self.stack.push(StackFrame {
             return_location,
-            variables: HashMap::new(),
+            variables: Variables::default(),
         });
         Ok(())
     }
@@ -339,13 +338,10 @@ impl Program {
     pub fn push_function_call_onto_stack_and_goto_it(
         &mut self,
         name: &Symbol,
-        bindings: HashMap<Symbol, Value>,
+        bindings: Variables,
     ) -> Result<(), TracedInterpreterError> {
         if self.stack.len() == STACK_LIMIT {
             return Err(OutOfMemoryError::StackOverflow.into());
-        }
-        for (arg_name, arg_value) in bindings.iter() {
-            arg_value.validate_type_matches_variable_name(arg_name.as_str())?;
         }
         self.stack.push(StackFrame {
             return_location: self.location,
@@ -373,8 +369,8 @@ impl Program {
         // Yes, it's really weird that we're crawling up the function call stack to look up
         // variables. This is not normal. But it's how Applesoft BASIC seems to work?
         for frame in self.stack.iter().rev() {
-            if let Some(value) = frame.variables.get(variable_name) {
-                return Some(value.clone());
+            if frame.variables.has(variable_name) {
+                return Some(frame.variables.get(variable_name).clone());
             }
         }
         None
@@ -617,27 +613,6 @@ impl Program {
 
     pub fn has_array(&self, array_name: &Symbol) -> bool {
         self.arrays.contains_key(array_name)
-    }
-
-    pub fn get_variable_value(&self, name: &Symbol) -> Value {
-        match self.variables.get(name) {
-            Some(value) => value.clone(),
-            None => Value::default_for_variable(name.as_str()),
-        }
-    }
-
-    pub fn set_variable_value(
-        &mut self,
-        name: Symbol,
-        value: Value,
-    ) -> Result<(), TracedInterpreterError> {
-        value.validate_type_matches_variable_name(name.as_str())?;
-        self.variables.insert(name, value);
-        Ok(())
-    }
-
-    pub fn has_variable(&self, name: &Symbol) -> bool {
-        self.variables.contains_key(name)
     }
 
     pub fn randomize(&mut self, seed: u64) {

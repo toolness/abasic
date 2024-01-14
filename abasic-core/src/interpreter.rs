@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     builtins,
     data::parse_data_until_colon,
@@ -16,6 +14,7 @@ use crate::{
     syntax_error::SyntaxError,
     tokenizer::{Token, Tokenizer},
     value::Value,
+    variables::Variables,
 };
 
 struct LValue {
@@ -94,10 +93,10 @@ impl Interpreter {
 
         self.program.expect_next_token(Token::LeftParen)?;
         let arity = arg_names.len();
-        let mut bindings: HashMap<Symbol, Value> = HashMap::with_capacity(arity);
+        let mut bindings = Variables::with_capacity(arity);
         for (i, arg) in arg_names.into_iter().enumerate() {
             let value = self.evaluate_expression()?;
-            bindings.insert(arg, value);
+            bindings.set(arg, value)?;
             if i < arity - 1 {
                 self.program.expect_next_token(Token::Comma)?;
             }
@@ -190,10 +189,10 @@ impl Interpreter {
                 } else if let Some(value) = self.program.find_variable_value_in_stack(&symbol) {
                     Ok(value)
                 } else {
-                    if self.enable_warnings && !self.program.has_variable(&symbol) {
+                    if self.enable_warnings && !self.program.variables.has(&symbol) {
                         self.warn(format!("Use of undeclared variable '{}'.", symbol));
                     }
-                    Ok(self.program.get_variable_value(&symbol))
+                    Ok(self.program.variables.get(&symbol))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken.into()),
@@ -343,7 +342,7 @@ impl Interpreter {
                 self.program
                     .set_value_at_array_index(&lvalue.symbol_name, &index, rvalue)
             }
-            None => self.program.set_variable_value(lvalue.symbol_name, rvalue),
+            None => self.program.variables.set(lvalue.symbol_name, rvalue),
         }
     }
 

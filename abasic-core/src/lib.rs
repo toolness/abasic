@@ -15,6 +15,7 @@ mod symbol;
 mod syntax_error;
 mod tokenizer;
 mod value;
+mod variables;
 
 pub use interpreter::{Interpreter, InterpreterState};
 pub use interpreter_error::{InterpreterError, TracedInterpreterError};
