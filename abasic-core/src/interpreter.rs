@@ -9,6 +9,7 @@ use crate::{
         MultiplyOrDivideOp, UnaryOp,
     },
     program::Program,
+    random::Rng,
     string_manager::StringManager,
     symbol::Symbol,
     syntax_error::SyntaxError,
@@ -40,6 +41,7 @@ pub struct Interpreter {
     state: InterpreterState,
     input: Option<String>,
     string_manager: StringManager,
+    rng: Rng,
 }
 
 impl core::fmt::Debug for Interpreter {
@@ -120,7 +122,7 @@ impl Interpreter {
             "INT" => self.evaluate_unary_function(builtins::int),
             "RND" => {
                 let number = self.evaluate_unary_function_arg()?;
-                Ok(self.program.random(number.try_into()?)?.into())
+                Ok(self.rng.rnd(number.try_into()?)?.into())
             }
             _ => {
                 return self.evaluate_user_defined_function_call(function_name);
@@ -794,7 +796,7 @@ impl Interpreter {
     }
 
     pub fn randomize(&mut self, seed: u64) {
-        self.program.randomize(seed);
+        self.rng = Rng::new(seed);
     }
 }
 
