@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::{
-    arrays::Arrays,
     data::{DataElement, DataIterator},
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     program_lines::ProgramLines,
@@ -95,8 +94,6 @@ pub struct Program {
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
     functions: HashMap<Symbol, FunctionDefinition>,
-    pub variables: Variables,
-    pub arrays: Arrays,
 }
 
 impl Program {
@@ -195,6 +192,7 @@ impl Program {
 
     pub fn start_loop(
         &mut self,
+        variables: &mut Variables,
         symbol: Symbol,
         from_value: f64,
         to_value: f64,
@@ -210,12 +208,16 @@ impl Program {
             to_value,
             step_value,
         });
-        self.variables.set(symbol, from_value.into())?;
+        variables.set(symbol, from_value.into())?;
         Ok(())
     }
 
-    pub fn end_loop(&mut self, symbol: Symbol) -> Result<(), TracedInterpreterError> {
-        let current_value = self.variables.get(&symbol);
+    pub fn end_loop(
+        &mut self,
+        variables: &mut Variables,
+        symbol: Symbol,
+    ) -> Result<(), TracedInterpreterError> {
+        let current_value = variables.get(&symbol);
         let current_number: f64 = current_value.clone().try_into()?;
 
         let Some(loop_info) = self.remove_loop_with_name(&symbol) else {
@@ -242,7 +244,7 @@ impl Program {
             self.loop_stack.push(loop_info);
         }
 
-        self.variables.set(symbol, new_value.into())?;
+        variables.set(symbol, new_value.into())?;
         Ok(())
     }
 
@@ -256,8 +258,6 @@ impl Program {
         self.breakpoint = None;
         self.reset_data_cursor();
         self.functions.clear();
-        self.variables = Variables::default();
-        self.arrays = Arrays::default();
         self.stack.clear();
         self.loop_stack.clear();
         if let Some(first_line) = self.numbered_lines.first() {

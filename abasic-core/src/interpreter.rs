@@ -1,4 +1,5 @@
 use crate::{
+    arrays::Arrays,
     builtins,
     data::parse_data_until_colon,
     interpreter_error::{InterpreterError, TracedInterpreterError},
@@ -42,6 +43,8 @@ pub struct Interpreter {
     input: Option<String>,
     string_manager: StringManager,
     rng: Rng,
+    variables: Variables,
+    arrays: Arrays,
 }
 
 impl core::fmt::Debug for Interpreter {
@@ -168,7 +171,7 @@ impl Interpreter {
     }
 
     fn maybe_log_warning_about_undeclared_array_use(&mut self, array_name: &Symbol) {
-        if self.enable_warnings && !self.program.arrays.has(array_name) {
+        if self.enable_warnings && !self.arrays.has(array_name) {
             self.warn(format!("Use of undeclared array '{}'.", array_name));
         }
     }
@@ -186,15 +189,15 @@ impl Interpreter {
                     } else {
                         let index = self.parse_array_index()?;
                         self.maybe_log_warning_about_undeclared_array_use(&symbol);
-                        self.program.arrays.get_value_at_index(&symbol, &index)
+                        self.arrays.get_value_at_index(&symbol, &index)
                     }
                 } else if let Some(value) = self.program.find_variable_value_in_stack(&symbol) {
                     Ok(value)
                 } else {
-                    if self.enable_warnings && !self.program.variables.has(&symbol) {
+                    if self.enable_warnings && !self.variables.has(&symbol) {
                         self.warn(format!("Use of undeclared variable '{}'.", symbol));
                     }
-                    Ok(self.program.variables.get(&symbol))
+                    Ok(self.variables.get(&symbol))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken.into()),
@@ -341,11 +344,10 @@ impl Interpreter {
         match lvalue.array_index {
             Some(index) => {
                 self.maybe_log_warning_about_undeclared_array_use(&lvalue.symbol_name);
-                self.program
-                    .arrays
+                self.arrays
                     .set_value_at_index(&lvalue.symbol_name, &index, rvalue)
             }
-            None => self.program.variables.set(lvalue.symbol_name, rvalue),
+            None => self.variables.set(lvalue.symbol_name, rvalue),
         }
     }
 
@@ -459,7 +461,7 @@ impl Interpreter {
             // just no-ops...
             return Ok(());
         };
-        self.program.arrays.create(lvalue.symbol_name, max_indices)
+        self.arrays.create(lvalue.symbol_name, max_indices)
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -533,8 +535,13 @@ impl Interpreter {
             1.0
         };
 
-        self.program
-            .start_loop(symbol.clone(), from_number, to_number, step_number)?;
+        self.program.start_loop(
+            &mut self.variables,
+            symbol.clone(),
+            from_number,
+            to_number,
+            step_number,
+        )?;
         Ok(())
     }
 
@@ -542,7 +549,7 @@ impl Interpreter {
         let Some(Token::Symbol(symbol)) = self.program.next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
-        self.program.end_loop(symbol)
+        self.program.end_loop(&mut self.variables, symbol)
     }
 
     pub fn break_at_current_location(&mut self) {
@@ -659,6 +666,8 @@ impl Interpreter {
         // That feels like overkill so for now we're just doing this.
         match first_word.to_ascii_uppercase().as_str() {
             "RUN" => {
+                self.variables = Variables::default();
+                self.arrays = Arrays::default();
                 self.program.run_from_first_numbered_line();
                 self.run_next_statement()?;
             }
