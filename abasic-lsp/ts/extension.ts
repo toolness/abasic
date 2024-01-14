@@ -61,5 +61,6 @@ export function deactivate(): Thenable<void> | undefined {
   if (!client) {
     return undefined;
   }
+  console.log("Shutting down client.");
   return client.stop();
 }
