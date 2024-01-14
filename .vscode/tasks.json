@@ -6,7 +6,7 @@
 		{
 			"label": "Watch LSP VSCode extension client",
 			"type": "npm",
-			"script": "watch-lsp",
+			"script": "watch",
 			"options": {
 				"cwd": "${workspaceFolder}/abasic-lsp"
 			},
