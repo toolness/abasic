@@ -4,8 +4,12 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Watch LSP VSCode extension client",
 			"type": "npm",
-			"script": "watch",
+			"script": "watch-lsp",
+			"options": {
+				"cwd": "${workspaceFolder}/abasic-lsp"
+			},
 			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
 			"presentation": {
