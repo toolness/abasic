@@ -2,14 +2,13 @@ use std::collections::HashMap;
 
 use crate::{
     data::{DataElement, DataIterator},
-    dim::ValueArray,
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     program_lines::ProgramLines,
-    random::Rng,
     symbol::Symbol,
     syntax_error::SyntaxError,
     tokenizer::Token,
     value::Value,
+    variables::Variables,
 };
 
 const STACK_LIMIT: usize = 32;
@@ -24,7 +23,7 @@ pub enum ProgramLine {
 #[derive(Debug)]
 struct StackFrame {
     return_location: ProgramLocation,
-    variables: HashMap<Symbol, Value>,
+    variables: Variables,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -95,9 +94,6 @@ pub struct Program {
     loop_stack: Vec<LoopInfo>,
     data_iterator: Option<DataIterator>,
     functions: HashMap<Symbol, FunctionDefinition>,
-    variables: HashMap<Symbol, Value>,
-    arrays: HashMap<Symbol, ValueArray>,
-    rng: Rng,
 }
 
 impl Program {
@@ -196,6 +192,7 @@ impl Program {
 
     pub fn start_loop(
         &mut self,
+        variables: &mut Variables,
         symbol: Symbol,
         from_value: f64,
         to_value: f64,
@@ -211,14 +208,16 @@ impl Program {
             to_value,
             step_value,
         });
-        self.variables.insert(symbol, from_value.into());
+        variables.set(symbol, from_value.into())?;
         Ok(())
     }
 
-    pub fn end_loop(&mut self, symbol: Symbol) -> Result<(), TracedInterpreterError> {
-        let Some(current_value) = self.variables.get(&symbol) else {
-            return Err(InterpreterError::NextWithoutFor.into());
-        };
+    pub fn end_loop(
+        &mut self,
+        variables: &mut Variables,
+        symbol: Symbol,
+    ) -> Result<(), TracedInterpreterError> {
+        let current_value = variables.get(&symbol);
         let current_number: f64 = current_value.clone().try_into()?;
 
         let Some(loop_info) = self.remove_loop_with_name(&symbol) else {
@@ -245,7 +244,7 @@ impl Program {
             self.loop_stack.push(loop_info);
         }
 
-        self.variables.insert(symbol, new_value.into());
+        variables.set(symbol, new_value.into())?;
         Ok(())
     }
 
@@ -259,8 +258,6 @@ impl Program {
         self.breakpoint = None;
         self.reset_data_cursor();
         self.functions.clear();
-        self.variables.clear();
-        self.arrays.clear();
         self.stack.clear();
         self.loop_stack.clear();
         if let Some(first_line) = self.numbered_lines.first() {
@@ -296,7 +293,7 @@ impl Program {
         self.goto_line_number(line_number)?;
         self.stack.push(StackFrame {
             return_location,
-            variables: HashMap::new(),
+            variables: Variables::default(),
         });
         Ok(())
     }
@@ -339,13 +336,10 @@ impl Program {
     pub fn push_function_call_onto_stack_and_goto_it(
         &mut self,
         name: &Symbol,
-        bindings: HashMap<Symbol, Value>,
+        bindings: Variables,
     ) -> Result<(), TracedInterpreterError> {
         if self.stack.len() == STACK_LIMIT {
             return Err(OutOfMemoryError::StackOverflow.into());
-        }
-        for (arg_name, arg_value) in bindings.iter() {
-            arg_value.validate_type_matches_variable_name(arg_name.as_str())?;
         }
         self.stack.push(StackFrame {
             return_location: self.location,
@@ -373,8 +367,8 @@ impl Program {
         // Yes, it's really weird that we're crawling up the function call stack to look up
         // variables. This is not normal. But it's how Applesoft BASIC seems to work?
         for frame in self.stack.iter().rev() {
-            if let Some(value) = frame.variables.get(variable_name) {
-                return Some(value.clone());
+            if frame.variables.has(variable_name) {
+                return Some(frame.variables.get(variable_name).clone());
             }
         }
         None
@@ -559,105 +553,5 @@ impl Program {
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
         self.location.token_index = self.tokens().len();
-    }
-
-    fn maybe_create_default_array(
-        &mut self,
-        array_name: &Symbol,
-        dimensions: usize,
-    ) -> Result<(), TracedInterpreterError> {
-        // It seems we can't use hash_map::Entry here to provide a default value,
-        // because we might actually error when creating the default value.
-        if !self.arrays.contains_key(array_name) {
-            let array = ValueArray::default_for_variable_and_dimensionality(
-                &array_name.as_str(),
-                dimensions,
-            )?;
-            self.arrays.insert(array_name.clone(), array);
-        }
-        Ok(())
-    }
-
-    pub fn create_array(
-        &mut self,
-        array_name: Symbol,
-        max_indices: Vec<usize>,
-    ) -> Result<(), TracedInterpreterError> {
-        if self.has_array(&array_name) {
-            return Err(InterpreterError::RedimensionedArray.into());
-        }
-        let array = ValueArray::create(array_name.as_str(), max_indices)?;
-        self.arrays.insert(array_name, array);
-        Ok(())
-    }
-
-    pub fn get_value_at_array_index(
-        &mut self,
-        array_name: &Symbol,
-        index: &Vec<usize>,
-    ) -> Result<Value, TracedInterpreterError> {
-        self.maybe_create_default_array(array_name, index.len())?;
-        let array = self.arrays.get(array_name).unwrap();
-
-        Ok(array.get(index)?)
-    }
-
-    pub fn set_value_at_array_index(
-        &mut self,
-        array_name: &Symbol,
-        index: &Vec<usize>,
-        value: Value,
-    ) -> Result<(), TracedInterpreterError> {
-        value.validate_type_matches_variable_name(array_name.as_str())?;
-        self.maybe_create_default_array(array_name, index.len())?;
-        let array = self.arrays.get_mut(array_name).unwrap();
-        array.set(index, value)?;
-        Ok(())
-    }
-
-    pub fn has_array(&self, array_name: &Symbol) -> bool {
-        self.arrays.contains_key(array_name)
-    }
-
-    pub fn get_variable_value(&self, name: &Symbol) -> Value {
-        match self.variables.get(name) {
-            Some(value) => value.clone(),
-            None => Value::default_for_variable(name.as_str()),
-        }
-    }
-
-    pub fn set_variable_value(
-        &mut self,
-        name: Symbol,
-        value: Value,
-    ) -> Result<(), TracedInterpreterError> {
-        value.validate_type_matches_variable_name(name.as_str())?;
-        self.variables.insert(name, value);
-        Ok(())
-    }
-
-    pub fn has_variable(&self, name: &Symbol) -> bool {
-        self.variables.contains_key(name)
-    }
-
-    pub fn randomize(&mut self, seed: u64) {
-        self.rng = Rng::new(seed);
-    }
-
-    pub fn random(&mut self, number: f64) -> Result<f64, TracedInterpreterError> {
-        // Applesoft BASIC would always return the most recent random with the argument '0', and
-        // predefined items in the sequence with '-1', but in practice all the code I've seen
-        // just calls it with '1', and *any* positive number is supposed to return a random number
-        // in the interval [0, 1).
-        if number < 0.0 {
-            // None of the code I've seen actually uses this, and
-            // I don't fully understand what it means, so just don't
-            // support it for now.
-            Err(InterpreterError::Unimplemented.into())
-        } else if number == 0.0 {
-            Ok(self.rng.latest_random())
-        } else {
-            Ok(self.rng.random())
-        }
     }
 }

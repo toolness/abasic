@@ -1,7 +1,9 @@
-use std::rc::Rc;
+use core::fmt::Debug;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
+    symbol::Symbol,
     value::Value,
 };
 
@@ -12,6 +14,75 @@ const MAX_DIM_TOTAL_ELEMENTS: usize = 10000;
 /// This is super weird and seems to be the default for Applesoft BASIC
 /// and Commodore 64 BASIC.
 const DEFAULT_ARRAY_SIZE: usize = 10;
+
+#[derive(Default)]
+pub struct Arrays(HashMap<Symbol, ValueArray>);
+
+impl Debug for Arrays {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl Arrays {
+    fn maybe_create_default_array(
+        &mut self,
+        array_name: &Symbol,
+        dimensions: usize,
+    ) -> Result<(), TracedInterpreterError> {
+        // It seems we can't use hash_map::Entry here to provide a default value,
+        // because we might actually error when creating the default value.
+        if !self.0.contains_key(array_name) {
+            let array = ValueArray::default_for_variable_and_dimensionality(
+                &array_name.as_str(),
+                dimensions,
+            )?;
+            self.0.insert(array_name.clone(), array);
+        }
+        Ok(())
+    }
+
+    pub fn create(
+        &mut self,
+        array_name: Symbol,
+        max_indices: Vec<usize>,
+    ) -> Result<(), TracedInterpreterError> {
+        if self.has(&array_name) {
+            return Err(InterpreterError::RedimensionedArray.into());
+        }
+        let array = ValueArray::create(array_name.as_str(), max_indices)?;
+        self.0.insert(array_name, array);
+        Ok(())
+    }
+
+    pub fn get_value_at_index(
+        &mut self,
+        array_name: &Symbol,
+        index: &Vec<usize>,
+    ) -> Result<Value, TracedInterpreterError> {
+        self.maybe_create_default_array(array_name, index.len())?;
+        let array = self.0.get(array_name).unwrap();
+
+        Ok(array.get(index)?)
+    }
+
+    pub fn set_value_at_index(
+        &mut self,
+        array_name: &Symbol,
+        index: &Vec<usize>,
+        value: Value,
+    ) -> Result<(), TracedInterpreterError> {
+        value.validate_type_matches_variable_name(array_name.as_str())?;
+        self.maybe_create_default_array(array_name, index.len())?;
+        let array = self.0.get_mut(array_name).unwrap();
+        array.set(index, value)?;
+        Ok(())
+    }
+
+    pub fn has(&self, array_name: &Symbol) -> bool {
+        self.0.contains_key(array_name)
+    }
+}
 
 #[derive(Debug)]
 pub enum ValueArray {
