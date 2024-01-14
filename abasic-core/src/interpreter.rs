@@ -26,28 +26,31 @@ pub enum InterpreterState {
 
 #[derive(Default)]
 pub struct Interpreter {
-    output: Vec<InterpreterOutput>,
-    pub(crate) program: Program,
-    pub enable_warnings: bool,
-    pub enable_tracing: bool,
-    state: InterpreterState,
     input: Option<String>,
+    output: Vec<InterpreterOutput>,
+    state: InterpreterState,
     string_manager: StringManager,
+    pub(crate) program: Program,
     pub(crate) rng: Rng,
     pub(crate) variables: Variables,
     pub(crate) arrays: Arrays,
+    pub enable_warnings: bool,
+    pub enable_tracing: bool,
 }
 
 impl core::fmt::Debug for Interpreter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interpreter")
+            .field("input", &self.input)
             .field("output", &self.output)
+            .field("state", &self.state)
+            .field("string_manager", &self.string_manager)
             .field("program", &self.program)
+            .field("rng", &self.rng)
+            .field("variables", &self.variables)
+            .field("arrays", &self.arrays)
             .field("enable_warnings", &self.enable_warnings)
             .field("enable_tracing", &self.enable_tracing)
-            .field("state", &self.state)
-            .field("input", &self.input)
-            .field("string_manager", &self.string_manager)
             .finish()
     }
 }
