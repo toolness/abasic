@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
@@ -6,7 +7,7 @@ use crate::{
     tokenizer::Token,
 };
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ProgramLines {
     numbered_lines: HashMap<u64, Vec<Token>>,
     /// According to Wikipedia, Applesoft BASIC stored lines as a linked list,
@@ -14,6 +15,19 @@ pub struct ProgramLines {
     /// memory constraints. We don't have such constraints, so we'll use a
     /// BTreeSet for faster lookup.
     sorted_line_numbers: BTreeSet<u64>,
+}
+
+impl Debug for ProgramLines {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut lines = f.debug_struct("ProgramLines");
+        for line in &self.sorted_line_numbers {
+            lines.field(
+                line.to_string().as_str(),
+                self.numbered_lines.get(line).unwrap(),
+            );
+        }
+        lines.finish()
+    }
 }
 
 impl ProgramLines {
