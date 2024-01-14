@@ -10,12 +10,12 @@
 			"request": "launch",
 			"runtimeExecutable": "${execPath}",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}"
+				"--extensionDevelopmentPath=${workspaceFolder}/abasic-lsp"
 			],
 			"outFiles": [
-				"${workspaceFolder}/ts/**/*.js"
+				"${workspaceFolder}/abasic-lsp/ts/**/*.js"
 			],
-			"preLaunchTask": "npm: watch"
+			"preLaunchTask": "Watch LSP VSCode extension client"
 		}
 	]
 }
