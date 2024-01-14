@@ -2,14 +2,27 @@ use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::{
-    request::GotoDefinition, GotoDefinitionResponse, InitializeParams, OneOf, ServerCapabilities, Location, Range, Position,
+    request::GotoDefinition, GotoDefinitionResponse, InitializeParams, Location, OneOf, Position,
+    Range, ServerCapabilities,
 };
 
-// This is mostly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
-fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    eprintln!("Starting LSP server.");
+type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
 
-    let (connection, io_threads) = Connection::listen("127.0.0.1:5007")?;
+const LISTEN_ADDR: &'static str = "127.0.0.1:5007";
+
+// This is mostly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
+fn main() -> LspResult<()> {
+    eprintln!("Starting LSP server on {LISTEN_ADDR}.");
+
+    loop {
+        handle_one_connection()?;
+    }
+}
+
+fn handle_one_connection() -> LspResult<()> {
+    eprintln!("Waiting for connection.");
+
+    let (connection, io_threads) = Connection::listen(LISTEN_ADDR)?;
 
     eprintln!("Got connection.");
 
@@ -30,15 +43,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     };
     main_loop(connection, initialization_params)?;
     io_threads.join()?;
-
-    eprintln!("Shutting down server.");
     Ok(())
 }
 
-fn main_loop(
-    connection: Connection,
-    params: serde_json::Value,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()> {
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
     eprintln!("Starting main loop.");
 
@@ -55,7 +63,10 @@ fn main_loop(
                         eprintln!("Go gotoDefinition request #{id}: {params:?}");
                         let uri = params.text_document_position_params.text_document.uri;
 
-                        let result = Some(GotoDefinitionResponse::Scalar(Location::new(uri, Range::new(Position::new(1, 1), Position::new(1,1)))));
+                        let result = Some(GotoDefinitionResponse::Scalar(Location::new(
+                            uri,
+                            Range::new(Position::new(1, 1), Position::new(1, 1)),
+                        )));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
                             id,
