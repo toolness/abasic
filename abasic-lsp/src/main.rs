@@ -3,7 +3,8 @@ use std::error::Error;
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::{
     request::GotoDefinition, GotoDefinitionResponse, InitializeParams, Location, OneOf, Position,
-    Range, ServerCapabilities,
+    Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions,
 };
 
 type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
@@ -28,6 +29,15 @@ fn handle_one_connection() -> LspResult<()> {
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::FULL),
+                will_save: None,
+                will_save_wait_until: None,
+                save: None,
+            },
+        )),
         ..Default::default()
     })
     .unwrap();
