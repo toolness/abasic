@@ -18,6 +18,8 @@ mod value;
 mod variables;
 
 pub use interpreter::{Interpreter, InterpreterState};
-pub use interpreter_error::{InterpreterError, TracedInterpreterError};
+pub use interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError};
 pub use interpreter_output::InterpreterOutput;
 pub use line_number_parser::parse_line_number;
+pub use syntax_error::SyntaxError;
+pub use tokenizer::Token;
