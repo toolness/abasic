@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
+use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    request::GotoDefinition, GotoDefinitionResponse, InitializeParams, Location, OneOf, Position,
-    Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions,
+    notification::DidOpenTextDocument, request::GotoDefinition, GotoDefinitionResponse,
+    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 
 type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
@@ -68,7 +68,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                     return Ok(());
                 }
                 eprintln!("Got request: {req:?}");
-                match cast::<GotoDefinition>(req) {
+                match cast_request::<GotoDefinition>(req) {
                     Ok((id, params)) => {
                         eprintln!("Go gotoDefinition request #{id}: {params:?}");
                         let uri = params.text_document_position_params.text_document.uri;
@@ -96,6 +96,15 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
             }
             Message::Notification(not) => {
                 eprintln!("Got notification: {not:?}");
+                match cast_notification::<DidOpenTextDocument>(not) {
+                    Ok(params) => {
+                        let text = params.text_document.text;
+                        println!("Document text: {text}");
+                        continue;
+                    }
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(ExtractError::MethodMismatch(not)) => not,
+                };
             }
         }
     }
@@ -103,10 +112,18 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     Ok(())
 }
 
-fn cast<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
+fn cast_request<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
 where
     R: lsp_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
 {
     req.extract(R::METHOD)
+}
+
+fn cast_notification<N>(not: Notification) -> Result<N::Params, ExtractError<Notification>>
+where
+    N: lsp_types::notification::Notification,
+    N::Params: serde::de::DeserializeOwned,
+{
+    not.extract(N::METHOD)
 }
