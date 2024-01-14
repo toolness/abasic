@@ -1,15 +1,12 @@
 import * as path from "path";
 import * as net from "net";
-import { workspace, ExtensionContext } from "vscode";
+import { ExtensionContext } from "vscode";
 
 import {
-  Executable,
   LanguageClient,
   LanguageClientOptions,
-  ServerOptions,
   StreamInfo,
   Trace,
-  TransportKind,
 } from "vscode-languageclient/node";
 
 let client: LanguageClient;
@@ -44,13 +41,8 @@ function connectToLanguageServer(): Promise<StreamInfo> {
   });
 }
 
+// A lot of this is based off: https://code.visualstudio.com/api/language-extensions/language-server-extension-guide
 export function activate(context: ExtensionContext) {
-  /*
-    const server = context.asAbsolutePath("../target/debug/abasic-lsp");
-    const run: Executable = {
-        command: server, transport: TransportKind.stdio
-    };
-    const serverOptions: ServerOptions = run;*/
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "abasic" }],
   };
