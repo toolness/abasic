@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, ops::Range, rc::Rc};
 
 use crate::{
     data::{data_elements_to_string, parse_data_until_colon, DataElement},
@@ -7,6 +7,8 @@ use crate::{
     symbol::Symbol,
     syntax_error::SyntaxError,
 };
+
+type TokenWithRange = (Token, Range<usize>);
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
@@ -424,8 +426,9 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         false
     }
 
-    fn chomp_next_token(&mut self) -> Result<Token, SyntaxError> {
-        if let Some(token) = self.chomp_any_keyword() {
+    fn chomp_next_token(&mut self) -> Result<TokenWithRange, SyntaxError> {
+        let token_start_index = self.index;
+        let result = if let Some(token) = self.chomp_any_keyword() {
             Ok(token)
         } else if let Some(result) = self.chomp_one_or_two_characters() {
             result
@@ -441,20 +444,24 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
             result
         } else {
             Err(SyntaxError::IllegalCharacter)
+        };
+        match result {
+            Ok(token) => Ok((token, token_start_index..self.index)),
+            Err(err) => Err(err),
         }
     }
 
     pub fn remaining_tokens(mut self) -> Result<Vec<Token>, SyntaxError> {
         let mut tokens: Vec<Token> = vec![];
         for token in &mut self {
-            tokens.push(token?);
+            tokens.push(token?.0);
         }
         Ok(tokens)
     }
 }
 
 impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {
-    type Item = Result<Token, SyntaxError>;
+    type Item = Result<TokenWithRange, SyntaxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.errored {
@@ -479,11 +486,11 @@ impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{ops::Range, rc::Rc};
 
     use crate::{string_manager::StringManager, syntax_error::SyntaxError};
 
-    use super::{Token, Tokenizer};
+    use super::{Token, TokenWithRange, Tokenizer};
 
     fn string_literal(value: &'static str) -> Token {
         Token::StringLiteral(Rc::new(String::from(value)))
@@ -497,7 +504,7 @@ mod tests {
         Token::Remark(Rc::new(String::from(value)))
     }
 
-    fn get_tokens_wrapped(value: &str) -> Vec<Result<Token, SyntaxError>> {
+    fn get_tokens_wrapped(value: &str) -> Vec<Result<TokenWithRange, SyntaxError>> {
         let mut manager = StringManager::default();
         let tokenizer = Tokenizer::new(value, &mut manager);
         tokenizer.into_iter().collect::<Vec<_>>()
@@ -509,7 +516,7 @@ mod tests {
         tokenizer
             .into_iter()
             .map(|t| match t {
-                Ok(token) => token,
+                Ok((token, _)) => token,
                 Err(err) => {
                     panic!(
                         "expected '{}' to tokenize without error, but got {:?}",
@@ -532,9 +539,36 @@ mod tests {
         }
     }
 
+    fn get_tokens_and_ranges(value: &str) -> Vec<TokenWithRange> {
+        let mut manager = StringManager::default();
+        let tokenizer = Tokenizer::new(value, &mut manager);
+        tokenizer
+            .into_iter()
+            .map(|t| match t {
+                Ok(token_with_range) => token_with_range,
+                Err(err) => {
+                    panic!(
+                        "expected '{}' to tokenize without error, but got {:?}",
+                        value, err
+                    )
+                }
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn assert_value_parses_to_tokens_and_ranges(value: &str, tokens: &[(Token, Range<usize>)]) {
+        assert_eq!(
+            get_tokens_and_ranges(value),
+            tokens.to_owned(),
+            "parsing '{}' == {:?}",
+            value,
+            tokens
+        );
+    }
+
     fn assert_values_parse_to_tokens_wrapped(
         values: &[&str],
-        tokens: &[Result<Token, SyntaxError>],
+        tokens: &[Result<TokenWithRange, SyntaxError>],
     ) {
         for value in values {
             assert_eq!(
@@ -671,6 +705,17 @@ mod tests {
         assert_eq!(
             get_tokens("1234 PRINT"),
             vec![Token::NumericLiteral(1234.0), Token::Print]
+        );
+    }
+
+    #[test]
+    fn token_ranges_work() {
+        assert_value_parses_to_tokens_and_ranges("print", &[(Token::Print, 0..5)]);
+        assert_value_parses_to_tokens_and_ranges("  print ", &[(Token::Print, 2..7)]);
+        assert_value_parses_to_tokens_and_ranges("  go to ", &[(Token::Goto, 2..7)]);
+        assert_value_parses_to_tokens_and_ranges(
+            "print  goto",
+            &[(Token::Print, 0..5), (Token::Goto, 7..11)],
         );
     }
 
