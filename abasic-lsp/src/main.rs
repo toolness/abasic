@@ -2,9 +2,11 @@ use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    notification::DidOpenTextDocument, request::GotoDefinition, GotoDefinitionResponse,
-    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    notification::{DidOpenTextDocument, PublishDiagnostics},
+    request::GotoDefinition,
+    Diagnostic, GotoDefinitionResponse, InitializeParams, Location, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 
 type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
@@ -100,6 +102,18 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                     Ok(params) => {
                         let text = params.text_document.text;
                         println!("Document text: {text}");
+                        let diag = Diagnostic::new_simple(
+                            Range::new(Position::new(1, 1), Position::new(1, 1)),
+                            "this is a diagnostic message".to_string(),
+                        );
+                        send_notification::<PublishDiagnostics>(
+                            &connection,
+                            PublishDiagnosticsParams {
+                                uri: params.text_document.uri,
+                                diagnostics: vec![diag],
+                                version: None,
+                            },
+                        )?;
                         continue;
                     }
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
@@ -126,4 +140,13 @@ where
     N::Params: serde::de::DeserializeOwned,
 {
     not.extract(N::METHOD)
+}
+
+fn send_notification<N: lsp_types::notification::Notification>(
+    connection: &Connection,
+    params: N::Params,
+) -> LspResult<()> {
+    let not = Notification::new(N::METHOD.to_string(), params);
+    connection.sender.send(not.into())?;
+    Ok(())
 }
