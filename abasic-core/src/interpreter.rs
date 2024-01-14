@@ -168,7 +168,7 @@ impl Interpreter {
     }
 
     fn maybe_log_warning_about_undeclared_array_use(&mut self, array_name: &Symbol) {
-        if self.enable_warnings && !self.program.has_array(array_name) {
+        if self.enable_warnings && !self.program.arrays.has(array_name) {
             self.warn(format!("Use of undeclared array '{}'.", array_name));
         }
     }
@@ -186,7 +186,7 @@ impl Interpreter {
                     } else {
                         let index = self.parse_array_index()?;
                         self.maybe_log_warning_about_undeclared_array_use(&symbol);
-                        self.program.get_value_at_array_index(&symbol, &index)
+                        self.program.arrays.get_value_at_index(&symbol, &index)
                     }
                 } else if let Some(value) = self.program.find_variable_value_in_stack(&symbol) {
                     Ok(value)
@@ -342,7 +342,8 @@ impl Interpreter {
             Some(index) => {
                 self.maybe_log_warning_about_undeclared_array_use(&lvalue.symbol_name);
                 self.program
-                    .set_value_at_array_index(&lvalue.symbol_name, &index, rvalue)
+                    .arrays
+                    .set_value_at_index(&lvalue.symbol_name, &index, rvalue)
             }
             None => self.program.variables.set(lvalue.symbol_name, rvalue),
         }
@@ -458,7 +459,7 @@ impl Interpreter {
             // just no-ops...
             return Ok(());
         };
-        self.program.create_array(lvalue.symbol_name, max_indices)
+        self.program.arrays.create(lvalue.symbol_name, max_indices)
     }
 
     fn evaluate_print_statement(&mut self) -> Result<(), TracedInterpreterError> {

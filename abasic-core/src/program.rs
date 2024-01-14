@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
+    arrays::Arrays,
     data::{DataElement, DataIterator},
-    dim::ValueArray,
     interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError},
     program_lines::ProgramLines,
     symbol::Symbol,
@@ -96,7 +96,7 @@ pub struct Program {
     data_iterator: Option<DataIterator>,
     functions: HashMap<Symbol, FunctionDefinition>,
     pub variables: Variables,
-    arrays: HashMap<Symbol, ValueArray>,
+    pub arrays: Arrays,
 }
 
 impl Program {
@@ -257,7 +257,7 @@ impl Program {
         self.reset_data_cursor();
         self.functions.clear();
         self.variables = Variables::default();
-        self.arrays.clear();
+        self.arrays = Arrays::default();
         self.stack.clear();
         self.loop_stack.clear();
         if let Some(first_line) = self.numbered_lines.first() {
@@ -553,63 +553,5 @@ impl Program {
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
         self.location.token_index = self.tokens().len();
-    }
-
-    fn maybe_create_default_array(
-        &mut self,
-        array_name: &Symbol,
-        dimensions: usize,
-    ) -> Result<(), TracedInterpreterError> {
-        // It seems we can't use hash_map::Entry here to provide a default value,
-        // because we might actually error when creating the default value.
-        if !self.arrays.contains_key(array_name) {
-            let array = ValueArray::default_for_variable_and_dimensionality(
-                &array_name.as_str(),
-                dimensions,
-            )?;
-            self.arrays.insert(array_name.clone(), array);
-        }
-        Ok(())
-    }
-
-    pub fn create_array(
-        &mut self,
-        array_name: Symbol,
-        max_indices: Vec<usize>,
-    ) -> Result<(), TracedInterpreterError> {
-        if self.has_array(&array_name) {
-            return Err(InterpreterError::RedimensionedArray.into());
-        }
-        let array = ValueArray::create(array_name.as_str(), max_indices)?;
-        self.arrays.insert(array_name, array);
-        Ok(())
-    }
-
-    pub fn get_value_at_array_index(
-        &mut self,
-        array_name: &Symbol,
-        index: &Vec<usize>,
-    ) -> Result<Value, TracedInterpreterError> {
-        self.maybe_create_default_array(array_name, index.len())?;
-        let array = self.arrays.get(array_name).unwrap();
-
-        Ok(array.get(index)?)
-    }
-
-    pub fn set_value_at_array_index(
-        &mut self,
-        array_name: &Symbol,
-        index: &Vec<usize>,
-        value: Value,
-    ) -> Result<(), TracedInterpreterError> {
-        value.validate_type_matches_variable_name(array_name.as_str())?;
-        self.maybe_create_default_array(array_name, index.len())?;
-        let array = self.arrays.get_mut(array_name).unwrap();
-        array.set(index, value)?;
-        Ok(())
-    }
-
-    pub fn has_array(&self, array_name: &Symbol) -> bool {
-        self.arrays.contains_key(array_name)
     }
 }

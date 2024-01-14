@@ -1,6 +1,6 @@
+mod arrays;
 mod builtins;
 mod data;
-mod dim;
 mod interpreter;
 mod interpreter_error;
 mod interpreter_output;
