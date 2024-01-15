@@ -21,6 +21,12 @@ impl Display for Symbol {
     }
 }
 
+impl AsRef<str> for Symbol {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 impl Debug for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)

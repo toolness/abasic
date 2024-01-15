@@ -1,3 +1,4 @@
+mod analyzer;
 mod arrays;
 mod data;
 mod expression;
