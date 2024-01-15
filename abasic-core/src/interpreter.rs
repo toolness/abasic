@@ -130,7 +130,7 @@ impl Interpreter {
     pub fn todo_actually_use_expression_analyzer(&mut self) -> Result<(), TracedInterpreterError> {
         // This won't actually do anything useful, I'm just using it to avoid
         // dead code warnings.
-        ExpressionAnalyzer::new(self).evaluate_expression()?;
+        ExpressionAnalyzer::new(&mut self.program).evaluate_expression()?;
         todo!();
     }
 

@@ -2,18 +2,18 @@ use crate::{
     operators::{AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp, UnaryOp},
     program::Program,
     symbol::Symbol,
-    Interpreter, SyntaxError, Token, TracedInterpreterError,
+    SyntaxError, Token, TracedInterpreterError,
 };
 
 use super::value_type::ValueType;
 
 pub struct ExpressionAnalyzer<'a> {
-    interpreter: &'a mut Interpreter,
+    program: &'a mut Program,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub fn new(interpreter: &'a mut Interpreter) -> Self {
-        ExpressionAnalyzer { interpreter }
+    pub fn new(program: &'a mut Program) -> Self {
+        ExpressionAnalyzer { program }
     }
 
     pub fn evaluate_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
@@ -22,26 +22,22 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     pub fn evaluate_array_index(&mut self) -> Result<usize, TracedInterpreterError> {
         let mut arity = 0;
-        self.program().expect_next_token(Token::LeftParen)?;
+        self.program.expect_next_token(Token::LeftParen)?;
         loop {
             self.evaluate_expression()?.check_number()?;
             arity += 1;
-            if !self.program().accept_next_token(Token::Comma) {
+            if !self.program.accept_next_token(Token::Comma) {
                 break;
             }
         }
-        self.program().expect_next_token(Token::RightParen)?;
+        self.program.expect_next_token(Token::RightParen)?;
         Ok(arity)
     }
 
-    fn program(&mut self) -> &mut Program {
-        &mut self.interpreter.program
-    }
-
     fn evaluate_unary_number_function_arg(&mut self) -> Result<ValueType, TracedInterpreterError> {
-        self.program().expect_next_token(Token::LeftParen)?;
+        self.program.expect_next_token(Token::LeftParen)?;
         let result = self.evaluate_expression()?.check_number()?;
-        self.program().expect_next_token(Token::RightParen)?;
+        self.program.expect_next_token(Token::RightParen)?;
         Ok(result)
     }
 
@@ -50,7 +46,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         function_name: &Symbol,
     ) -> Result<Option<ValueType>, TracedInterpreterError> {
         let Some(arg_names) = self
-            .program()
+            .program
             .get_function_argument_names(function_name)
             // Cloning this is a bit of a bummer but we don't expect user-defined
             // function calls to happen very often, and we can always put the Vec
@@ -60,16 +56,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Ok(None);
         };
 
-        self.program().expect_next_token(Token::LeftParen)?;
+        self.program.expect_next_token(Token::LeftParen)?;
         let arity = arg_names.len();
         for (i, arg) in arg_names.into_iter().enumerate() {
             let value = self.evaluate_expression()?;
             value.check_variable_name(arg)?;
             if i < arity - 1 {
-                self.program().expect_next_token(Token::Comma)?;
+                self.program.expect_next_token(Token::Comma)?;
             }
         }
-        self.program().expect_next_token(Token::RightParen)?;
+        self.program.expect_next_token(Token::RightParen)?;
 
         Ok(Some(ValueType::from_variable_name(function_name)))
     }
@@ -90,12 +86,12 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn evaluate_expression_term(&mut self) -> Result<ValueType, TracedInterpreterError> {
-        match self.program().next_unwrapped_token()? {
+        match self.program.next_unwrapped_token()? {
             Token::StringLiteral(_string) => Ok(ValueType::Number),
             Token::NumericLiteral(_number) => Ok(ValueType::Number),
             Token::Symbol(symbol) => {
                 let is_array_or_function_call =
-                    self.program().peek_next_token() == Some(Token::LeftParen);
+                    self.program.peek_next_token() == Some(Token::LeftParen);
                 if is_array_or_function_call {
                     if let Some(value) = self.evaluate_function_call(&symbol)? {
                         Ok(value)
@@ -112,9 +108,9 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn evaluate_parenthesized_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
-        if self.program().accept_next_token(Token::LeftParen) {
+        if self.program.accept_next_token(Token::LeftParen) {
             let value = self.evaluate_expression()?;
-            self.program().expect_next_token(Token::RightParen)?;
+            self.program.expect_next_token(Token::RightParen)?;
             Ok(value)
         } else {
             self.evaluate_expression_term()
@@ -122,7 +118,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn evaluate_unary_operator(&mut self) -> Result<ValueType, TracedInterpreterError> {
-        let maybe_unary_op = self.program().try_next_token(UnaryOp::from_token);
+        let maybe_unary_op = self.program.try_next_token(UnaryOp::from_token);
 
         let value = self.evaluate_parenthesized_expression()?;
 
@@ -139,7 +135,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_exponent_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_unary_operator()?;
 
-        while self.program().accept_next_token(Token::Caret) {
+        while self.program.accept_next_token(Token::Caret) {
             let power = self.evaluate_unary_operator()?;
             value.check_number()?;
             power.check_number()?;
@@ -153,10 +149,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_exponent_expression()?;
 
-        while let Some(_op) = self
-            .program()
-            .try_next_token(MultiplyOrDivideOp::from_token)
-        {
+        while let Some(_op) = self.program.try_next_token(MultiplyOrDivideOp::from_token) {
             let second_operand = self.evaluate_exponent_expression()?;
             value.check_number()?;
             second_operand.check_number()?;
@@ -168,8 +161,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_plus_or_minus_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_multiply_or_divide_expression()?;
 
-        while let Some(_plus_or_minus) = self.program().try_next_token(AddOrSubtractOp::from_token)
-        {
+        while let Some(_plus_or_minus) = self.program.try_next_token(AddOrSubtractOp::from_token) {
             let second_operand = self.evaluate_multiply_or_divide_expression()?;
             value.check_number()?;
             second_operand.check_number()?;
@@ -181,7 +173,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_equality_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_plus_or_minus_expression()?;
 
-        while let Some(_equality_op) = self.program().try_next_token(EqualityOp::from_token) {
+        while let Some(_equality_op) = self.program.try_next_token(EqualityOp::from_token) {
             let second_operand = self.evaluate_plus_or_minus_expression()?;
             value.check(second_operand)?;
         }
@@ -192,7 +184,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_logical_and_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_equality_expression()?;
 
-        while self.program().accept_next_token(Token::And) {
+        while self.program.accept_next_token(Token::And) {
             let _second_operand = self.evaluate_equality_expression()?;
         }
 
@@ -204,7 +196,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_logical_or_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
         let value = self.evaluate_logical_and_expression()?;
 
-        while self.program().accept_next_token(Token::Or) {
+        while self.program.accept_next_token(Token::Or) {
             let _second_operand = self.evaluate_logical_and_expression()?;
         }
 
