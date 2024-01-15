@@ -5,7 +5,7 @@ use crate::{
     interpreter_error::{InterpreterError, TracedInterpreterError},
     interpreter_output::InterpreterOutput,
     line_number_parser::parse_line_number,
-    program::Program,
+    program::{Program, ProgramLocation},
     random::Rng,
     statement::StatementEvaluator,
     string_manager::StringManager,
@@ -185,7 +185,21 @@ impl Interpreter {
             if err.location.is_none() {
                 err.location = match err.error {
                     InterpreterError::DataTypeMismatch => self.program.get_data_location(),
-                    _ => Some(self.program.get_location()),
+                    _ => {
+                        let location = self.program.get_location();
+                        Some(ProgramLocation {
+                            line: location.line,
+                            token_index: if location.token_index > 0 {
+                                // Generally, we raise errors after we've already moved the
+                                // program's current location to the next token index, so
+                                // push it back one to arrive at the token that we actually
+                                // errored on.
+                                location.token_index - 1
+                            } else {
+                                0
+                            },
+                        })
+                    }
                 };
             }
             self.return_to_idle_state();
@@ -279,5 +293,9 @@ impl Interpreter {
 
     pub fn randomize(&mut self, seed: u64) {
         self.rng = Rng::new(seed);
+    }
+
+    pub fn get_line_with_pointer_caret(&self, location: ProgramLocation) -> Vec<String> {
+        self.program.get_line_with_pointer_caret(location)
     }
 }

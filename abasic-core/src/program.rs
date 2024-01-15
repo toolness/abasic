@@ -394,6 +394,26 @@ impl Program {
         self.location
     }
 
+    pub fn get_line_with_pointer_caret(&self, location: ProgramLocation) -> Vec<String> {
+        let tokens = self.tokens_for_line(location.line);
+        if tokens.is_empty() {
+            return vec![];
+        }
+        let mut string_tokens = vec![];
+        let mut spaces_before_caret = 0;
+        for (i, token) in tokens.iter().enumerate() {
+            let string_token = token.to_string();
+            if i < location.token_index {
+                spaces_before_caret += string_token.len() + 1;
+            }
+            string_tokens.push(string_token);
+        }
+        vec![
+            string_tokens.join(" "),
+            format!("{}^", " ".repeat(spaces_before_caret)),
+        ]
+    }
+
     pub fn get_data_location(&self) -> Option<ProgramLocation> {
         if let Some(data_iterator) = &self.data_iterator {
             if let Some(location) = data_iterator.current_location() {
@@ -459,11 +479,15 @@ impl Program {
         self.end();
     }
 
-    fn tokens(&self) -> &Vec<Token> {
-        match self.location.line {
+    fn tokens_for_line(&self, line: ProgramLine) -> &Vec<Token> {
+        match line {
             ProgramLine::Immediate => &self.immediate_line,
             ProgramLine::Line(number) => self.numbered_lines.get(number).unwrap(),
         }
+    }
+
+    fn tokens(&self) -> &Vec<Token> {
+        self.tokens_for_line(self.location.line)
     }
 
     /// Returns whether we have any more tokens in the stream.

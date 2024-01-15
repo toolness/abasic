@@ -112,6 +112,12 @@ impl StdioInterpreter {
 
     fn show_error(&mut self, err: TracedInterpreterError) {
         self.printer.eprintln(err.to_string().red());
+        if let Some(location) = err.location {
+            let lines = self.interpreter.get_line_with_pointer_caret(location);
+            for line in lines {
+                self.printer.eprintln(format!("| {line}").dimmed());
+            }
+        }
     }
 
     pub fn run(&mut self) -> i32 {
