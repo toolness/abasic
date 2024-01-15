@@ -269,7 +269,9 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
                 self.index += pos;
                 Some(Ok(Token::NumericLiteral(number)))
             } else {
-                Some(Err(SyntaxError::InvalidNumber))
+                Some(Err(SyntaxError::InvalidNumber(
+                    self.index..self.index + pos,
+                )))
             }
         } else {
             None
@@ -312,7 +314,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
-                Some(Err(SyntaxError::UnterminatedStringLiteral))
+                Some(Err(SyntaxError::UnterminatedStringLiteral(self.index)))
             }
         } else {
             None
@@ -443,7 +445,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         } else if let Some(result) = self.chomp_symbol() {
             result
         } else {
-            Err(SyntaxError::IllegalCharacter)
+            Err(SyntaxError::IllegalCharacter(self.index))
         };
         match result {
             Ok(token) => Ok((token, token_start_index..self.index)),
@@ -566,19 +568,17 @@ mod tests {
         );
     }
 
-    fn assert_values_parse_to_tokens_wrapped(
-        values: &[&str],
+    fn assert_value_parses_to_tokens_wrapped(
+        value: &str,
         tokens: &[Result<TokenWithRange, SyntaxError>],
     ) {
-        for value in values {
-            assert_eq!(
-                get_tokens_wrapped(value),
-                tokens.to_owned(),
-                "parsing '{}' == {:?}",
-                value,
-                tokens
-            );
-        }
+        assert_eq!(
+            get_tokens_wrapped(value),
+            tokens.to_owned(),
+            "parsing '{}' == {:?}",
+            value,
+            tokens
+        );
     }
 
     fn assert_roundtrip_works(value: &str) {
@@ -635,10 +635,9 @@ mod tests {
 
     #[test]
     fn parsing_invalid_decimal_number_returns_error() {
-        assert_values_parse_to_tokens_wrapped(
-            &[".1.", " .1..", " ..10 "],
-            &[Err(SyntaxError::InvalidNumber)],
-        );
+        assert_value_parses_to_tokens_wrapped(".1.", &[Err(SyntaxError::InvalidNumber(0..3))]);
+        assert_value_parses_to_tokens_wrapped(".1..", &[Err(SyntaxError::InvalidNumber(0..4))]);
+        assert_value_parses_to_tokens_wrapped("..10", &[Err(SyntaxError::InvalidNumber(0..4))]);
     }
 
     #[test]
@@ -774,17 +773,21 @@ mod tests {
 
     #[test]
     fn parsing_single_illegal_character_returns_error() {
-        assert_values_parse_to_tokens_wrapped(
-            &[" %", "😊", "\n", "$"],
-            &[Err(SyntaxError::IllegalCharacter)],
-        );
+        assert_value_parses_to_tokens_wrapped(" %", &[Err(SyntaxError::IllegalCharacter(1))]);
+        for value in &["😊", "\n", "$"] {
+            assert_value_parses_to_tokens_wrapped(value, &[Err(SyntaxError::IllegalCharacter(0))]);
+        }
     }
 
     #[test]
     fn parsing_unterminated_string_literal_returns_error() {
-        assert_values_parse_to_tokens_wrapped(
-            &["\"", " \"blarg"],
-            &[Err(SyntaxError::UnterminatedStringLiteral)],
+        assert_value_parses_to_tokens_wrapped(
+            "\"",
+            &[Err(SyntaxError::UnterminatedStringLiteral(0))],
+        );
+        assert_value_parses_to_tokens_wrapped(
+            " \"blarg",
+            &[Err(SyntaxError::UnterminatedStringLiteral(1))],
         );
     }
 
