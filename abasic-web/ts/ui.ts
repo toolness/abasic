@@ -11,7 +11,7 @@ let latestPartialLine: Node[] = [];
 /**
  * These should all be defined in the CSS.
  */
-type SpanClassName = "error" | "warning" | "info";
+type SpanClassName = "error" | "error-context" | "warning" | "info";
 
 export function printSpanWithClass(msg: string, className: SpanClassName) {
   const span = document.createElement("span");

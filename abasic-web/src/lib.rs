@@ -100,8 +100,10 @@ impl JsInterpreter {
 
     pub fn start_evaluating(&mut self, line: String) {
         assert!(self.latest_error.is_none());
-        if let Err(err) = self.interpreter.start_evaluating(line) {
-            self.latest_error = Some(err.to_string());
+        if let Err(err) = self.interpreter.start_evaluating(&line) {
+            let mut lines = vec![err.to_string()];
+            lines.extend(err.get_line_with_pointer_caret(&self.interpreter, Some(line)));
+            self.latest_error = Some(lines.join("\n"));
         } else {
             self.maybe_replace_interpreter();
         }
