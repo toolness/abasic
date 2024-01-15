@@ -262,6 +262,7 @@ impl Interpreter {
 
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
+        self.program.set_and_goto_immediate_line(vec![]);
         let mut line_ref = line.as_ref();
 
         if self.maybe_process_command(line_ref.to_uppercase().as_str())? {
