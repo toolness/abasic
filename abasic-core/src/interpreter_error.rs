@@ -103,6 +103,15 @@ pub enum OutOfMemoryError {
     ArrayTooLarge,
 }
 
+impl Display for OutOfMemoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutOfMemoryError::StackOverflow => write!(f, "STACK OVERFLOW"),
+            OutOfMemoryError::ArrayTooLarge => write!(f, "ARRAY TOO LARGE"),
+        }
+    }
+}
+
 impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
         TracedInterpreterError {
@@ -154,7 +163,7 @@ impl Display for TracedInterpreterError {
                 write!(f, "UNDEF'D STATEMENT ERROR")?;
             }
             InterpreterError::OutOfMemory(err) => {
-                write!(f, "OUT OF MEMORY ERROR ({:?})", err)?;
+                write!(f, "OUT OF MEMORY ERROR ({err})")?;
             }
             InterpreterError::ReturnWithoutGosub => {
                 write!(f, "RETURN WITHOUT GOSUB ERROR")?;

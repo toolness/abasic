@@ -22,6 +22,16 @@ impl TokenizationError {
     }
 }
 
+impl Display for TokenizationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenizationError::IllegalCharacter(_) => write!(f, "ILLEGAL CHARACTER"),
+            TokenizationError::UnterminatedStringLiteral(_) => write!(f, "UNTERMINATED STRING"),
+            TokenizationError::InvalidNumber(_) => write!(f, "INVALID NUMBER"),
+        }
+    }
+}
+
 impl From<TokenizationError> for SyntaxError {
     fn from(value: TokenizationError) -> Self {
         SyntaxError::Tokenization(value)
@@ -40,6 +50,12 @@ impl Error for SyntaxError {}
 
 impl Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SYNTAX ERROR ({:?})", self)
+        write!(f, "SYNTAX ERROR (")?;
+        match self {
+            SyntaxError::Tokenization(t) => write!(f, "{t})"),
+            SyntaxError::UnexpectedToken => write!(f, "UNEXPECTED TOKEN)"),
+            SyntaxError::ExpectedToken(tok) => write!(f, "EXPECTED TOKEN '{tok}')"),
+            SyntaxError::UnexpectedEndOfInput => write!(f, "UNEXPECTED END OF INPUT)"),
+        }
     }
 }
