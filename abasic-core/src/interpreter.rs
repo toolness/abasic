@@ -118,6 +118,7 @@ impl Interpreter {
         }
         if !self.program.has_next_token() {
             if !self.program.next_line() {
+                self.program.set_and_goto_immediate_line(vec![]);
                 self.return_to_idle_state();
             }
         }
@@ -210,7 +211,6 @@ impl Interpreter {
     }
 
     fn return_to_idle_state(&mut self) {
-        self.program.set_and_goto_immediate_line(vec![]);
         self.string_manager.gc();
         self.state = InterpreterState::Idle;
     }
