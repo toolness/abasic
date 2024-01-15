@@ -1,7 +1,7 @@
-import { default as wasm, init_and_set_rnd_seed, JsInterpreter, JsInterpreterState, JsInterpreterOutputType, } from "../pkg/abasic_web.js";
+import { default as wasm, JsInterpreter, JsInterpreterState, JsInterpreterOutputType, } from "../pkg/abasic_web.js";
 import * as ui from "./ui.js";
 import { unreachable } from "./util.js";
-const VERSION = "0.2.1";
+const VERSION = "0.3.0";
 class Interpreter {
     constructor(impl) {
         this.impl = impl;
@@ -35,7 +35,10 @@ class Interpreter {
                     if (err === undefined) {
                         throw new Error("Assertion failure, take_latest_error() returned undefined!");
                     }
-                    ui.printSpanWithClass(`${err}\n`, "error");
+                    err.split("\n").map((line, i) => {
+                        const className = i == 0 ? "error" : "error-context";
+                        ui.printSpanWithClass(`${line}\n`, className);
+                    });
                     this.handleCurrentState();
                     break;
                 case JsInterpreterState.Running:
@@ -46,6 +49,7 @@ class Interpreter {
                     unreachable(state);
             }
         };
+        this.impl.randomize(BigInt(Date.now()));
     }
     loadAndRunSourceCode(sourceCode) {
         this.isFullyInteractive = false;
@@ -145,7 +149,6 @@ function normalizeProgramPath(path) {
     return path;
 }
 wasm().then(async (module) => {
-    init_and_set_rnd_seed(BigInt(Date.now()));
     const interpreter = new Interpreter(JsInterpreter.new());
     const searchParams = new URLSearchParams(window.location.search);
     const programPath = normalizeProgramPath(searchParams.get("p"));

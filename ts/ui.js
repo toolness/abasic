@@ -5,6 +5,9 @@ const promptEl = getHTMLElement("label", "#prompt");
 const inputEl = getHTMLElement("input", "#input");
 const formEl = getHTMLElement("form", "#form");
 let latestPartialLine = [];
+let temporaryInputHistoryIndex = 0;
+let temporaryInputHistory = [""];
+let committedInputHistory = [];
 export function printSpanWithClass(msg, className) {
     const span = document.createElement("span");
     span.className = className;
@@ -65,14 +68,34 @@ export function commitCurrentPromptToOutput(additionalText = "") {
     outputEl.appendChild(el);
     scroll_output();
 }
+const ARROW_UP = "ArrowUp";
+const ARROW_DOWN = "ArrowDown";
 export function onInputKeyDown(callback) {
     inputEl.addEventListener("keydown", (e) => {
+        if (e.key === ARROW_UP || e.key === ARROW_DOWN) {
+            e.preventDefault();
+            let delta = e.key === ARROW_UP ? -1 : 1;
+            temporaryInputHistory[temporaryInputHistoryIndex] = inputEl.value;
+            let newIndex = temporaryInputHistoryIndex + delta;
+            if (newIndex >= 0 && newIndex < temporaryInputHistory.length) {
+                temporaryInputHistoryIndex = newIndex;
+                inputEl.value = temporaryInputHistory[temporaryInputHistoryIndex];
+                let selectionEnd = inputEl.value.length;
+                inputEl.setSelectionRange(selectionEnd, selectionEnd);
+            }
+            return;
+        }
         callback(e, inputEl);
     });
 }
 export function onSubmitInput(callback) {
     formEl.addEventListener("submit", (e) => {
         e.preventDefault();
+        if (inputEl.value !== "") {
+            committedInputHistory.push(inputEl.value);
+            temporaryInputHistory = [...committedInputHistory, ""];
+            temporaryInputHistoryIndex = temporaryInputHistory.length - 1;
+        }
         callback();
     });
 }

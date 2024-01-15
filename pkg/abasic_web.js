@@ -55,12 +55,6 @@ function getInt32Memory0() {
     }
     return cachedInt32Memory0;
 }
-/**
-* @param {bigint} seed
-*/
-export function init_and_set_rnd_seed(seed) {
-    wasm.init_and_set_rnd_seed(seed);
-}
 
 let WASM_VECTOR_LEN = 0;
 
@@ -171,6 +165,12 @@ export class JsInterpreter {
     static new() {
         const ret = wasm.jsinterpreter_new();
         return JsInterpreter.__wrap(ret);
+    }
+    /**
+    * @param {bigint} seed
+    */
+    randomize(seed) {
+        wasm.jsinterpreter_randomize(this.__wbg_ptr, seed);
     }
     /**
     * @param {string} input
@@ -335,12 +335,12 @@ async function __wbg_load(module, imports) {
 function __wbg_get_imports() {
     const imports = {};
     imports.wbg = {};
+    imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
+        takeObject(arg0);
+    };
     imports.wbg.__wbg_jsinterpreteroutput_new = function(arg0) {
         const ret = JsInterpreterOutput.__wrap(arg0);
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
-        takeObject(arg0);
     };
     imports.wbg.__wbg_new_abda76e883ba8a5f = function() {
         const ret = new Error();
