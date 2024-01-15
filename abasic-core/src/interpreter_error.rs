@@ -7,6 +7,7 @@ use std::{
 use crate::{
     program::{ProgramLine, ProgramLocation},
     syntax_error::{SyntaxError, TokenizationError},
+    Interpreter,
 };
 
 #[derive(Debug)]
@@ -23,6 +24,41 @@ impl TracedInterpreterError {
             location: Some(location),
             backtrace: Backtrace::capture(),
         }
+    }
+
+    /// Attempts to find the line that this error is pointing at, and, if found, returns
+    /// it along with a second line containing one or more carets that, when printed
+    /// below the line in a monospaced font, "points" at the part of the line that
+    /// caused the error.
+    ///
+    /// Note that `line` is the most recent line passed to the interpreter, if any.
+    /// This is used to retrieve information about tokenization errors, which aren't
+    /// owned by the interpreter.
+    pub fn get_line_with_pointer_caret(
+        &self,
+        interpreter: &Interpreter,
+        line: Option<&str>,
+    ) -> Vec<String> {
+        if let Some(location) = self.location {
+            let lines = interpreter.program.get_line_with_pointer_caret(location);
+            if !lines.is_empty() {
+                return lines;
+            }
+        }
+        if let Some(line) = line {
+            if let InterpreterError::Syntax(SyntaxError::Tokenization(tok)) = &self.error {
+                let range = tok.string_range(line);
+                return vec![
+                    line.to_owned(),
+                    format!(
+                        "{}{}",
+                        " ".repeat(range.start),
+                        "^".repeat(range.end - range.start)
+                    ),
+                ];
+            }
+        }
+        vec![]
     }
 }
 

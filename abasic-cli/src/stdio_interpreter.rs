@@ -5,8 +5,7 @@ use std::sync::mpsc::channel;
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
 use abasic_core::{
-    parse_line_number, Interpreter, InterpreterError, InterpreterOutput, InterpreterState,
-    SyntaxError, TracedInterpreterError,
+    parse_line_number, Interpreter, InterpreterOutput, InterpreterState, TracedInterpreterError,
 };
 use colored::*;
 use ctrlc;
@@ -104,34 +103,17 @@ impl StdioInterpreter {
                 warn("Line contains no statements and will not be defined.");
             }
             if let Err(err) = self.interpreter.start_evaluating(line) {
-                self.show_error(err, Some(line.to_string()));
+                self.show_error(err, Some(line));
                 return Err(1);
             }
         }
         Ok(())
     }
 
-    fn show_error(&mut self, err: TracedInterpreterError, line: Option<String>) {
+    fn show_error(&mut self, err: TracedInterpreterError, line: Option<&str>) {
         self.printer.eprintln(err.to_string().red());
-        if let Some(location) = err.location {
-            let lines = self.interpreter.get_line_with_pointer_caret(location);
-            for line in lines {
-                self.printer.eprintln(format!("| {line}").dimmed());
-            }
-        }
-        if let Some(line) = line {
-            if let InterpreterError::Syntax(SyntaxError::Tokenization(tok)) = err.error {
-                let range = tok.string_range(line.as_str());
-                self.printer.eprintln(format!("| {line}").dimmed());
-                self.printer.eprintln(
-                    format!(
-                        "| {}{}",
-                        " ".repeat(range.start),
-                        "^".repeat(range.end - range.start)
-                    )
-                    .dimmed(),
-                );
-            }
+        for line in err.get_line_with_pointer_caret(&self.interpreter, line) {
+            self.printer.eprintln(format!("| {line}").dimmed());
         }
     }
 
@@ -249,7 +231,7 @@ impl StdioInterpreter {
             self.show_interpreter_output();
 
             if let Err(err) = result {
-                self.show_error(err, last_line);
+                self.show_error(err, last_line.as_ref().map(|s| s.as_str()));
                 if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);

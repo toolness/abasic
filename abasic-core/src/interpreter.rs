@@ -297,8 +297,4 @@ impl Interpreter {
     pub fn randomize(&mut self, seed: u64) {
         self.rng = Rng::new(seed);
     }
-
-    pub fn get_line_with_pointer_caret(&self, location: ProgramLocation) -> Vec<String> {
-        self.program.get_line_with_pointer_caret(location)
-    }
 }
