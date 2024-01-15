@@ -534,7 +534,7 @@ impl Program {
     pub fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {
         match self.next_token() {
             Some(token) => Ok(token),
-            None => Err(SyntaxError::UnexpectedEndOfInput.into()),
+            None => Err(self.error_at_current_location(SyntaxError::UnexpectedEndOfInput.into())),
         }
     }
 
@@ -588,5 +588,14 @@ impl Program {
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
         self.location.token_index = self.tokens().len();
+    }
+
+    /// Explicitly creates a TracedInterpreterError homed at our current
+    /// program location. Normally, this is detected automatically once
+    /// an error without location information has been caught, but at
+    /// that detection can be fallible, so setting it explicitly is
+    /// ideal.
+    fn error_at_current_location(&self, err: InterpreterError) -> TracedInterpreterError {
+        TracedInterpreterError::with_location(err, self.location)
     }
 }

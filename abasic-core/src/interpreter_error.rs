@@ -16,6 +16,16 @@ pub struct TracedInterpreterError {
     backtrace: Backtrace,
 }
 
+impl TracedInterpreterError {
+    pub fn with_location(error: InterpreterError, location: ProgramLocation) -> Self {
+        TracedInterpreterError {
+            error,
+            location: Some(location),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum InterpreterError {
     Syntax(SyntaxError),
