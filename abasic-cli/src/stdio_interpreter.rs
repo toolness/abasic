@@ -110,7 +110,7 @@ impl StdioInterpreter {
         Ok(())
     }
 
-    fn show_error(&mut self, err: TracedInterpreterError, line: Option<&str>) {
+    fn show_error<T: AsRef<str>>(&mut self, err: TracedInterpreterError, line: Option<T>) {
         self.printer.eprintln(err.to_string().red());
         for line in err.get_line_with_pointer_caret(&self.interpreter, line) {
             self.printer.eprintln(format!("| {line}").dimmed());
@@ -231,7 +231,7 @@ impl StdioInterpreter {
             self.show_interpreter_output();
 
             if let Err(err) = result {
-                self.show_error(err, last_line.as_ref().map(|s| s.as_str()));
+                self.show_error(err, last_line);
                 if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);

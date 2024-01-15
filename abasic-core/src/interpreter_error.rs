@@ -34,10 +34,10 @@ impl TracedInterpreterError {
     /// Note that `line` is the most recent line passed to the interpreter, if any.
     /// This is used to retrieve information about tokenization errors, which aren't
     /// owned by the interpreter.
-    pub fn get_line_with_pointer_caret(
+    pub fn get_line_with_pointer_caret<T: AsRef<str>>(
         &self,
         interpreter: &Interpreter,
-        line: Option<&str>,
+        line: Option<T>,
     ) -> Vec<String> {
         if let Some(location) = self.location {
             let lines = interpreter.program.get_line_with_pointer_caret(location);
@@ -47,9 +47,9 @@ impl TracedInterpreterError {
         }
         if let Some(line) = line {
             if let InterpreterError::Syntax(SyntaxError::Tokenization(tok)) = &self.error {
-                let range = tok.string_range(line);
+                let range = tok.string_range(line.as_ref());
                 return vec![
-                    line.to_owned(),
+                    line.as_ref().to_owned(),
                     format!(
                         "{}{}",
                         " ".repeat(range.start),
