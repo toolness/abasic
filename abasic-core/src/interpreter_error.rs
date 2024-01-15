@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     program::{ProgramLine, ProgramLocation},
-    syntax_error::SyntaxError,
+    syntax_error::{SyntaxError, TokenizationError},
 };
 
 #[derive(Debug)]
@@ -47,6 +47,12 @@ pub enum InterpreterError {
     RedimensionedArray,
     CannotContinue,
     IllegalDirect,
+}
+
+impl From<TokenizationError> for TracedInterpreterError {
+    fn from(value: TokenizationError) -> Self {
+        SyntaxError::Tokenization(value).into()
+    }
 }
 
 impl From<SyntaxError> for InterpreterError {

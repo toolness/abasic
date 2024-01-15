@@ -5,7 +5,7 @@ use crate::{
     line_cruncher::LineCruncher,
     string_manager::StringManager,
     symbol::Symbol,
-    syntax_error::SyntaxError,
+    syntax_error::TokenizationError,
 };
 
 type TokenWithRange = (Token, Range<usize>);
@@ -147,7 +147,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
     }
 
-    fn chomp_one_or_two_characters(&mut self) -> Option<Result<Token, SyntaxError>> {
+    fn chomp_one_or_two_characters(&mut self) -> Option<Result<Token, TokenizationError>> {
         if let Some((byte, pos)) = self.crunch_remaining_bytes().next() {
             let token: Token = match byte {
                 b':' => Token::Colon,
@@ -193,7 +193,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         None
     }
 
-    fn chomp_symbol(&mut self) -> Option<Result<Token, SyntaxError>> {
+    fn chomp_symbol(&mut self) -> Option<Result<Token, TokenizationError>> {
         let mut chars: Vec<u8> = vec![];
 
         loop {
@@ -246,7 +246,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
     }
 
-    fn chomp_number(&mut self) -> Option<Result<Token, SyntaxError>> {
+    fn chomp_number(&mut self) -> Option<Result<Token, TokenizationError>> {
         let mut digits = String::new();
         let mut latest_pos: Option<usize> = None;
 
@@ -269,7 +269,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
                 self.index += pos;
                 Some(Ok(Token::NumericLiteral(number)))
             } else {
-                Some(Err(SyntaxError::InvalidNumber(
+                Some(Err(TokenizationError::InvalidNumber(
                     self.index..self.index + pos,
                 )))
             }
@@ -278,7 +278,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
     }
 
-    fn chomp_string(&mut self) -> Option<Result<Token, SyntaxError>> {
+    fn chomp_string(&mut self) -> Option<Result<Token, TokenizationError>> {
         // Can't use self.remaining_bytes() b/c we want to mutably borrow other
         // parts of our struct.
         let remaining_bytes = &self.string.as_ref().as_bytes()[self.index..];
@@ -314,14 +314,16 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
                 self.index += 1 + end_quote_index + 1;
                 Some(Ok(Token::StringLiteral(string)))
             } else {
-                Some(Err(SyntaxError::UnterminatedStringLiteral(self.index)))
+                Some(Err(TokenizationError::UnterminatedStringLiteral(
+                    self.index,
+                )))
             }
         } else {
             None
         }
     }
 
-    fn chomp_remark(&mut self) -> Option<Result<Token, SyntaxError>> {
+    fn chomp_remark(&mut self) -> Option<Result<Token, TokenizationError>> {
         if self.chomp_keyword("REM") {
             let bytes = self.remaining_bytes();
 
@@ -428,7 +430,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         false
     }
 
-    fn chomp_next_token(&mut self) -> Result<TokenWithRange, SyntaxError> {
+    fn chomp_next_token(&mut self) -> Result<TokenWithRange, TokenizationError> {
         let token_start_index = self.index;
         let result = if let Some(token) = self.chomp_any_keyword() {
             Ok(token)
@@ -445,7 +447,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         } else if let Some(result) = self.chomp_symbol() {
             result
         } else {
-            Err(SyntaxError::IllegalCharacter(self.index))
+            Err(TokenizationError::IllegalCharacter(self.index))
         };
         match result {
             Ok(token) => Ok((token, token_start_index..self.index)),
@@ -453,7 +455,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
     }
 
-    pub fn remaining_tokens(mut self) -> Result<Vec<Token>, SyntaxError> {
+    pub fn remaining_tokens(mut self) -> Result<Vec<Token>, TokenizationError> {
         let mut tokens: Vec<Token> = vec![];
         for token in &mut self {
             tokens.push(token?.0);
@@ -463,7 +465,7 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
 }
 
 impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {
-    type Item = Result<TokenWithRange, SyntaxError>;
+    type Item = Result<TokenWithRange, TokenizationError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.errored {
@@ -490,7 +492,7 @@ impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {
 mod tests {
     use std::{ops::Range, rc::Rc};
 
-    use crate::{string_manager::StringManager, syntax_error::SyntaxError};
+    use crate::{string_manager::StringManager, syntax_error::TokenizationError};
 
     use super::{Token, TokenWithRange, Tokenizer};
 
@@ -506,7 +508,7 @@ mod tests {
         Token::Remark(Rc::new(String::from(value)))
     }
 
-    fn get_tokens_wrapped(value: &str) -> Vec<Result<TokenWithRange, SyntaxError>> {
+    fn get_tokens_wrapped(value: &str) -> Vec<Result<TokenWithRange, TokenizationError>> {
         let mut manager = StringManager::default();
         let tokenizer = Tokenizer::new(value, &mut manager);
         tokenizer.into_iter().collect::<Vec<_>>()
@@ -570,7 +572,7 @@ mod tests {
 
     fn assert_value_parses_to_tokens_wrapped(
         value: &str,
-        tokens: &[Result<TokenWithRange, SyntaxError>],
+        tokens: &[Result<TokenWithRange, TokenizationError>],
     ) {
         assert_eq!(
             get_tokens_wrapped(value),
@@ -635,9 +637,18 @@ mod tests {
 
     #[test]
     fn parsing_invalid_decimal_number_returns_error() {
-        assert_value_parses_to_tokens_wrapped(".1.", &[Err(SyntaxError::InvalidNumber(0..3))]);
-        assert_value_parses_to_tokens_wrapped(".1..", &[Err(SyntaxError::InvalidNumber(0..4))]);
-        assert_value_parses_to_tokens_wrapped("..10", &[Err(SyntaxError::InvalidNumber(0..4))]);
+        assert_value_parses_to_tokens_wrapped(
+            ".1.",
+            &[Err(TokenizationError::InvalidNumber(0..3))],
+        );
+        assert_value_parses_to_tokens_wrapped(
+            ".1..",
+            &[Err(TokenizationError::InvalidNumber(0..4))],
+        );
+        assert_value_parses_to_tokens_wrapped(
+            "..10",
+            &[Err(TokenizationError::InvalidNumber(0..4))],
+        );
     }
 
     #[test]
@@ -773,9 +784,12 @@ mod tests {
 
     #[test]
     fn parsing_single_illegal_character_returns_error() {
-        assert_value_parses_to_tokens_wrapped(" %", &[Err(SyntaxError::IllegalCharacter(1))]);
+        assert_value_parses_to_tokens_wrapped(" %", &[Err(TokenizationError::IllegalCharacter(1))]);
         for value in &["😊", "\n", "$"] {
-            assert_value_parses_to_tokens_wrapped(value, &[Err(SyntaxError::IllegalCharacter(0))]);
+            assert_value_parses_to_tokens_wrapped(
+                value,
+                &[Err(TokenizationError::IllegalCharacter(0))],
+            );
         }
     }
 
@@ -783,11 +797,11 @@ mod tests {
     fn parsing_unterminated_string_literal_returns_error() {
         assert_value_parses_to_tokens_wrapped(
             "\"",
-            &[Err(SyntaxError::UnterminatedStringLiteral(0))],
+            &[Err(TokenizationError::UnterminatedStringLiteral(0))],
         );
         assert_value_parses_to_tokens_wrapped(
             " \"blarg",
-            &[Err(SyntaxError::UnterminatedStringLiteral(1))],
+            &[Err(TokenizationError::UnterminatedStringLiteral(1))],
         );
     }
 

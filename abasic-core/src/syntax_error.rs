@@ -3,27 +3,37 @@ use std::{error::Error, fmt::Display, ops::Range};
 use crate::tokenizer::Token;
 
 #[derive(Debug, PartialEq)]
-pub enum SyntaxError {
+pub enum TokenizationError {
     /// The argument is the string index of the illegal character.
     IllegalCharacter(usize),
     /// The argument is the string index of the string's opening quote.
     UnterminatedStringLiteral(usize),
     /// The argument is the span (as string indices) that represents an invalid number.
     InvalidNumber(Range<usize>),
+}
+
+impl TokenizationError {
+    pub fn string_range(&self, string: &str) -> Range<usize> {
+        match &self {
+            TokenizationError::IllegalCharacter(i) => *i..*i + 1,
+            TokenizationError::UnterminatedStringLiteral(i) => *i..string.len(),
+            TokenizationError::InvalidNumber(range) => range.clone(),
+        }
+    }
+}
+
+impl From<TokenizationError> for SyntaxError {
+    fn from(value: TokenizationError) -> Self {
+        SyntaxError::Tokenization(value)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SyntaxError {
+    Tokenization(TokenizationError),
     UnexpectedToken,
     ExpectedToken(Token),
     UnexpectedEndOfInput,
-}
-
-impl SyntaxError {
-    pub fn string_range(&self, string: &str) -> Option<Range<usize>> {
-        match &self {
-            SyntaxError::IllegalCharacter(i) => Some(*i..*i + 1),
-            SyntaxError::UnterminatedStringLiteral(i) => Some(*i..string.len()),
-            SyntaxError::InvalidNumber(range) => Some(range.clone()),
-            _ => None,
-        }
-    }
 }
 
 impl Error for SyntaxError {}
