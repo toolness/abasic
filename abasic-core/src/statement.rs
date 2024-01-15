@@ -170,7 +170,7 @@ impl<'a> StatementEvaluator<'a> {
             let Some(element) = self.program().next_data_element() else {
                 return Err(InterpreterError::OutOfData.into());
             };
-            let value = Value::coerce_from_data_element(lvalue.symbol_name.as_str(), &element)?;
+            let value = Value::coerce_from_data_element(&lvalue.symbol_name, &element)?;
             self.assign_value(lvalue, value)?;
             if !self.program().accept_next_token(Token::Comma) {
                 break;
@@ -186,7 +186,7 @@ impl<'a> StatementEvaluator<'a> {
             // We're guaranteed to have at least one item in here, even if the input was an empty string.
             let first_element = &data[0];
             let has_excess_data = data.len() > 1 || has_leftover_input;
-            match Value::coerce_from_data_element(lvalue.symbol_name.as_str(), first_element) {
+            match Value::coerce_from_data_element(&lvalue.symbol_name, first_element) {
                 Ok(value) => {
                     self.assign_value(lvalue, value)?;
                     if has_excess_data {
