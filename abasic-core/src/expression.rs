@@ -1,5 +1,4 @@
 use crate::{
-    builtins,
     operators::{
         evaluate_exponent, evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp,
         MultiplyOrDivideOp, UnaryOp,
@@ -47,19 +46,19 @@ impl<'a> ExpressionEvaluator<'a> {
         &mut self.interpreter.program
     }
 
-    fn evaluate_unary_function_arg(&mut self) -> Result<Value, TracedInterpreterError> {
+    fn evaluate_unary_number_function_arg(&mut self) -> Result<f64, TracedInterpreterError> {
         self.program().expect_next_token(Token::LeftParen)?;
-        let arg = self.evaluate_expression()?;
+        let arg: f64 = self.evaluate_expression()?.try_into()?;
         self.program().expect_next_token(Token::RightParen)?;
         Ok(arg)
     }
 
-    fn evaluate_unary_function<F: Fn(Value) -> Result<Value, TracedInterpreterError>>(
+    fn evaluate_unary_number_function<F: Fn(f64) -> f64>(
         &mut self,
         f: F,
     ) -> Result<Value, TracedInterpreterError> {
-        let arg = self.evaluate_unary_function_arg()?;
-        f(arg)
+        let arg = self.evaluate_unary_number_function_arg()?;
+        Ok(f(arg).into())
     }
 
     fn evaluate_user_defined_function_call(
@@ -102,11 +101,11 @@ impl<'a> ExpressionEvaluator<'a> {
         function_name: &Symbol,
     ) -> Result<Option<Value>, TracedInterpreterError> {
         let result = match function_name.as_str() {
-            "ABS" => self.evaluate_unary_function(builtins::abs),
-            "INT" => self.evaluate_unary_function(builtins::int),
+            "ABS" => self.evaluate_unary_number_function(|num| num.abs()),
+            "INT" => self.evaluate_unary_number_function(|num| num.floor()),
             "RND" => {
-                let number = self.evaluate_unary_function_arg()?;
-                Ok(self.interpreter.rng.rnd(number.try_into()?)?.into())
+                let number = self.evaluate_unary_number_function_arg()?;
+                Ok(self.interpreter.rng.rnd(number)?.into())
             }
             _ => {
                 return self.evaluate_user_defined_function_call(function_name);
