@@ -4,7 +4,9 @@ use std::sync::mpsc::channel;
 
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
-use abasic_core::{parse_line_number, Interpreter, InterpreterOutput, InterpreterState};
+use abasic_core::{
+    parse_line_number, Interpreter, InterpreterOutput, InterpreterState, TracedInterpreterError,
+};
 use colored::*;
 use ctrlc;
 use rustyline::{error::ReadlineError, DefaultEditor};
@@ -101,11 +103,15 @@ impl StdioInterpreter {
                 warn("Line contains no statements and will not be defined.");
             }
             if let Err(err) = self.interpreter.start_evaluating(line) {
-                self.printer.eprintln(err.to_string().red());
+                self.show_error(err);
                 return Err(1);
             }
         }
         Ok(())
+    }
+
+    fn show_error(&mut self, err: TracedInterpreterError) {
+        self.printer.eprintln(err.to_string().red());
     }
 
     pub fn run(&mut self) -> i32 {
@@ -219,7 +225,7 @@ impl StdioInterpreter {
             self.show_interpreter_output();
 
             if let Err(err) = result {
-                self.printer.eprintln(err.to_string().red());
+                self.show_error(err);
                 if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);
