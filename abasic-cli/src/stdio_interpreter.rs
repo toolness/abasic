@@ -5,7 +5,8 @@ use std::sync::mpsc::channel;
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
 use abasic_core::{
-    parse_line_number, Interpreter, InterpreterOutput, InterpreterState, TracedInterpreterError,
+    parse_line_number, Interpreter, InterpreterError, InterpreterOutput, InterpreterState,
+    SyntaxError, TracedInterpreterError,
 };
 use colored::*;
 use ctrlc;
@@ -103,19 +104,33 @@ impl StdioInterpreter {
                 warn("Line contains no statements and will not be defined.");
             }
             if let Err(err) = self.interpreter.start_evaluating(line) {
-                self.show_error(err);
+                self.show_error(err, Some(line.to_string()));
                 return Err(1);
             }
         }
         Ok(())
     }
 
-    fn show_error(&mut self, err: TracedInterpreterError) {
+    fn show_error(&mut self, err: TracedInterpreterError, line: Option<String>) {
         self.printer.eprintln(err.to_string().red());
         if let Some(location) = err.location {
             let lines = self.interpreter.get_line_with_pointer_caret(location);
             for line in lines {
                 self.printer.eprintln(format!("| {line}").dimmed());
+            }
+        }
+        if let Some(line) = line {
+            if let InterpreterError::Syntax(SyntaxError::Tokenization(tok)) = err.error {
+                let range = tok.string_range(line.as_str());
+                self.printer.eprintln(format!("| {line}").dimmed());
+                self.printer.eprintln(
+                    format!(
+                        "| {}{}",
+                        " ".repeat(range.start),
+                        "^".repeat(range.end - range.start)
+                    )
+                    .dimmed(),
+                );
             }
         }
     }
@@ -166,6 +181,7 @@ impl StdioInterpreter {
         }
 
         loop {
+            let mut last_line: Option<String> = None;
             let result = match self.interpreter.get_state() {
                 InterpreterState::Idle => {
                     self.printer.print_buffered_output();
@@ -184,7 +200,9 @@ impl StdioInterpreter {
                                     eprintln!("WARNING: Failed to add history entry (${:?}).", err);
                                 }
                             }
-                            self.interpreter.start_evaluating(line)
+                            let result = self.interpreter.start_evaluating(&line);
+                            last_line = Some(line);
+                            result
                         }
                         Err(ReadlineError::Interrupted) => {
                             self.printer.eprintln("CTRL-C pressed, exiting.");
@@ -231,7 +249,7 @@ impl StdioInterpreter {
             self.show_interpreter_output();
 
             if let Err(err) = result {
-                self.show_error(err);
+                self.show_error(err, last_line);
                 if !(self.args.is_interactive() && stdin().is_terminal()) {
                     // If we're not interactive, treat errors as fatal.
                     return Err(1);

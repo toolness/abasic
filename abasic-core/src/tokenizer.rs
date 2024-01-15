@@ -462,6 +462,11 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
         Ok(tokens)
     }
+
+    pub fn skip_bytes(mut self, bytes: usize) -> Self {
+        self.index += bytes;
+        self
+    }
 }
 
 impl<'a, T: AsRef<str>> Iterator for Tokenizer<'a, T> {

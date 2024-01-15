@@ -263,19 +263,21 @@ impl Interpreter {
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
         self.program.set_and_goto_immediate_line(vec![]);
-        let mut line_ref = line.as_ref();
 
-        if self.maybe_process_command(line_ref.to_uppercase().as_str())? {
+        if self.maybe_process_command(line.as_ref().to_uppercase().as_str())? {
             return Ok(());
         }
 
         let mut maybe_line_number: Option<u64> = None;
-        if let Some((line_number, end_index)) = parse_line_number(line_ref) {
+        let mut skip_bytes = 0;
+        if let Some((line_number, end_index)) = parse_line_number(line.as_ref()) {
             maybe_line_number = Some(line_number);
-            line_ref = &line_ref[end_index..];
+            skip_bytes = end_index;
         }
 
-        let tokens = Tokenizer::new(line_ref, &mut self.string_manager).remaining_tokens()?;
+        let tokens = Tokenizer::new(line, &mut self.string_manager)
+            .skip_bytes(skip_bytes)
+            .remaining_tokens()?;
 
         if let Some(line_number) = maybe_line_number {
             let had_existing_line = self.program.has_line_number(line_number);
