@@ -84,6 +84,12 @@ body, label, input {
 }
 
 .error-context {
+  /**
+   * We might be showing carets pointing at lines above them,
+   * word-wrapping would make them illegible.
+   */
+  white-space: pre;
+
   color: lightgray;
 }
 
