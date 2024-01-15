@@ -13,6 +13,10 @@ let latestPartialLine: Node[] = [];
  */
 type SpanClassName = "error" | "error-context" | "warning" | "info";
 
+let temporaryInputHistoryIndex = 0;
+let temporaryInputHistory = [""];
+let committedInputHistory: string[] = [];
+
 export function printSpanWithClass(msg: string, className: SpanClassName) {
   const span = document.createElement("span");
   span.className = className;
@@ -80,10 +84,26 @@ export function commitCurrentPromptToOutput(additionalText = "") {
   scroll_output();
 }
 
+const ARROW_UP = "ArrowUp";
+const ARROW_DOWN = "ArrowDown";
+
 export function onInputKeyDown(
   callback: (e: KeyboardEvent, el: HTMLInputElement) => void
 ) {
   inputEl.addEventListener("keydown", (e) => {
+    if (e.key === ARROW_UP || e.key === ARROW_DOWN) {
+      e.preventDefault();
+      let delta = e.key === ARROW_UP ? -1 : 1;
+      temporaryInputHistory[temporaryInputHistoryIndex] = inputEl.value;
+      let newIndex = temporaryInputHistoryIndex + delta;
+      if (newIndex >= 0 && newIndex < temporaryInputHistory.length) {
+        temporaryInputHistoryIndex = newIndex;
+        inputEl.value = temporaryInputHistory[temporaryInputHistoryIndex];
+        let selectionEnd = inputEl.value.length;
+        inputEl.setSelectionRange(selectionEnd, selectionEnd);
+      }
+      return;
+    }
     callback(e, inputEl);
   });
 }
@@ -91,7 +111,11 @@ export function onInputKeyDown(
 export function onSubmitInput(callback: () => void) {
   formEl.addEventListener("submit", (e) => {
     e.preventDefault();
-
+    if (inputEl.value !== "") {
+      committedInputHistory.push(inputEl.value);
+      temporaryInputHistory = [...committedInputHistory, ""];
+      temporaryInputHistoryIndex = temporaryInputHistory.length - 1;
+    }
     callback();
   });
 }
