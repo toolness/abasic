@@ -1,5 +1,5 @@
 use crate::{
-    analyzer::ExpressionAnalyzer,
+    analyzer::StatementAnalyzer,
     arrays::Arrays,
     data::{parse_data_until_colon, DataElement},
     expression::ExpressionEvaluator,
@@ -130,7 +130,7 @@ impl Interpreter {
     pub fn todo_actually_use_expression_analyzer(&mut self) -> Result<(), TracedInterpreterError> {
         // This won't actually do anything useful, I'm just using it to avoid
         // dead code warnings.
-        ExpressionAnalyzer::new(&mut self.program).evaluate_expression()?;
+        StatementAnalyzer::new(&mut self.program).evaluate_statement()?;
         todo!();
     }
 
