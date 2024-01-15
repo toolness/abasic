@@ -182,12 +182,11 @@ impl Interpreter {
         result: Result<T, TracedInterpreterError>,
     ) -> Result<T, TracedInterpreterError> {
         if let Err(mut err) = result {
-            let line_number = match err.error {
-                InterpreterError::DataTypeMismatch => self.program.get_data_line_number(),
-                _ => self.program.get_line_number(),
-            };
-            if let Some(line_number) = line_number {
-                err.set_line_number(line_number);
+            if err.location.is_none() {
+                err.location = match err.error {
+                    InterpreterError::DataTypeMismatch => self.program.get_data_location(),
+                    _ => Some(self.program.get_location()),
+                };
             }
             self.return_to_idle_state();
             Err(err)

@@ -27,9 +27,15 @@ struct StackFrame {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-struct NumberedProgramLocation {
+pub struct NumberedProgramLocation {
     line: u64,
     token_index: usize,
+}
+
+impl NumberedProgramLocation {
+    pub fn new(line: u64, token_index: usize) -> Self {
+        NumberedProgramLocation { line, token_index }
+    }
 }
 
 impl TryFrom<ProgramLocation> for NumberedProgramLocation {
@@ -43,10 +49,10 @@ impl TryFrom<ProgramLocation> for NumberedProgramLocation {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
-struct ProgramLocation {
-    line: ProgramLine,
-    token_index: usize,
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
+pub struct ProgramLocation {
+    pub line: ProgramLine,
+    pub token_index: usize,
 }
 
 impl ProgramLocation {
@@ -383,10 +389,15 @@ impl Program {
         }
     }
 
-    pub fn get_data_line_number(&self) -> Option<u64> {
+    /// Returns the program location currently being evaluated.
+    pub fn get_location(&self) -> ProgramLocation {
+        self.location
+    }
+
+    pub fn get_data_location(&self) -> Option<ProgramLocation> {
         if let Some(data_iterator) = &self.data_iterator {
-            if let Some(ProgramLine::Line(line_number)) = data_iterator.current_location() {
-                Some(line_number)
+            if let Some(location) = data_iterator.current_location() {
+                Some(location)
             } else {
                 None
             }

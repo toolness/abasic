@@ -4,12 +4,15 @@ use std::{
     fmt::Display,
 };
 
-use crate::syntax_error::SyntaxError;
+use crate::{
+    program::{ProgramLine, ProgramLocation},
+    syntax_error::SyntaxError,
+};
 
 #[derive(Debug)]
 pub struct TracedInterpreterError {
     pub error: InterpreterError,
-    line_number: Option<u64>,
+    pub location: Option<ProgramLocation>,
     backtrace: Backtrace,
 }
 
@@ -48,17 +51,11 @@ pub enum OutOfMemoryError {
     ArrayTooLarge,
 }
 
-impl TracedInterpreterError {
-    pub fn set_line_number(&mut self, line_number: u64) {
-        self.line_number = Some(line_number);
-    }
-}
-
 impl From<SyntaxError> for TracedInterpreterError {
     fn from(value: SyntaxError) -> Self {
         TracedInterpreterError {
             error: value.into(),
-            line_number: None,
+            location: None,
             backtrace: Backtrace::capture(),
         }
     }
@@ -74,7 +71,7 @@ impl From<OutOfMemoryError> for TracedInterpreterError {
     fn from(value: OutOfMemoryError) -> Self {
         TracedInterpreterError {
             error: value.into(),
-            line_number: None,
+            location: None,
             backtrace: Backtrace::capture(),
         }
     }
@@ -84,7 +81,7 @@ impl From<InterpreterError> for TracedInterpreterError {
     fn from(value: InterpreterError) -> Self {
         TracedInterpreterError {
             error: value,
-            line_number: None,
+            location: None,
             backtrace: Backtrace::capture(),
         }
     }
@@ -141,7 +138,11 @@ impl Display for TracedInterpreterError {
                 write!(f, "ILLEGAL DIRECT ERROR")?;
             }
         }
-        if let Some(line) = self.line_number {
+        if let Some(ProgramLocation {
+            line: ProgramLine::Line(line),
+            ..
+        }) = self.location
+        {
             write!(f, " IN {}", line)?;
         }
         if self.backtrace.status() == BacktraceStatus::Captured {
