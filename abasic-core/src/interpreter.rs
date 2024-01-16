@@ -60,6 +60,14 @@ impl Interpreter {
         std::mem::take(&mut self.output)
     }
 
+    pub(crate) fn from_program(program: Program, string_manager: StringManager) -> Self {
+        Interpreter {
+            program,
+            string_manager,
+            ..Default::default()
+        }
+    }
+
     pub(crate) fn output(&mut self, output: InterpreterOutput) {
         self.output.push(output);
     }

@@ -15,6 +15,7 @@ pub struct SourceFileAnalyzer {
     lines: Vec<String>,
     program: Program,
     messages: Vec<DiagnosticMessage>,
+    string_manager: StringManager,
 }
 
 impl SourceFileAnalyzer {
@@ -40,7 +41,6 @@ impl SourceFileAnalyzer {
             .split('\n')
             .map(|s| s.to_owned())
             .collect::<Vec<_>>();
-        let mut string_manager = StringManager::default();
         for (i, line) in lines.iter().enumerate() {
             if line.is_empty() {
                 continue;
@@ -52,7 +52,7 @@ impl SourceFileAnalyzer {
             if self.program.has_line_number(basic_line_number) {
                 self.warn(i, "Redefinition of pre-existing BASIC line.");
             }
-            let tokenize_result = Tokenizer::new(line, &mut string_manager)
+            let tokenize_result = Tokenizer::new(line, &mut self.string_manager)
                 .skip_bytes(end)
                 .remaining_tokens();
             match tokenize_result {
@@ -86,9 +86,7 @@ impl SourceFileAnalyzer {
     }
 
     pub fn into_interpreter(mut self) -> Interpreter {
-        let mut interpreter = Interpreter::default();
         self.program.reset_runtime_state();
-        interpreter.program = self.program;
-        interpreter
+        Interpreter::from_program(self.program, self.string_manager)
     }
 }
