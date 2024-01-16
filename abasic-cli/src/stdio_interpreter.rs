@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use crate::cli_args::CliArgs;
 use crate::stdio_printer::StdioPrinter;
 use abasic_core::{
-    parse_line_number, Interpreter, InterpreterOutput, InterpreterState, TracedInterpreterError,
+    Interpreter, InterpreterOutput, InterpreterState, SourceFileAnalyzer, TracedInterpreterError,
 };
 use colored::*;
 use ctrlc;
@@ -77,37 +77,41 @@ impl StdioInterpreter {
             println!("ERROR READING FILE: {}", filename);
             return Err(1);
         };
-        let lines = code.split('\n');
-        for (i, line) in lines.enumerate() {
-            if line.is_empty() {
-                continue;
-            }
-            let file_line_number = i + 1;
-            let mut warn = |message: &str| {
-                self.printer.eprintln(
-                    format!(
-                        "Warning on line {} of '{}': {}",
-                        file_line_number, filename, message
-                    )
-                    .yellow(),
-                );
-            };
-            let Some((basic_line_number, end)) = parse_line_number(line) else {
-                warn("Line has no line number, ignoring it.");
-                continue;
-            };
-            if self.interpreter.has_line_number(basic_line_number) {
-                warn("Redefinition of pre-existing BASIC line.");
-            }
-            if line[end..].trim().is_empty() {
-                warn("Line contains no statements and will not be defined.");
-            }
-            if let Err(err) = self.interpreter.start_evaluating(line) {
-                self.show_error(err, Some(line));
-                return Err(1);
+        let mut analyzer = SourceFileAnalyzer::analyze(code);
+        let messages = analyzer.take_messages();
+        self.interpreter = analyzer.into_interpreter();
+        let mut errored = false;
+        for message in messages {
+            match message {
+                abasic_core::DiagnosticMessage::Warning(file_line_number, message) => {
+                    self.printer.eprintln(
+                        format!(
+                            "Warning on line {} of '{}': {}",
+                            file_line_number + 1,
+                            filename,
+                            message
+                        )
+                        .yellow(),
+                    );
+                }
+                abasic_core::DiagnosticMessage::Error(err, line) => {
+                    if !errored {
+                        self.printer.eprintln(format!(
+                            "Errors were encountered when analyzing '{filename}':"
+                        ));
+                    }
+                    errored = true;
+                    self.show_error(err, line);
+                }
             }
         }
-        Ok(())
+        if errored {
+            self.printer
+                .eprintln("Please fix the above errors before running the program again.");
+            Err(1)
+        } else {
+            Ok(())
+        }
     }
 
     fn show_error<T: AsRef<str>>(&mut self, err: TracedInterpreterError, line: Option<T>) {
