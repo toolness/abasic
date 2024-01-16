@@ -5,6 +5,7 @@ use crate::{
 
 use super::statement_analyzer::StatementAnalyzer;
 
+#[derive(Debug)]
 pub enum DiagnosticMessage {
     Warning(usize, String),
     Error(TracedInterpreterError, Option<String>),
