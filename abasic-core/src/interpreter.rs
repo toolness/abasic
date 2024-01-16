@@ -1,12 +1,11 @@
 use crate::{
-    analyzer::StatementAnalyzer,
     arrays::Arrays,
     data::{parse_data_until_colon, DataElement},
     expression::ExpressionEvaluator,
-    interpreter_error::{InterpreterError, TracedInterpreterError},
+    interpreter_error::TracedInterpreterError,
     interpreter_output::InterpreterOutput,
     line_number_parser::parse_line_number,
-    program::{Program, ProgramLocation},
+    program::Program,
     random::Rng,
     statement::StatementEvaluator,
     string_manager::StringManager,
@@ -127,13 +126,6 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn todo_actually_use_expression_analyzer(&mut self) -> Result<(), TracedInterpreterError> {
-        // This won't actually do anything useful, I'm just using it to avoid
-        // dead code warnings.
-        StatementAnalyzer::new(&mut self.program).evaluate_statement()?;
-        todo!();
-    }
-
     pub fn get_state(&self) -> InterpreterState {
         self.state
     }
@@ -191,26 +183,7 @@ impl Interpreter {
         result: Result<T, TracedInterpreterError>,
     ) -> Result<T, TracedInterpreterError> {
         if let Err(mut err) = result {
-            if err.location.is_none() {
-                err.location = match err.error {
-                    InterpreterError::DataTypeMismatch => self.program.get_data_location(),
-                    _ => {
-                        let location = self.program.get_location();
-                        Some(ProgramLocation {
-                            line: location.line,
-                            token_index: if location.token_index > 0 {
-                                // Generally, we raise errors after we've already moved the
-                                // program's current location to the next token index, so
-                                // push it back one to arrive at the token that we actually
-                                // errored on.
-                                location.token_index - 1
-                            } else {
-                                0
-                            },
-                        })
-                    }
-                };
-            }
+            self.program.populate_error_location(&mut err);
             self.return_to_idle_state();
             Err(err)
         } else {
@@ -225,10 +198,6 @@ impl Interpreter {
 
     pub(crate) fn print(&mut self, string: String) {
         self.output.push(InterpreterOutput::Print(string));
-    }
-
-    pub fn has_line_number(&self, line_number: u64) -> bool {
-        self.program.has_line_number(line_number)
     }
 
     pub fn provide_input(&mut self, input: String) {

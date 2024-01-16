@@ -87,7 +87,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     fn evaluate_expression_term(&mut self) -> Result<ValueType, TracedInterpreterError> {
         match self.program.next_unwrapped_token()? {
-            Token::StringLiteral(_string) => Ok(ValueType::Number),
+            Token::StringLiteral(_string) => Ok(ValueType::String),
             Token::NumericLiteral(_number) => Ok(ValueType::Number),
             Token::Symbol(symbol) => {
                 let is_array_or_function_call =

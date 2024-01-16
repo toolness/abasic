@@ -27,10 +27,10 @@ impl<'a> StatementAnalyzer<'a> {
             Some(Token::If) => self.evaluate_if_statement(),
             Some(Token::Goto) => self.evaluate_goto_statement(),
             Some(Token::Gosub) => self.evaluate_gosub_statement(),
-            Some(Token::Return) => self.program().return_to_last_gosub(),
+            Some(Token::Return) => Ok(()),
             // Dartmouth BASIC only allowed END at the very end of a program,
             // while Applesoft allowed it anywhere. We'll do the latter.
-            Some(Token::End) => Ok(self.program().end()),
+            Some(Token::End) => Ok(()),
             Some(Token::For) => self.evaluate_for_statement(),
             Some(Token::Next) => self.evaluate_next_statement(),
             Some(Token::Restore) => Ok(self.program().reset_data_cursor()),

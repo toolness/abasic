@@ -258,24 +258,29 @@ impl Program {
         self.numbered_lines.has(line_number)
     }
 
-    /// Go to the first numbered line. Resets virtually everything in the program
+    /// Resets virtually everything in the program
     /// except for the actual code.
-    pub fn run_from_first_numbered_line(&mut self) {
+    pub fn reset_runtime_state(&mut self) {
         self.breakpoint = None;
         self.reset_data_cursor();
         self.functions.clear();
         self.stack.clear();
         self.loop_stack.clear();
+        self.end();
+    }
+
+    /// Go to the first numbered line. Resets virtually everything in the program
+    /// except for the actual code.
+    pub fn run_from_first_numbered_line(&mut self) {
+        self.reset_runtime_state();
         if let Some(first_line) = self.numbered_lines.first() {
             self.location = ProgramLocation {
                 line: ProgramLine::Line(first_line),
                 token_index: 0,
             };
-        } else {
-            // Applesoft basic just does nothing when RUN is executed
-            // in an empty program, so we'll do that too.
-            self.end();
-        };
+        }
+        // Applesoft basic just does nothing when RUN is executed
+        // in an empty program, so we'll do that too.
     }
 
     pub fn goto_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
@@ -597,5 +602,29 @@ impl Program {
     /// ideal.
     fn error_at_current_location(&self, err: InterpreterError) -> TracedInterpreterError {
         TracedInterpreterError::with_location(err, self.location)
+    }
+
+    pub fn populate_error_location(&self, err: &mut TracedInterpreterError) {
+        if err.location.is_some() {
+            return;
+        }
+        err.location = match err.error {
+            InterpreterError::DataTypeMismatch => self.get_data_location(),
+            _ => {
+                let location = self.get_location();
+                Some(ProgramLocation {
+                    line: location.line,
+                    token_index: if location.token_index > 0 {
+                        // Generally, we raise errors after we've already moved the
+                        // program's current location to the next token index, so
+                        // push it back one to arrive at the token that we actually
+                        // errored on.
+                        location.token_index - 1
+                    } else {
+                        0
+                    },
+                })
+            }
+        };
     }
 }
