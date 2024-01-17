@@ -1,6 +1,6 @@
 use abasic_core::{
-    Interpreter, InterpreterError, InterpreterOutput, InterpreterState, OutOfMemoryError,
-    SyntaxError, Token, TracedInterpreterError,
+    DiagnosticMessage, Interpreter, InterpreterError, InterpreterOutput, InterpreterState,
+    OutOfMemoryError, SourceFileAnalyzer, SyntaxError, Token, TracedInterpreterError,
 };
 
 struct Action {
@@ -41,6 +41,24 @@ fn evaluate_line_while_running(
     evaluate_while_running(interpreter)
 }
 
+fn ensure_no_analyzer_errors<T: AsRef<str>>(program: T) {
+    let lines = program
+        .as_ref()
+        .split("\n")
+        .map(|line| line.trim_start())
+        .map(|s| s.to_owned());
+    let mut analyzer = SourceFileAnalyzer::analyze(lines.clone().collect::<Vec<_>>().join("\n"));
+    for message in analyzer.take_messages() {
+        if let DiagnosticMessage::Error(e, _) = message {
+            panic!(
+                "expected '{}' to raise no analyzer errors but got {:?}",
+                program.as_ref(),
+                e
+            );
+        }
+    }
+}
+
 fn assert_eval_error(line: &'static str, expected: InterpreterError) {
     let mut interpreter = create_interpreter();
     match evaluate_line_while_running(&mut interpreter, line) {
@@ -54,12 +72,14 @@ fn assert_eval_error(line: &'static str, expected: InterpreterError) {
 }
 
 fn assert_eval_output(line: &'static str, expected: &'static str) {
+    ensure_no_analyzer_errors(format!("10 {line}"));
     let mut interpreter = create_interpreter();
     let output = eval_line_and_expect_success(&mut interpreter, line);
     assert_eq!(output, expected, "evaluating '{}'", line);
 }
 
 fn assert_program_actions(program: &'static str, actions: &[Action]) {
+    ensure_no_analyzer_errors(program);
     let mut interpreter = create_interpreter();
     let lines = program.split("\n").map(|line| line.trim_start());
     for line in lines {
@@ -339,7 +359,10 @@ fn if_statement_works_with_numbers() {
 #[test]
 fn if_statement_processes_multiple_statements_in_then_clause() {
     assert_eval_output("if 1 then print \"hi\":print", "hi\n\n");
-    assert_eval_output("if 0 then print \"hi\":print:kaboom", "");
+    assert_eval_output(
+        "if 0 then print \"hi\":print:print \"this should not print\"",
+        "",
+    );
     assert_eval_output("if 1 then x=3:print \"hi \" x:print", "hi 3\n\n");
 }
 
