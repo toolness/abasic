@@ -45,6 +45,14 @@ fn for_loops_work() {
 }
 
 #[test]
+fn goto_and_gosub_work() {
+    assert_program_is_fine("10 if 0 then 20\n20 print \"hi\"");
+    assert_program_is_fine("10 if 1 then 10 else 20\n20 print \"hi\"");
+    assert_program_is_fine("10 goto 20\n20 print \"hi\"");
+    assert_program_is_fine("10 gosub 20\n20 print \"hi\"");
+}
+
+#[test]
 fn conditionals_work() {
     assert_program_is_fine("10 if x = 1 then print \"one\" else print \"not one\"");
     assert_program_is_fine("10 if x = 0 then print \"zero\" else print \"not zero\"");
@@ -63,5 +71,19 @@ fn unexpected_end_of_input_works() {
     assert_program_has_error(
         "10 print 1\n20 goto 10blargblarg",
         SyntaxError::UnexpectedEndOfInput.into(),
+    );
+}
+
+#[test]
+fn undefined_statement_error_works() {
+    assert_program_has_error("10 if 0 then goto 20", InterpreterError::UndefinedStatement);
+    assert_program_has_error(
+        "10 if 0 then gosub 20",
+        InterpreterError::UndefinedStatement,
+    );
+    assert_program_has_error("10 if 0 then 20", InterpreterError::UndefinedStatement);
+    assert_program_has_error(
+        "10 if 0 then 10 else 20",
+        InterpreterError::UndefinedStatement,
     );
 }
