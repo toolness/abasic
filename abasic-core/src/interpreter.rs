@@ -2,7 +2,7 @@ use crate::{
     arrays::Arrays,
     data::{parse_data_until_colon, DataElement},
     expression::ExpressionEvaluator,
-    interpreter_error::{InterpreterError, TracedInterpreterError},
+    interpreter_error::TracedInterpreterError,
     interpreter_output::InterpreterOutput,
     line_number_parser::parse_line_number,
     program::Program,
@@ -58,6 +58,14 @@ impl core::fmt::Debug for Interpreter {
 impl Interpreter {
     pub fn take_output(&mut self) -> Vec<InterpreterOutput> {
         std::mem::take(&mut self.output)
+    }
+
+    pub(crate) fn from_program(program: Program, string_manager: StringManager) -> Self {
+        Interpreter {
+            program,
+            string_manager,
+            ..Default::default()
+        }
     }
 
     pub(crate) fn output(&mut self, output: InterpreterOutput) {
@@ -118,6 +126,7 @@ impl Interpreter {
         }
         if !self.program.has_next_token() {
             if !self.program.next_line() {
+                self.program.set_and_goto_immediate_line(vec![]);
                 self.return_to_idle_state();
             }
         }
@@ -182,13 +191,7 @@ impl Interpreter {
         result: Result<T, TracedInterpreterError>,
     ) -> Result<T, TracedInterpreterError> {
         if let Err(mut err) = result {
-            let line_number = match err.error {
-                InterpreterError::DataTypeMismatch => self.program.get_data_line_number(),
-                _ => self.program.get_line_number(),
-            };
-            if let Some(line_number) = line_number {
-                err.set_line_number(line_number);
-            }
+            self.program.populate_error_location(&mut err);
             self.return_to_idle_state();
             Err(err)
         } else {
@@ -197,17 +200,12 @@ impl Interpreter {
     }
 
     fn return_to_idle_state(&mut self) {
-        self.program.set_and_goto_immediate_line(vec![]);
         self.string_manager.gc();
         self.state = InterpreterState::Idle;
     }
 
     pub(crate) fn print(&mut self, string: String) {
         self.output.push(InterpreterOutput::Print(string));
-    }
-
-    pub fn has_line_number(&self, line_number: u64) -> bool {
-        self.program.has_line_number(line_number)
     }
 
     pub fn provide_input(&mut self, input: String) {
@@ -249,19 +247,22 @@ impl Interpreter {
 
     fn evaluate_impl<T: AsRef<str>>(&mut self, line: T) -> Result<(), TracedInterpreterError> {
         assert_eq!(self.state, InterpreterState::Idle);
-        let mut line_ref = line.as_ref();
+        self.program.set_and_goto_immediate_line(vec![]);
 
-        if self.maybe_process_command(line_ref.to_uppercase().as_str())? {
+        if self.maybe_process_command(line.as_ref().to_uppercase().as_str())? {
             return Ok(());
         }
 
         let mut maybe_line_number: Option<u64> = None;
-        if let Some((line_number, end_index)) = parse_line_number(line_ref) {
+        let mut skip_bytes = 0;
+        if let Some((line_number, end_index)) = parse_line_number(line.as_ref()) {
             maybe_line_number = Some(line_number);
-            line_ref = &line_ref[end_index..];
+            skip_bytes = end_index;
         }
 
-        let tokens = Tokenizer::new(line_ref, &mut self.string_manager).remaining_tokens()?;
+        let tokens = Tokenizer::new(line, &mut self.string_manager)
+            .skip_bytes(skip_bytes)
+            .remaining_tokens()?;
 
         if let Some(line_number) = maybe_line_number {
             let had_existing_line = self.program.has_line_number(line_number);

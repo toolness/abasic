@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::{
     data::{DataChunk, DataIterator},
-    program::ProgramLine,
+    program::NumberedProgramLocation,
     tokenizer::Token,
 };
 
@@ -45,10 +45,13 @@ impl ProgramLines {
 
     pub fn data_iterator(&self) -> DataIterator {
         let mut chunks = vec![];
-        for line in self.sorted_line_numbers.iter() {
-            for token in self.numbered_lines.get(line).unwrap() {
+        for &line in self.sorted_line_numbers.iter() {
+            for (token_index, token) in self.numbered_lines.get(&line).unwrap().iter().enumerate() {
                 if let Token::Data(data) = token {
-                    chunks.push(DataChunk::new(ProgramLine::Line(*line), data.clone()));
+                    chunks.push(DataChunk::new(
+                        NumberedProgramLocation::new(line, token_index).into(),
+                        data.clone(),
+                    ));
                 }
             }
         }

@@ -27,9 +27,15 @@ struct StackFrame {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-struct NumberedProgramLocation {
+pub struct NumberedProgramLocation {
     line: u64,
     token_index: usize,
+}
+
+impl NumberedProgramLocation {
+    pub fn new(line: u64, token_index: usize) -> Self {
+        NumberedProgramLocation { line, token_index }
+    }
 }
 
 impl TryFrom<ProgramLocation> for NumberedProgramLocation {
@@ -43,10 +49,10 @@ impl TryFrom<ProgramLocation> for NumberedProgramLocation {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
-struct ProgramLocation {
-    line: ProgramLine,
-    token_index: usize,
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
+pub struct ProgramLocation {
+    pub line: ProgramLine,
+    pub token_index: usize,
 }
 
 impl ProgramLocation {
@@ -252,24 +258,29 @@ impl Program {
         self.numbered_lines.has(line_number)
     }
 
-    /// Go to the first numbered line. Resets virtually everything in the program
+    /// Resets virtually everything in the program
     /// except for the actual code.
-    pub fn run_from_first_numbered_line(&mut self) {
+    pub fn reset_runtime_state(&mut self) {
         self.breakpoint = None;
         self.reset_data_cursor();
         self.functions.clear();
         self.stack.clear();
         self.loop_stack.clear();
+        self.end();
+    }
+
+    /// Go to the first numbered line. Resets virtually everything in the program
+    /// except for the actual code.
+    pub fn run_from_first_numbered_line(&mut self) {
+        self.reset_runtime_state();
         if let Some(first_line) = self.numbered_lines.first() {
             self.location = ProgramLocation {
                 line: ProgramLine::Line(first_line),
                 token_index: 0,
             };
-        } else {
-            // Applesoft basic just does nothing when RUN is executed
-            // in an empty program, so we'll do that too.
-            self.end();
-        };
+        }
+        // Applesoft basic just does nothing when RUN is executed
+        // in an empty program, so we'll do that too.
     }
 
     pub fn goto_line_number(&mut self, line_number: u64) -> Result<(), TracedInterpreterError> {
@@ -383,10 +394,35 @@ impl Program {
         }
     }
 
-    pub fn get_data_line_number(&self) -> Option<u64> {
+    /// Returns the program location currently being evaluated.
+    pub fn get_location(&self) -> ProgramLocation {
+        self.location
+    }
+
+    pub fn get_line_with_pointer_caret(&self, location: ProgramLocation) -> Vec<String> {
+        let tokens = self.tokens_for_line(location.line);
+        if tokens.is_empty() {
+            return vec![];
+        }
+        let mut string_tokens = vec![];
+        let mut spaces_before_caret = 0;
+        for (i, token) in tokens.iter().enumerate() {
+            let string_token = token.to_string();
+            if i < location.token_index {
+                spaces_before_caret += string_token.len() + 1;
+            }
+            string_tokens.push(string_token);
+        }
+        vec![
+            string_tokens.join(" "),
+            format!("{}^", " ".repeat(spaces_before_caret)),
+        ]
+    }
+
+    pub fn get_data_location(&self) -> Option<ProgramLocation> {
         if let Some(data_iterator) = &self.data_iterator {
-            if let Some(ProgramLine::Line(line_number)) = data_iterator.current_location() {
-                Some(line_number)
+            if let Some(location) = data_iterator.current_location() {
+                Some(location)
             } else {
                 None
             }
@@ -448,11 +484,15 @@ impl Program {
         self.end();
     }
 
-    fn tokens(&self) -> &Vec<Token> {
-        match self.location.line {
+    fn tokens_for_line(&self, line: ProgramLine) -> &Vec<Token> {
+        match line {
             ProgramLine::Immediate => &self.immediate_line,
             ProgramLine::Line(number) => self.numbered_lines.get(number).unwrap(),
         }
+    }
+
+    fn tokens(&self) -> &Vec<Token> {
+        self.tokens_for_line(self.location.line)
     }
 
     /// Returns whether we have any more tokens in the stream.
@@ -499,7 +539,7 @@ impl Program {
     pub fn next_unwrapped_token(&mut self) -> Result<Token, TracedInterpreterError> {
         match self.next_token() {
             Some(token) => Ok(token),
-            None => Err(SyntaxError::UnexpectedEndOfInput.into()),
+            None => Err(self.error_at_current_location(SyntaxError::UnexpectedEndOfInput.into())),
         }
     }
 
@@ -553,5 +593,38 @@ impl Program {
     /// Throw away any remaining tokens.
     pub fn discard_remaining_tokens(&mut self) {
         self.location.token_index = self.tokens().len();
+    }
+
+    /// Explicitly creates a TracedInterpreterError homed at our current
+    /// program location. Normally, this is detected automatically once
+    /// an error without location information has been caught, but at
+    /// that detection can be fallible, so setting it explicitly is
+    /// ideal.
+    fn error_at_current_location(&self, err: InterpreterError) -> TracedInterpreterError {
+        TracedInterpreterError::with_location(err, self.location)
+    }
+
+    pub fn populate_error_location(&self, err: &mut TracedInterpreterError) {
+        if err.location.is_some() {
+            return;
+        }
+        err.location = match err.error {
+            InterpreterError::DataTypeMismatch => self.get_data_location(),
+            _ => {
+                let location = self.get_location();
+                Some(ProgramLocation {
+                    line: location.line,
+                    token_index: if location.token_index > 0 {
+                        // Generally, we raise errors after we've already moved the
+                        // program's current location to the next token index, so
+                        // push it back one to arrive at the token that we actually
+                        // errored on.
+                        location.token_index - 1
+                    } else {
+                        0
+                    },
+                })
+            }
+        };
     }
 }

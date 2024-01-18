@@ -1,15 +1,15 @@
 use std::rc::Rc;
 
-use crate::{program::ProgramLine, string_manager::StringManager};
+use crate::{program::ProgramLocation, string_manager::StringManager};
 
 #[derive(Debug)]
 pub struct DataChunk {
-    location: ProgramLine,
+    location: ProgramLocation,
     data: Rc<Vec<DataElement>>,
 }
 
 impl DataChunk {
-    pub fn new(location: ProgramLine, data: Rc<Vec<DataElement>>) -> Self {
+    pub fn new(location: ProgramLocation, data: Rc<Vec<DataElement>>) -> Self {
         DataChunk { location, data }
     }
 }
@@ -30,7 +30,7 @@ impl DataIterator {
         }
     }
 
-    pub fn current_location(&self) -> Option<ProgramLine> {
+    pub fn current_location(&self) -> Option<ProgramLocation> {
         if let Some(chunk) = self.chunks.get(self.chunk_index) {
             Some(chunk.location)
         } else {
@@ -221,7 +221,7 @@ mod tests {
 
     use crate::{
         data::{parse_data_until_colon, DataChunk},
-        program::ProgramLine,
+        program::NumberedProgramLocation,
     };
 
     use super::{
@@ -269,18 +269,33 @@ mod tests {
     fn non_empty_data_iterator_works() {
         let mut iterator = DataIterator::new(vec![
             DataChunk::new(
-                ProgramLine::Line(10),
+                NumberedProgramLocation::new(10, 0).into(),
                 Rc::new(vec![string("hi"), number(1.0)]),
             ),
-            DataChunk::new(ProgramLine::Line(20), Rc::new(vec![string("boop")])),
+            DataChunk::new(
+                NumberedProgramLocation::new(20, 0).into(),
+                Rc::new(vec![string("boop")]),
+            ),
         ]);
-        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(
+            iterator.current_location(),
+            Some(NumberedProgramLocation::new(10, 0).into())
+        );
         assert_eq!(iterator.next(), Some(string("hi")));
-        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(
+            iterator.current_location(),
+            Some(NumberedProgramLocation::new(10, 0).into())
+        );
         assert_eq!(iterator.next(), Some(number(1.0)));
-        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(10)));
+        assert_eq!(
+            iterator.current_location(),
+            Some(NumberedProgramLocation::new(10, 0).into())
+        );
         assert_eq!(iterator.next(), Some(string("boop")));
-        assert_eq!(iterator.current_location(), Some(ProgramLine::Line(20)));
+        assert_eq!(
+            iterator.current_location(),
+            Some(NumberedProgramLocation::new(20, 0).into())
+        );
         assert_eq!(iterator.next(), None);
         assert_eq!(iterator.current_location(), None);
     }

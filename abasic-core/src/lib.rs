@@ -1,5 +1,5 @@
+mod analyzer;
 mod arrays;
-mod builtins;
 mod data;
 mod expression;
 mod interpreter;
@@ -19,9 +19,9 @@ mod tokenizer;
 mod value;
 mod variables;
 
+pub use analyzer::{DiagnosticMessage, SourceFileAnalyzer};
 pub use interpreter::{Interpreter, InterpreterState};
 pub use interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError};
 pub use interpreter_output::InterpreterOutput;
-pub use line_number_parser::parse_line_number;
 pub use syntax_error::SyntaxError;
 pub use tokenizer::Token;
