@@ -455,8 +455,21 @@ impl<'a, T: AsRef<str>> Tokenizer<'a, T> {
         }
     }
 
+    pub fn remaining_tokens_and_ranges(
+        mut self,
+    ) -> Result<(Vec<Token>, Vec<Range<usize>>), TokenizationError> {
+        let mut tokens = vec![];
+        let mut ranges = vec![];
+        for token in &mut self {
+            let (token, range) = token?;
+            tokens.push(token);
+            ranges.push(range);
+        }
+        Ok((tokens, ranges))
+    }
+
     pub fn remaining_tokens(mut self) -> Result<Vec<Token>, TokenizationError> {
-        let mut tokens: Vec<Token> = vec![];
+        let mut tokens = vec![];
         for token in &mut self {
             tokens.push(token?.0);
         }
