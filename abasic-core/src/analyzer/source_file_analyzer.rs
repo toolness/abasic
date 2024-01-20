@@ -24,7 +24,7 @@ struct SourceLineRanges {
 }
 
 #[derive(Default)]
-struct SourceFileMap {
+pub struct SourceFileMap {
     basic_lines_to_file_lines: HashMap<u64, usize>,
     file_line_ranges: Vec<SourceLineRanges>,
 }
@@ -41,7 +41,7 @@ impl SourceFileMap {
         self.file_line_ranges.push(ranges);
     }
 
-    fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
+    pub fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
         match message {
             DiagnosticMessage::Warning(file_line_number, _) => {
                 let source_line_ranges = &self.file_line_ranges[*file_line_number];
@@ -80,7 +80,10 @@ impl SourceFileMap {
 
 #[derive(Default)]
 pub struct SourceFileAnalyzer {
+    // TODO: We should probably borrow these lines to avoid
+    // needless extra allocations.
     lines: Vec<String>,
+
     program: Program,
     messages: Vec<DiagnosticMessage>,
     string_manager: StringManager,
@@ -101,6 +104,10 @@ impl SourceFileAnalyzer {
         let mut analyzer = SourceFileAnalyzer::default();
         analyzer.run(lines);
         analyzer
+    }
+
+    pub fn source_file_map(&self) -> &SourceFileMap {
+        &self.source_file_map
     }
 
     pub fn take_messages(&mut self) -> Vec<DiagnosticMessage> {
