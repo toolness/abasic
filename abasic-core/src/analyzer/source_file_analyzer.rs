@@ -89,8 +89,17 @@ pub struct SourceFileAnalyzer {
 
 impl SourceFileAnalyzer {
     pub fn analyze(contents: String) -> Self {
+        Self::analyze_lines(
+            contents
+                .split('\n')
+                .map(|s| s.to_owned())
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    pub fn analyze_lines(lines: Vec<String>) -> Self {
         let mut analyzer = SourceFileAnalyzer::default();
-        analyzer.run(contents);
+        analyzer.run(lines);
         analyzer
     }
 
@@ -105,11 +114,7 @@ impl SourceFileAnalyzer {
         ));
     }
 
-    fn run(&mut self, contents: String) {
-        let lines = contents
-            .split('\n')
-            .map(|s| s.to_owned())
-            .collect::<Vec<_>>();
+    fn run(&mut self, lines: Vec<String>) {
         for (i, line) in lines.iter().enumerate() {
             if line.is_empty() {
                 self.source_file_map.add_empty();
