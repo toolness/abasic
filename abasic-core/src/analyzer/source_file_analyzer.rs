@@ -1,8 +1,11 @@
 use std::{collections::HashMap, ops::Range};
 
 use crate::{
-    line_number_parser::parse_line_number, program::Program, string_manager::StringManager,
-    tokenizer::Tokenizer, Interpreter, TracedInterpreterError,
+    line_number_parser::parse_line_number,
+    program::{Program, ProgramLine},
+    string_manager::StringManager,
+    tokenizer::Tokenizer,
+    Interpreter, InterpreterError, SyntaxError, TracedInterpreterError,
 };
 
 use super::statement_analyzer::StatementAnalyzer;
@@ -10,7 +13,7 @@ use super::statement_analyzer::StatementAnalyzer;
 #[derive(Debug)]
 pub enum DiagnosticMessage {
     Warning(usize, String),
-    Error(TracedInterpreterError, Option<String>),
+    Error(TracedInterpreterError, Option<String>, Option<usize>),
 }
 
 #[derive(Default)]
@@ -35,6 +38,46 @@ impl SourceFileMap {
         self.basic_lines_to_file_lines
             .insert(basic_line, file_line_number);
         self.file_line_ranges.push(ranges);
+    }
+
+    fn map_to_source(
+        &self,
+        message: &DiagnosticMessage,
+        lines: &Vec<String>,
+    ) -> Option<(usize, Range<usize>)> {
+        match message {
+            DiagnosticMessage::Warning(file_line_number, _) => {
+                let source_line_ranges = &self.file_line_ranges[*file_line_number];
+                Some((*file_line_number, 0..source_line_ranges.line_number_end))
+            }
+            DiagnosticMessage::Error(err, _, file_line_number) => {
+                if let Some(file_line_number) = file_line_number {
+                    match &err.error {
+                        InterpreterError::Syntax(SyntaxError::Tokenization(t)) => {
+                            let line = &lines[*file_line_number];
+                            let range = t.string_range(line.as_str());
+                            return Some((*file_line_number, range));
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(location) = err.location {
+                    if let ProgramLine::Line(basic_line_number) = location.line {
+                        if let Some(&file_line_number) =
+                            self.basic_lines_to_file_lines.get(&basic_line_number)
+                        {
+                            let source_line_ranges = &self.file_line_ranges[file_line_number];
+                            if let Some(token_ranges) = &source_line_ranges.token_ranges {
+                                if let Some(range) = token_ranges.get(location.token_index) {
+                                    return Some((file_line_number, range.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+                None
+            }
+        }
     }
 }
 
@@ -99,9 +142,11 @@ impl SourceFileAnalyzer {
                         self.program.set_numbered_line(basic_line_number, tokens);
                     }
                 }
-                Err(err) => self
-                    .messages
-                    .push(DiagnosticMessage::Error(err.into(), Some(line.clone()))),
+                Err(err) => self.messages.push(DiagnosticMessage::Error(
+                    err.into(),
+                    Some(line.clone()),
+                    Some(i),
+                )),
             }
             self.source_file_map
                 .add(basic_line_number, source_line_ranges);
@@ -113,7 +158,8 @@ impl SourceFileAnalyzer {
                 let result = StatementAnalyzer::new(&mut self.program).evaluate_statement();
                 if let Err(mut err) = result {
                     self.program.populate_error_location(&mut err);
-                    self.messages.push(DiagnosticMessage::Error(err, None));
+                    self.messages
+                        .push(DiagnosticMessage::Error(err, None, None));
                     break;
                 }
             }

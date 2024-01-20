@@ -22,7 +22,7 @@ fn assert_program_has_error(program: &'static str, error: InterpreterError) {
     }
     let message = analyzer_messages.get(0).unwrap();
     match message {
-        abasic_core::DiagnosticMessage::Error(err, _) => {
+        abasic_core::DiagnosticMessage::Error(err, _, _) => {
             assert_eq!(err.error, error);
         }
         _ => {

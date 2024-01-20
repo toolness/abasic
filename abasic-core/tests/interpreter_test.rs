@@ -49,7 +49,7 @@ fn ensure_no_analyzer_errors<T: AsRef<str>>(program: T) {
         .map(|s| s.to_owned());
     let mut analyzer = SourceFileAnalyzer::analyze(lines.clone().collect::<Vec<_>>().join("\n"));
     for message in analyzer.take_messages() {
-        if let DiagnosticMessage::Error(e, _) = message {
+        if let DiagnosticMessage::Error(e, _, _) = message {
             panic!(
                 "expected '{}' to raise no analyzer errors but got {:?}",
                 program.as_ref(),

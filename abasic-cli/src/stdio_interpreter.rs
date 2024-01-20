@@ -94,7 +94,7 @@ impl StdioInterpreter {
                         .yellow(),
                     );
                 }
-                abasic_core::DiagnosticMessage::Error(err, line) => {
+                abasic_core::DiagnosticMessage::Error(err, line, _) => {
                     if !errored {
                         self.printer.eprintln(format!(
                             "Errors were encountered when analyzing '{filename}':"
