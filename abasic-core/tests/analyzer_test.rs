@@ -27,6 +27,7 @@ enum MessageType {
 struct SourceMappedMessage {
     _type: MessageType,
     message: String,
+    line: usize,
     source_snippet: String,
 }
 
@@ -41,23 +42,31 @@ impl SourceMappedMessage {
         };
         let source_snippet = lines[line][range].to_string();
         match diagnostic {
-            DiagnosticMessage::Warning(_, message) => SourceMappedMessage {
+            DiagnosticMessage::Warning(line, message) => SourceMappedMessage {
                 _type: MessageType::Warning,
                 message: message.clone(),
+                line: *line,
                 source_snippet,
             },
-            DiagnosticMessage::Error(_line, err) => SourceMappedMessage {
+            DiagnosticMessage::Error(line, err) => SourceMappedMessage {
                 _type: MessageType::Error,
                 message: err.to_string(),
+                line: *line,
                 source_snippet,
             },
         }
     }
 
-    fn new(_type: MessageType, message: &'static str, source_snippet: &'static str) -> Self {
+    fn new(
+        _type: MessageType,
+        message: &'static str,
+        line: usize,
+        source_snippet: &'static str,
+    ) -> Self {
         SourceMappedMessage {
             _type,
             message: message.to_string(),
+            line,
             source_snippet: source_snippet.to_string(),
         }
     }
@@ -169,6 +178,7 @@ fn line_without_statements_warning_works() {
         vec![SourceMappedMessage::new(
             Warning,
             "Line contains no statements and will not be defined.",
+            0,
             "10",
         )],
     );
@@ -181,6 +191,7 @@ fn line_without_number_warning_works() {
         vec![SourceMappedMessage::new(
             Warning,
             "Line has no line number, ignoring it.",
+            0,
             "",
         )],
     );
@@ -193,6 +204,7 @@ fn redefined_line_warning_works() {
         vec![SourceMappedMessage::new(
             Warning,
             "Redefinition of pre-existing BASIC line.",
+            1,
             "10",
         )],
     );
@@ -205,6 +217,7 @@ fn unterminated_string_literal_works() {
         vec![SourceMappedMessage::new(
             Error,
             "SYNTAX ERROR (UNTERMINATED STRING)",
+            0,
             "\"boop",
         )],
     );
@@ -217,6 +230,7 @@ fn type_mismatch_works() {
         vec![SourceMappedMessage::new(
             Error,
             "TYPE MISMATCH IN 10",
+            0,
             "\"hi\"",
         )],
     );
