@@ -1,13 +1,11 @@
 use std::error::Error;
 
 use abasic_core::{DiagnosticMessage, SourceFileAnalyzer};
-use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
+use lsp_server::{Connection, ExtractError, Message, Notification};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
-    request::GotoDefinition,
-    Diagnostic, DiagnosticSeverity, GotoDefinitionResponse, InitializeParams, Location, OneOf,
-    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions,
+    Diagnostic, DiagnosticSeverity, InitializeParams, Position, PublishDiagnosticsParams, Range,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 
 type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
@@ -31,7 +29,6 @@ fn handle_one_connection() -> LspResult<()> {
     eprintln!("Got connection.");
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        definition_provider: Some(OneOf::Left(true)),
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
@@ -71,29 +68,6 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                     return Ok(());
                 }
                 eprintln!("Got request: {req:?}");
-                match cast_request::<GotoDefinition>(req) {
-                    Ok((id, params)) => {
-                        eprintln!("Go gotoDefinition request #{id}: {params:?}");
-                        let uri = params.text_document_position_params.text_document.uri;
-
-                        let result = Some(GotoDefinitionResponse::Scalar(Location::new(
-                            uri,
-                            // TODO: Actually find the definition!!
-                            Range::new(Position::new(1, 1), Position::new(1, 1)),
-                        )));
-                        let result = serde_json::to_value(&result).unwrap();
-                        let resp = Response {
-                            id,
-                            result: Some(result),
-                            error: None,
-                        };
-                        connection.sender.send(Message::Response(resp))?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(req)) => req,
-                };
-                // ...
             }
             Message::Response(resp) => {
                 eprintln!("Got response: {resp:?}");
@@ -165,14 +139,6 @@ fn analyze_source_file(text: String) -> Vec<Diagnostic> {
         }
     }
     diagnostics
-}
-
-fn cast_request<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
-where
-    R: lsp_types::request::Request,
-    R::Params: serde::de::DeserializeOwned,
-{
-    req.extract(R::METHOD)
 }
 
 fn cast_notification<N>(not: &Notification) -> Result<N::Params, ExtractError<Notification>>
