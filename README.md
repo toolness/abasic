@@ -103,6 +103,34 @@ To deploy the Web frontend, you can run:
 npm run publish
 ```
 
+### Language Server Protocol (LSP) client/server
+
+An experimental [Language Server Protocol][LSP] server and VSCode client
+is in the `abasic-lsp` directory.
+
+At the moment, actually using it takes a bit of work:
+
+1. In the terminal, run the LSP server with `cargo run -p abasic-lsp`.
+
+2. In VSCode, open the root of the repository and press F5.
+
+3. In the newly-opened Extension Development Host VSCode instance, open or
+   create a .BAS file. As you type into it, you should see warnings and
+   errors appear (for example, try leaving out a closing double-quote on
+   a string, or GOTO a non-existent line).
+
+If you make changes to the Rust server code, you'll need to manually recompile
+and re-run it.  While I originally wrote the VSCode extension to attempt to
+reconnect to it, it doesn't seem to work with notifications from VSCode, so
+you might need to restart the Extension Development Host whenever you change
+the server too (you can try cmd-shift-F5, or quit the host and press F5 again).
+
+If you make changes to the VSCode extension, they should be automatically
+re-transpiled to JS, though you will likely need to restart the Extension
+Development Host to see them take effect.
+
+[LSP]: https://microsoft.github.io/language-server-protocol/
+
 ## Rationale
 
 I created this interpreter with the following goals:
