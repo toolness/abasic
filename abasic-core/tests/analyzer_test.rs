@@ -192,3 +192,27 @@ fn redefined_line_warning_works() {
         )],
     );
 }
+
+#[test]
+fn unterminated_string_literal_works() {
+    assert_program_has_source_mapped_diagnostics(
+        "10 print \"boop",
+        vec![SourceMappedMessage::new(
+            Error,
+            "SYNTAX ERROR (UNTERMINATED STRING)",
+            "\"boop",
+        )],
+    );
+}
+
+#[test]
+fn type_mismatch_works() {
+    assert_program_has_source_mapped_diagnostics(
+        "10 a = \"hi\"",
+        vec![SourceMappedMessage::new(
+            Error,
+            "TYPE MISMATCH IN 10",
+            "\"hi\"",
+        )],
+    );
+}
