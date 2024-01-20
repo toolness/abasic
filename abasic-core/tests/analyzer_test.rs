@@ -18,9 +18,16 @@ fn assert_program_is_fine(program: &'static str) {
 }
 
 #[derive(PartialEq, Debug)]
-enum SourceMappedMessage {
-    Warning(String, String),
-    Error(String, String),
+enum MessageType {
+    Warning,
+    Error,
+}
+
+#[derive(PartialEq, Debug)]
+struct SourceMappedMessage {
+    _type: MessageType,
+    message: String,
+    source_snippet: String,
 }
 
 impl SourceMappedMessage {
@@ -34,12 +41,24 @@ impl SourceMappedMessage {
         };
         let source_snippet = lines[line][range].to_string();
         match diagnostic {
-            DiagnosticMessage::Warning(_, message) => {
-                SourceMappedMessage::Warning(message.clone(), source_snippet)
-            }
-            DiagnosticMessage::Error(err, _, _) => {
-                SourceMappedMessage::Error(err.to_string(), source_snippet)
-            }
+            DiagnosticMessage::Warning(_, message) => SourceMappedMessage {
+                _type: MessageType::Warning,
+                message: message.clone(),
+                source_snippet,
+            },
+            DiagnosticMessage::Error(err, _, _) => SourceMappedMessage {
+                _type: MessageType::Error,
+                message: err.to_string(),
+                source_snippet,
+            },
+        }
+    }
+
+    fn new(_type: MessageType, message: &'static str, source_snippet: &'static str) -> Self {
+        SourceMappedMessage {
+            _type,
+            message: message.to_string(),
+            source_snippet: source_snippet.to_string(),
         }
     }
 }
@@ -136,26 +155,28 @@ fn undefined_statement_error_works() {
     );
 }
 
-use SourceMappedMessage::*;
+use MessageType::*;
 
 #[test]
-fn line_without_statements_warning() {
+fn line_without_statements_warning_works() {
     assert_program_has_source_mapped_diagnostics(
         "10",
-        vec![Warning(
-            "Line contains no statements and will not be defined.".to_string(),
-            "10".to_string(),
+        vec![SourceMappedMessage::new(
+            Warning,
+            "Line contains no statements and will not be defined.",
+            "10",
         )],
     );
 }
 
 #[test]
-fn line_without_number_warning() {
+fn line_without_number_warning_works() {
     assert_program_has_source_mapped_diagnostics(
         "print 5",
-        vec![Warning(
-            "Line has no line number, ignoring it.".to_string(),
-            "".to_string(),
+        vec![SourceMappedMessage::new(
+            Warning,
+            "Line has no line number, ignoring it.",
+            "",
         )],
     );
 }
