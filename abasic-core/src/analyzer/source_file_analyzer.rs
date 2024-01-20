@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     line_number_parser::parse_line_number,
-    program::{Program, ProgramLine},
+    program::{Program, ProgramLine, ProgramLocation},
     string_manager::StringManager,
     tokenizer::Tokenizer,
     Interpreter, InterpreterError, SyntaxError, TracedInterpreterError,
@@ -43,6 +43,31 @@ impl SourceFileMap {
         self.file_line_ranges.push(ranges);
     }
 
+    pub fn map_location_to_source(
+        &self,
+        location: &ProgramLocation,
+    ) -> Option<(usize, Range<usize>)> {
+        if let ProgramLine::Line(basic_line_number) = location.line {
+            if let Some(&file_line_number) = self.basic_lines_to_file_lines.get(&basic_line_number)
+            {
+                let source_line_ranges = &self.file_line_ranges[file_line_number];
+                if let Some(token_ranges) = &source_line_ranges.token_ranges {
+                    let token_index =
+                        if location.token_index == token_ranges.len() && !token_ranges.is_empty() {
+                            // The error is at the very end of the line, just use the very last token for now.
+                            token_ranges.len() - 1
+                        } else {
+                            location.token_index
+                        };
+                    if let Some(range) = token_ranges.get(token_index) {
+                        return Some((file_line_number, range.clone()));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
         match message {
             DiagnosticMessage::Warning(file_line_number, _) => {
@@ -58,20 +83,10 @@ impl SourceFileMap {
                     _ => {}
                 }
                 if let Some(location) = err.location {
-                    if let ProgramLine::Line(basic_line_number) = location.line {
-                        if let Some(&file_line_number) =
-                            self.basic_lines_to_file_lines.get(&basic_line_number)
-                        {
-                            let source_line_ranges = &self.file_line_ranges[file_line_number];
-                            if let Some(token_ranges) = &source_line_ranges.token_ranges {
-                                if let Some(range) = token_ranges.get(location.token_index) {
-                                    return Some((file_line_number, range.clone()));
-                                }
-                            }
-                        }
-                    }
+                    self.map_location_to_source(&location)
+                } else {
+                    None
                 }
-                None
             }
         }
     }
@@ -168,12 +183,12 @@ impl SourceFileAnalyzer {
                 let result = StatementAnalyzer::new(&mut self.program).evaluate_statement();
                 if let Err(mut err) = result {
                     self.program.populate_error_location(&mut err);
-                    let basic_line_number = err.location.unwrap().as_numbered().unwrap().line;
-                    let file_line_number = *self
+                    let Some((file_line_number, _)) = self
                         .source_file_map()
-                        .basic_lines_to_file_lines
-                        .get(&basic_line_number)
-                        .unwrap();
+                        .map_location_to_source(&err.location.unwrap())
+                    else {
+                        panic!("Expected error to have a numbered program line: {:?}", err);
+                    };
                     self.messages
                         .push(DiagnosticMessage::Error(file_line_number, err));
                     break;
