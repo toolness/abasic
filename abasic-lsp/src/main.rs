@@ -1,11 +1,20 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use abasic_core::{DiagnosticMessage, SourceFileAnalyzer};
-use lsp_server::{Connection, ExtractError, Message, Notification as ServerNotification};
+use lsp_server::{
+    Connection, ErrorCode, ExtractError, Message, Notification as ServerNotification,
+    Request as ServerRequest, RequestId, Response, ResponseError,
+};
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
+    notification::{
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
+        PublishDiagnostics,
+    },
+    request::{Request, SemanticTokensFullRequest},
     Diagnostic, DiagnosticSeverity, InitializeParams, Position, PublishDiagnosticsParams, Range,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    SemanticToken, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 
 type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
@@ -29,6 +38,21 @@ fn handle_one_connection() -> LspResult<()> {
     eprintln!("Got connection.");
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
+        semantic_tokens_provider: Some(
+            lsp_types::SemanticTokensServerCapabilities::SemanticTokensOptions(
+                SemanticTokensOptions {
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                    legend: SemanticTokensLegend {
+                        token_types: vec![SemanticTokenType::COMMENT, SemanticTokenType::KEYWORD],
+                        token_modifiers: vec![],
+                    },
+                    range: None,
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                },
+            ),
+        ),
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
@@ -60,6 +84,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
     eprintln!("Starting main loop.");
 
+    let mut files: HashMap<String, String> = HashMap::new();
+
     for msg in &connection.receiver {
         eprintln!("Got message: {msg:?}");
         match msg {
@@ -68,6 +94,55 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                     return Ok(());
                 }
                 eprintln!("Got request: {req:?}");
+                match req.method.as_ref() {
+                    SemanticTokensFullRequest::METHOD => {
+                        let (id, params) = cast_request::<SemanticTokensFullRequest>(req).unwrap();
+                        let Some(content) = files.get(&params.text_document.uri.to_string()) else {
+                            connection.sender.send(Message::Response(Response {
+                                id,
+                                result: None,
+                                error: Some(ResponseError {
+                                    code: ErrorCode::RequestFailed as i32,
+                                    message: "File contents have not been sent by client"
+                                        .to_string(),
+                                    data: None,
+                                }),
+                            }))?;
+                            continue;
+                        };
+
+                        // TODO: Actually parse the content, etc.
+                        let _unused = content;
+
+                        let result = Some(SemanticTokens {
+                            result_id: None,
+                            data: vec![
+                                // TODO: Actually return real stuff for this.
+                                SemanticToken {
+                                    delta_line: 0,
+                                    delta_start: 0,
+                                    length: 2,
+                                    token_type: 0,
+                                    token_modifiers_bitset: 0,
+                                },
+                                SemanticToken {
+                                    delta_line: 1,
+                                    delta_start: 0,
+                                    length: 3,
+                                    token_type: 1,
+                                    token_modifiers_bitset: 0,
+                                },
+                            ],
+                        });
+                        let result = serde_json::to_value(&result).unwrap();
+                        connection.sender.send(Message::Response(Response {
+                            id,
+                            result: Some(result),
+                            error: None,
+                        }))?;
+                    }
+                    _ => {}
+                }
             }
             Message::Response(resp) => {
                 eprintln!("Got response: {resp:?}");
@@ -77,6 +152,10 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                 match not.method.as_ref() {
                     DidOpenTextDocument::METHOD => {
                         let params = cast_notification::<DidOpenTextDocument>(not).unwrap();
+                        files.insert(
+                            params.text_document.uri.to_string(),
+                            params.text_document.text.clone(),
+                        );
                         let diagnostics = analyze_source_file(params.text_document.text);
                         send_notification::<PublishDiagnostics>(
                             &connection,
@@ -86,12 +165,15 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                                 version: None,
                             },
                         )?;
-                        continue;
                     }
                     DidChangeTextDocument::METHOD => {
                         let params = cast_notification::<DidChangeTextDocument>(not).unwrap();
                         // TODO: I think we only get one change b/c we're using TextDocumentSyncKind::FULL but not sure...
                         if let Some(last_change) = params.content_changes.into_iter().last() {
+                            files.insert(
+                                params.text_document.uri.to_string(),
+                                last_change.text.clone(),
+                            );
                             let diagnostics = analyze_source_file(last_change.text);
                             send_notification::<PublishDiagnostics>(
                                 &connection,
@@ -102,7 +184,10 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                                 },
                             )?;
                         }
-                        continue;
+                    }
+                    DidCloseTextDocument::METHOD => {
+                        let params = cast_notification::<DidCloseTextDocument>(not).unwrap();
+                        files.remove(&params.text_document.uri.to_string());
                     }
                     _ => {}
                 }
@@ -136,6 +221,16 @@ fn analyze_source_file(text: String) -> Vec<Diagnostic> {
         }
     }
     diagnostics
+}
+
+fn cast_request<R>(
+    req: ServerRequest,
+) -> Result<(RequestId, R::Params), ExtractError<ServerRequest>>
+where
+    R: lsp_types::request::Request,
+    R::Params: serde::de::DeserializeOwned,
+{
+    req.extract(R::METHOD)
 }
 
 fn cast_notification<N>(
