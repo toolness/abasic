@@ -46,7 +46,7 @@ impl SourceMappedMessage {
                 message: message.clone(),
                 source_snippet,
             },
-            DiagnosticMessage::Error(err, _, _) => SourceMappedMessage {
+            DiagnosticMessage::Error(_line, err) => SourceMappedMessage {
                 _type: MessageType::Error,
                 message: err.to_string(),
                 source_snippet,
@@ -94,7 +94,7 @@ fn assert_program_has_error(program: &'static str, error: InterpreterError) {
     }
     let message = analyzer_messages.get(0).unwrap();
     match message {
-        abasic_core::DiagnosticMessage::Error(err, _, _) => {
+        abasic_core::DiagnosticMessage::Error(_line, err) => {
             assert_eq!(err.error, error);
         }
         _ => {

@@ -12,8 +12,10 @@ use super::statement_analyzer::StatementAnalyzer;
 
 #[derive(Debug)]
 pub enum DiagnosticMessage {
+    /// The first number is the file line number, then the warning message.
     Warning(usize, String),
-    Error(TracedInterpreterError, Option<String>, Option<usize>),
+    /// The first number is the file line number, then the error that occurred.
+    Error(usize, TracedInterpreterError),
 }
 
 #[derive(Default)]
@@ -47,16 +49,13 @@ impl SourceFileMap {
                 let source_line_ranges = &self.file_line_ranges[*file_line_number];
                 Some((*file_line_number, 0..source_line_ranges.line_number_end))
             }
-            DiagnosticMessage::Error(err, _, file_line_number) => {
-                if let Some(file_line_number) = file_line_number {
-                    match &err.error {
-                        InterpreterError::Syntax(SyntaxError::Tokenization(t)) => {
-                            let range =
-                                t.string_range(self.file_line_ranges[*file_line_number].length);
-                            return Some((*file_line_number, range));
-                        }
-                        _ => {}
+            DiagnosticMessage::Error(file_line_number, err) => {
+                match &err.error {
+                    InterpreterError::Syntax(SyntaxError::Tokenization(t)) => {
+                        let range = t.string_range(self.file_line_ranges[*file_line_number].length);
+                        return Some((*file_line_number, range));
                     }
+                    _ => {}
                 }
                 if let Some(location) = err.location {
                     if let ProgramLine::Line(basic_line_number) = location.line {
@@ -115,6 +114,10 @@ impl SourceFileAnalyzer {
         std::mem::take(&mut self.messages)
     }
 
+    pub fn take_lines(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.lines)
+    }
+
     fn warn<T: AsRef<str>>(&mut self, line_number: usize, message: T) {
         self.messages.push(DiagnosticMessage::Warning(
             line_number,
@@ -153,11 +156,7 @@ impl SourceFileAnalyzer {
                         self.program.set_numbered_line(basic_line_number, tokens);
                     }
                 }
-                Err(err) => self.messages.push(DiagnosticMessage::Error(
-                    err.into(),
-                    Some(line.clone()),
-                    Some(i),
-                )),
+                Err(err) => self.messages.push(DiagnosticMessage::Error(i, err.into())),
             }
             self.source_file_map
                 .add(basic_line_number, source_line_ranges);
@@ -169,8 +168,14 @@ impl SourceFileAnalyzer {
                 let result = StatementAnalyzer::new(&mut self.program).evaluate_statement();
                 if let Err(mut err) = result {
                     self.program.populate_error_location(&mut err);
+                    let basic_line_number = err.location.unwrap().as_numbered().unwrap().line;
+                    let file_line_number = *self
+                        .source_file_map()
+                        .basic_lines_to_file_lines
+                        .get(&basic_line_number)
+                        .unwrap();
                     self.messages
-                        .push(DiagnosticMessage::Error(err, None, None));
+                        .push(DiagnosticMessage::Error(file_line_number, err));
                     break;
                 }
             }

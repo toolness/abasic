@@ -79,6 +79,7 @@ impl StdioInterpreter {
         };
         let mut analyzer = SourceFileAnalyzer::analyze(code);
         let messages = analyzer.take_messages();
+        let lines = analyzer.take_lines();
         self.interpreter = analyzer.into_interpreter();
         let mut errored = false;
         for message in messages {
@@ -94,13 +95,14 @@ impl StdioInterpreter {
                         .yellow(),
                     );
                 }
-                abasic_core::DiagnosticMessage::Error(err, line, _) => {
+                abasic_core::DiagnosticMessage::Error(line_number, err) => {
                     if !errored {
                         self.printer.eprintln(format!(
                             "Errors were encountered when analyzing '{filename}':"
                         ));
                     }
                     errored = true;
+                    let line = Some(lines[line_number].clone());
                     self.show_error(err, line);
                 }
             }

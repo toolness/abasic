@@ -28,8 +28,8 @@ struct StackFrame {
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct NumberedProgramLocation {
-    line: u64,
-    token_index: usize,
+    pub line: u64,
+    pub token_index: usize,
 }
 
 impl NumberedProgramLocation {
