@@ -78,6 +78,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
 
                         let result = Some(GotoDefinitionResponse::Scalar(Location::new(
                             uri,
+                            // TODO: Actually find the definition!!
                             Range::new(Position::new(1, 1), Position::new(1, 1)),
                         )));
                         let result = serde_json::to_value(&result).unwrap();
