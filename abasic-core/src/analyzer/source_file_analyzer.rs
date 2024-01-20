@@ -80,10 +80,7 @@ impl SourceFileMap {
 
 #[derive(Default)]
 pub struct SourceFileAnalyzer {
-    // TODO: We should probably borrow these lines to avoid
-    // needless extra allocations.
     lines: Vec<String>,
-
     program: Program,
     messages: Vec<DiagnosticMessage>,
     string_manager: StringManager,
@@ -104,6 +101,10 @@ impl SourceFileAnalyzer {
         let mut analyzer = SourceFileAnalyzer::default();
         analyzer.run(lines);
         analyzer
+    }
+
+    pub fn source_file_lines(&self) -> &Vec<String> {
+        &self.lines
     }
 
     pub fn source_file_map(&self) -> &SourceFileMap {

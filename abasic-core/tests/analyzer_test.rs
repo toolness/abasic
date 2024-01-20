@@ -67,16 +67,21 @@ fn assert_program_has_source_mapped_diagnostics(
     program: &'static str,
     expected_messages: Vec<SourceMappedMessage>,
 ) {
-    let lines = program
-        .split('\n')
-        .map(|s| s.to_owned())
-        .collect::<Vec<_>>();
-    let mut analyzer = SourceFileAnalyzer::analyze_lines(lines.clone());
+    let mut analyzer = SourceFileAnalyzer::analyze_lines(
+        program
+            .split('\n')
+            .map(|s| s.to_owned())
+            .collect::<Vec<_>>(),
+    );
     let messages = analyzer
         .take_messages()
         .iter()
         .map(|diagnostic| {
-            SourceMappedMessage::from_diagnostic(diagnostic, analyzer.source_file_map(), &lines)
+            SourceMappedMessage::from_diagnostic(
+                diagnostic,
+                analyzer.source_file_map(),
+                analyzer.source_file_lines(),
+            )
         })
         .collect::<Vec<_>>();
     assert_eq!(messages, expected_messages);
