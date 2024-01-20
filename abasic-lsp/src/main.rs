@@ -1,9 +1,9 @@
 use std::error::Error;
 
 use abasic_core::{DiagnosticMessage, SourceFileAnalyzer};
-use lsp_server::{Connection, ExtractError, Message, Notification};
+use lsp_server::{Connection, ExtractError, Message, Notification as ServerNotification};
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
+    notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
     Diagnostic, DiagnosticSeverity, InitializeParams, Position, PublishDiagnosticsParams, Range,
     ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
 };
@@ -74,8 +74,9 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
             }
             Message::Notification(not) => {
                 eprintln!("Got notification: {not:?}");
-                match cast_notification::<DidOpenTextDocument>(&not) {
-                    Ok(params) => {
+                match not.method.as_ref() {
+                    DidOpenTextDocument::METHOD => {
+                        let params = cast_notification::<DidOpenTextDocument>(not).unwrap();
                         let diagnostics = analyze_source_file(params.text_document.text);
                         send_notification::<PublishDiagnostics>(
                             &connection,
@@ -87,11 +88,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                         )?;
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(not)) => not,
-                };
-                match cast_notification::<DidChangeTextDocument>(&not) {
-                    Ok(params) => {
+                    DidChangeTextDocument::METHOD => {
+                        let params = cast_notification::<DidChangeTextDocument>(not).unwrap();
                         // TODO: I think we only get one change b/c we're using TextDocumentSyncKind::FULL but not sure...
                         if let Some(last_change) = params.content_changes.into_iter().last() {
                             let diagnostics = analyze_source_file(last_change.text);
@@ -106,9 +104,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                         }
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(not)) => not,
-                };
+                    _ => {}
+                }
             }
         }
     }
@@ -141,21 +138,21 @@ fn analyze_source_file(text: String) -> Vec<Diagnostic> {
     diagnostics
 }
 
-fn cast_notification<N>(not: &Notification) -> Result<N::Params, ExtractError<Notification>>
+fn cast_notification<N>(
+    not: ServerNotification,
+) -> Result<N::Params, ExtractError<ServerNotification>>
 where
     N: lsp_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,
 {
-    // TODO: Can we avoid cloning here?
-    // Not sure how to do multiple `cast_notification()`'s otherwise...
-    not.clone().extract(N::METHOD)
+    not.extract(N::METHOD)
 }
 
 fn send_notification<N: lsp_types::notification::Notification>(
     connection: &Connection,
     params: N::Params,
 ) -> LspResult<()> {
-    let not = Notification::new(N::METHOD.to_string(), params);
+    let not = ServerNotification::new(N::METHOD.to_string(), params);
     connection.sender.send(not.into())?;
     Ok(())
 }
