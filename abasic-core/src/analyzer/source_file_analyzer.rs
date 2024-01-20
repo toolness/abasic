@@ -165,6 +165,13 @@ impl SourceFileAnalyzer {
                 break;
             }
         }
+
+        for message in &self.messages {
+            // TODO: We're only doing this so we don't get dead code
+            // errors, and so we can verify that this code doesn't
+            // panic. But we should actually test it separately.
+            self.source_file_map.map_to_source(message);
+        }
     }
 
     pub fn into_interpreter(mut self) -> Interpreter {
