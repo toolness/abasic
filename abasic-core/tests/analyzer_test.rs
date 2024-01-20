@@ -180,3 +180,15 @@ fn line_without_number_warning_works() {
         )],
     );
 }
+
+#[test]
+fn redefined_line_warning_works() {
+    assert_program_has_source_mapped_diagnostics(
+        "10 print 5\n10 print 10",
+        vec![SourceMappedMessage::new(
+            Warning,
+            "Redefinition of pre-existing BASIC line.",
+            "10",
+        )],
+    );
+}
