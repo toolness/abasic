@@ -1,11 +1,12 @@
 use std::error::Error;
 
+use abasic_core::{DiagnosticMessage, SourceFileAnalyzer};
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    notification::{DidOpenTextDocument, PublishDiagnostics},
+    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
     request::GotoDefinition,
-    Diagnostic, GotoDefinitionResponse, InitializeParams, Location, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
+    Diagnostic, DiagnosticSeverity, GotoDefinitionResponse, InitializeParams, Location, OneOf,
+    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 
@@ -98,22 +99,36 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
             }
             Message::Notification(not) => {
                 eprintln!("Got notification: {not:?}");
-                match cast_notification::<DidOpenTextDocument>(not) {
+                match cast_notification::<DidOpenTextDocument>(&not) {
                     Ok(params) => {
-                        let text = params.text_document.text;
-                        println!("Document text: {text}");
-                        let diag = Diagnostic::new_simple(
-                            Range::new(Position::new(1, 1), Position::new(1, 1)),
-                            "this is a diagnostic message".to_string(),
-                        );
+                        let diagnostics = analyze_source_file(params.text_document.text);
                         send_notification::<PublishDiagnostics>(
                             &connection,
                             PublishDiagnosticsParams {
                                 uri: params.text_document.uri,
-                                diagnostics: vec![diag],
+                                diagnostics,
                                 version: None,
                             },
                         )?;
+                        continue;
+                    }
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(ExtractError::MethodMismatch(not)) => not,
+                };
+                match cast_notification::<DidChangeTextDocument>(&not) {
+                    Ok(params) => {
+                        // TODO: I think we only get one change b/c we're using TextDocumentSyncKind::FULL but not sure...
+                        if let Some(last_change) = params.content_changes.into_iter().last() {
+                            let diagnostics = analyze_source_file(last_change.text);
+                            send_notification::<PublishDiagnostics>(
+                                &connection,
+                                PublishDiagnosticsParams {
+                                    uri: params.text_document.uri,
+                                    diagnostics,
+                                    version: None,
+                                },
+                            )?;
+                        }
                         continue;
                     }
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
@@ -126,6 +141,31 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     Ok(())
 }
 
+fn analyze_source_file(text: String) -> Vec<Diagnostic> {
+    let mut analyzer = SourceFileAnalyzer::analyze(text);
+    let messages = analyzer.take_messages();
+    let mut diagnostics: Vec<Diagnostic> = vec![];
+    let source_map = analyzer.source_file_map();
+    for message in messages {
+        if let Some((line, range)) = source_map.map_to_source(&message) {
+            let diag_range = Range::new(
+                Position::new(line as u32, range.start as u32),
+                Position::new(line as u32, range.end as u32),
+            );
+            let (severity, content) = match message {
+                DiagnosticMessage::Warning(_line, msg) => (DiagnosticSeverity::WARNING, msg),
+                DiagnosticMessage::Error(_line, err) => {
+                    (DiagnosticSeverity::ERROR, err.to_string())
+                }
+            };
+            let mut diag = Diagnostic::new_simple(diag_range, content);
+            diag.severity = Some(severity);
+            diagnostics.push(diag);
+        }
+    }
+    diagnostics
+}
+
 fn cast_request<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
 where
     R: lsp_types::request::Request,
@@ -134,12 +174,14 @@ where
     req.extract(R::METHOD)
 }
 
-fn cast_notification<N>(not: Notification) -> Result<N::Params, ExtractError<Notification>>
+fn cast_notification<N>(not: &Notification) -> Result<N::Params, ExtractError<Notification>>
 where
     N: lsp_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,
 {
-    not.extract(N::METHOD)
+    // TODO: Can we avoid cloning here?
+    // Not sure how to do multiple `cast_notification()`'s otherwise...
+    not.clone().extract(N::METHOD)
 }
 
 fn send_notification<N: lsp_types::notification::Notification>(
