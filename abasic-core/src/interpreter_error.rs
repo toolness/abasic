@@ -47,7 +47,7 @@ impl TracedInterpreterError {
         }
         if let Some(line) = line {
             if let InterpreterError::Syntax(SyntaxError::Tokenization(tok)) = &self.error {
-                let range = tok.string_range(line.as_ref());
+                let range = tok.string_range(line.as_ref().len());
                 return vec![
                     line.as_ref().to_owned(),
                     format!(

@@ -25,8 +25,7 @@ impl<'a> StatementAnalyzer<'a> {
             Some(Token::Print) | Some(Token::QuestionMark) => self.evaluate_print_statement(),
             Some(Token::Input) => self.evaluate_input_statement(),
             Some(Token::If) => self.evaluate_if_statement(),
-            Some(Token::Goto) => self.evaluate_goto_statement(),
-            Some(Token::Gosub) => self.evaluate_gosub_statement(),
+            Some(Token::Goto | Token::Gosub) => self.evaluate_goto_or_gosub_statement(),
             Some(Token::Return) => Ok(()),
             // Dartmouth BASIC only allowed END at the very end of a program,
             // while Applesoft allowed it anywhere. We'll do the latter.
@@ -180,22 +179,19 @@ impl<'a> StatementAnalyzer<'a> {
         Ok(())
     }
 
-    fn evaluate_goto_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        let Some(Token::NumericLiteral(line_number)) = self.program().next_token() else {
-            return Err(InterpreterError::UndefinedStatement.into());
-        };
-        // TODO: Do something with the line number.
-        let _unused_for_now = line_number;
-        Ok(())
+    fn ensure_valid_line_number(&self, line_number: f64) -> Result<(), TracedInterpreterError> {
+        if !self.program.has_line_number(line_number as u64) {
+            Err(InterpreterError::UndefinedStatement.into())
+        } else {
+            Ok(())
+        }
     }
 
-    fn evaluate_gosub_statement(&mut self) -> Result<(), TracedInterpreterError> {
+    fn evaluate_goto_or_gosub_statement(&mut self) -> Result<(), TracedInterpreterError> {
         let Some(Token::NumericLiteral(line_number)) = self.program().next_token() else {
             return Err(InterpreterError::UndefinedStatement.into());
         };
-        // TODO: Do something with the line number.
-        let _unused_for_now = line_number;
-        Ok(())
+        self.ensure_valid_line_number(line_number)
     }
 
     fn evaluate_for_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -254,7 +250,7 @@ impl<'a> StatementAnalyzer<'a> {
 
     fn evaluate_statement_or_goto_line_number(&mut self) -> Result<(), TracedInterpreterError> {
         if let Some(Token::NumericLiteral(_)) = self.program().peek_next_token() {
-            self.evaluate_goto_statement()
+            self.evaluate_goto_or_gosub_statement()
         } else {
             self.evaluate_statement()
         }

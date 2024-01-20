@@ -13,10 +13,10 @@ pub enum TokenizationError {
 }
 
 impl TokenizationError {
-    pub fn string_range(&self, string: &str) -> Range<usize> {
+    pub fn string_range(&self, string_length: usize) -> Range<usize> {
         match &self {
             TokenizationError::IllegalCharacter(i) => *i..*i + 1,
-            TokenizationError::UnterminatedStringLiteral(i) => *i..string.len(),
+            TokenizationError::UnterminatedStringLiteral(i) => *i..string_length,
             TokenizationError::InvalidNumber(range) => range.clone(),
         }
     }

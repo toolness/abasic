@@ -1,4 +1,5 @@
 use crate::{
+    builtins::Builtin,
     operators::{AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp, UnaryOp},
     program::Program,
     symbol::Symbol,
@@ -74,15 +75,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         function_name: &Symbol,
     ) -> Result<Option<ValueType>, TracedInterpreterError> {
-        let result = match function_name.as_str() {
-            "ABS" => self.evaluate_unary_number_function_arg(),
-            "INT" => self.evaluate_unary_number_function_arg(),
-            "RND" => self.evaluate_unary_number_function_arg(),
-            _ => {
-                return self.evaluate_user_defined_function_call(function_name);
+        if let Some(builtin) = Builtin::try_from(function_name) {
+            match builtin {
+                Builtin::Abs | Builtin::Int | Builtin::Rnd => {
+                    self.evaluate_unary_number_function_arg()
+                }
             }
-        };
-        result.map(|value| Some(value))
+            .map(|value| Some(value))
+        } else {
+            self.evaluate_user_defined_function_call(function_name)
+        }
     }
 
     fn evaluate_expression_term(&mut self) -> Result<ValueType, TracedInterpreterError> {

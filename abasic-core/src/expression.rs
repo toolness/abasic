@@ -1,4 +1,5 @@
 use crate::{
+    builtins::Builtin,
     operators::{
         evaluate_exponent, evaluate_logical_and, evaluate_logical_or, AddOrSubtractOp, EqualityOp,
         MultiplyOrDivideOp, UnaryOp,
@@ -100,18 +101,19 @@ impl<'a> ExpressionEvaluator<'a> {
         &mut self,
         function_name: &Symbol,
     ) -> Result<Option<Value>, TracedInterpreterError> {
-        let result = match function_name.as_str() {
-            "ABS" => self.evaluate_unary_number_function(|num| num.abs()),
-            "INT" => self.evaluate_unary_number_function(|num| num.floor()),
-            "RND" => {
-                let number = self.evaluate_unary_number_function_arg()?;
-                Ok(self.interpreter.rng.rnd(number)?.into())
+        if let Some(builtin) = Builtin::try_from(function_name) {
+            match builtin {
+                Builtin::Abs => self.evaluate_unary_number_function(|num| num.abs()),
+                Builtin::Int => self.evaluate_unary_number_function(|num| num.floor()),
+                Builtin::Rnd => {
+                    let number = self.evaluate_unary_number_function_arg()?;
+                    Ok(self.interpreter.rng.rnd(number)?.into())
+                }
             }
-            _ => {
-                return self.evaluate_user_defined_function_call(function_name);
-            }
-        };
-        result.map(|value| Some(value))
+            .map(|value| Some(value))
+        } else {
+            self.evaluate_user_defined_function_call(function_name)
+        }
     }
 
     fn evaluate_expression_term(&mut self) -> Result<Value, TracedInterpreterError> {
