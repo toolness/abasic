@@ -20,6 +20,7 @@ pub enum DiagnosticMessage {
 struct SourceLineRanges {
     line_number_end: usize,
     token_ranges: Option<Vec<Range<usize>>>,
+    length: usize,
 }
 
 #[derive(Default)]
@@ -40,11 +41,7 @@ impl SourceFileMap {
         self.file_line_ranges.push(ranges);
     }
 
-    fn map_to_source(
-        &self,
-        message: &DiagnosticMessage,
-        lines: &Vec<String>,
-    ) -> Option<(usize, Range<usize>)> {
+    fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
         match message {
             DiagnosticMessage::Warning(file_line_number, _) => {
                 let source_line_ranges = &self.file_line_ranges[*file_line_number];
@@ -54,8 +51,8 @@ impl SourceFileMap {
                 if let Some(file_line_number) = file_line_number {
                     match &err.error {
                         InterpreterError::Syntax(SyntaxError::Tokenization(t)) => {
-                            let line = &lines[*file_line_number];
-                            let range = t.string_range(line.as_str());
+                            let range =
+                                t.string_range(self.file_line_ranges[*file_line_number].length);
                             return Some((*file_line_number, range));
                         }
                         _ => {}
@@ -125,6 +122,7 @@ impl SourceFileAnalyzer {
             };
             let mut source_line_ranges = SourceLineRanges {
                 line_number_end,
+                length: line.len(),
                 ..Default::default()
             };
             if self.program.has_line_number(basic_line_number) {
