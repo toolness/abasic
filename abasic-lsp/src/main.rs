@@ -1,3 +1,6 @@
+/// For details on what a lot of this code is doing, see the LSP specification:
+///
+/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 use std::{collections::HashMap, error::Error};
 
 use abasic_core::{DiagnosticMessage, SourceFileAnalyzer, TokenType};
@@ -18,7 +21,7 @@ type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
 
 const LISTEN_ADDR: &'static str = "127.0.0.1:5007";
 
-// This is mostly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
+// This is partly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
 fn main() -> LspResult<()> {
     eprintln!("Starting LSP server on {LISTEN_ADDR}.");
 
@@ -124,45 +127,15 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                     CastResult::Match((id, params)) => {
                         let Some(analyzer) = files.get(&params.text_document.uri.to_string())
                         else {
-                            connection.sender.send(Message::Response(Response {
+                            send_request_failed_error(
+                                &connection,
                                 id,
-                                result: None,
-                                error: Some(ResponseError {
-                                    code: ErrorCode::RequestFailed as i32,
-                                    message: "File contents have not been sent by client"
-                                        .to_string(),
-                                    data: None,
-                                }),
-                            }))?;
+                                "File contents have not been sent by client".to_string(),
+                            )?;
                             continue;
                         };
 
-                        let mut data: Vec<SemanticToken> = vec![];
-                        let mut prev_line_number = 0;
-                        for (line_number, line) in analyzer.token_types().iter().enumerate() {
-                            let mut prev_token_start = 0;
-                            for (abasic_token_type, range) in line {
-                                let delta_line = (line_number - prev_line_number) as u32;
-                                prev_line_number = line_number;
-                                let delta_start = (range.start - prev_token_start) as u32;
-                                prev_token_start = range.start;
-                                let length = range.len() as u32;
-                                let token_type =
-                                    abasic_token_type_to_lsp_token_type(*abasic_token_type);
-                                data.push(SemanticToken {
-                                    delta_line,
-                                    delta_start,
-                                    length,
-                                    token_type,
-                                    token_modifiers_bitset: 0,
-                                })
-                            }
-                        }
-
-                        let result = Some(SemanticTokens {
-                            result_id: None,
-                            data,
-                        });
+                        let result = Some(get_semantic_tokens(analyzer));
                         let result = serde_json::to_value(&result).unwrap();
                         connection.sender.send(Message::Response(Response {
                             id,
@@ -230,6 +203,50 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     }
 
     Ok(())
+}
+
+fn send_request_failed_error(
+    connection: &Connection,
+    id: RequestId,
+    message: String,
+) -> Result<(), impl Error> {
+    connection.sender.send(Message::Response(Response {
+        id,
+        result: None,
+        error: Some(ResponseError {
+            code: ErrorCode::RequestFailed as i32,
+            message,
+            data: None,
+        }),
+    }))
+}
+
+fn get_semantic_tokens(analyzer: &SourceFileAnalyzer) -> SemanticTokens {
+    let mut data: Vec<SemanticToken> = vec![];
+    let mut prev_line_number = 0;
+    for (line_number, line) in analyzer.token_types().iter().enumerate() {
+        let mut prev_token_start = 0;
+        for (abasic_token_type, range) in line {
+            let delta_line = (line_number - prev_line_number) as u32;
+            prev_line_number = line_number;
+            let delta_start = (range.start - prev_token_start) as u32;
+            prev_token_start = range.start;
+            let length = range.len() as u32;
+            let token_type = abasic_token_type_to_lsp_token_type(*abasic_token_type);
+            data.push(SemanticToken {
+                delta_line,
+                delta_start,
+                length,
+                token_type,
+                token_modifiers_bitset: 0,
+            })
+        }
+    }
+
+    SemanticTokens {
+        result_id: None,
+        data,
+    }
 }
 
 fn analyze_source_file(analyzer: &SourceFileAnalyzer) -> Vec<Diagnostic> {
