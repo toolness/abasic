@@ -84,7 +84,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
     eprintln!("Starting main loop.");
 
-    let mut files: HashMap<String, String> = HashMap::new();
+    let mut files: HashMap<String, SourceFileAnalyzer> = HashMap::new();
 
     for msg in &connection.receiver {
         eprintln!("Got message: {msg:?}");
@@ -97,7 +97,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                 match req.method.as_ref() {
                     SemanticTokensFullRequest::METHOD => {
                         let (id, params) = cast_request::<SemanticTokensFullRequest>(req).unwrap();
-                        let Some(content) = files.get(&params.text_document.uri.to_string()) else {
+                        let Some(analyzer) = files.get(&params.text_document.uri.to_string())
+                        else {
                             connection.sender.send(Message::Response(Response {
                                 id,
                                 result: None,
@@ -112,7 +113,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                         };
 
                         // TODO: Actually parse the content, etc.
-                        let _unused = content;
+                        let _unused = analyzer;
 
                         let result = Some(SemanticTokens {
                             result_id: None,
@@ -152,11 +153,9 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                 match not.method.as_ref() {
                     DidOpenTextDocument::METHOD => {
                         let params = cast_notification::<DidOpenTextDocument>(not).unwrap();
-                        files.insert(
-                            params.text_document.uri.to_string(),
-                            params.text_document.text.clone(),
-                        );
-                        let diagnostics = analyze_source_file(params.text_document.text);
+                        let analyzer = SourceFileAnalyzer::analyze(params.text_document.text);
+                        let diagnostics = analyze_source_file(&analyzer);
+                        files.insert(params.text_document.uri.to_string(), analyzer);
                         send_notification::<PublishDiagnostics>(
                             &connection,
                             PublishDiagnosticsParams {
@@ -170,11 +169,9 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                         let params = cast_notification::<DidChangeTextDocument>(not).unwrap();
                         // TODO: I think we only get one change b/c we're using TextDocumentSyncKind::FULL but not sure...
                         if let Some(last_change) = params.content_changes.into_iter().last() {
-                            files.insert(
-                                params.text_document.uri.to_string(),
-                                last_change.text.clone(),
-                            );
-                            let diagnostics = analyze_source_file(last_change.text);
+                            let analyzer = SourceFileAnalyzer::analyze(last_change.text);
+                            let diagnostics = analyze_source_file(&analyzer);
+                            files.insert(params.text_document.uri.to_string(), analyzer);
                             send_notification::<PublishDiagnostics>(
                                 &connection,
                                 PublishDiagnosticsParams {
@@ -198,9 +195,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     Ok(())
 }
 
-fn analyze_source_file(text: String) -> Vec<Diagnostic> {
-    let mut analyzer = SourceFileAnalyzer::analyze(text);
-    let messages = analyzer.take_messages();
+fn analyze_source_file(analyzer: &SourceFileAnalyzer) -> Vec<Diagnostic> {
+    let messages = analyzer.messages();
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let source_map = analyzer.source_file_map();
     for message in messages {
@@ -210,7 +206,9 @@ fn analyze_source_file(text: String) -> Vec<Diagnostic> {
                 Position::new(line as u32, range.end as u32),
             );
             let (severity, content) = match message {
-                DiagnosticMessage::Warning(_line, msg) => (DiagnosticSeverity::WARNING, msg),
+                DiagnosticMessage::Warning(_line, msg) => {
+                    (DiagnosticSeverity::WARNING, msg.clone())
+                }
                 DiagnosticMessage::Error(_line, err) => {
                     (DiagnosticSeverity::ERROR, err.to_string())
                 }

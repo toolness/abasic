@@ -181,6 +181,10 @@ impl SourceFileAnalyzer {
         analyzer
     }
 
+    pub fn messages(&self) -> &Vec<DiagnosticMessage> {
+        &self.messages
+    }
+
     pub fn source_file_lines(&self) -> &Vec<String> {
         &self.lines
     }
@@ -193,7 +197,7 @@ impl SourceFileAnalyzer {
         std::mem::take(&mut self.messages)
     }
 
-    pub fn take_lines(&mut self) -> Vec<String> {
+    pub fn take_source_file_lines(&mut self) -> Vec<String> {
         std::mem::take(&mut self.lines)
     }
 

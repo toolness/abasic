@@ -79,7 +79,7 @@ impl StdioInterpreter {
         };
         let mut analyzer = SourceFileAnalyzer::analyze(code);
         let messages = analyzer.take_messages();
-        let lines = analyzer.take_lines();
+        let lines = analyzer.take_source_file_lines();
         self.interpreter = analyzer.into_interpreter();
         let mut errored = false;
         for message in messages {
