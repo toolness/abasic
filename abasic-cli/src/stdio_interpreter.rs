@@ -81,6 +81,9 @@ impl StdioInterpreter {
         let messages = analyzer.take_messages();
         let lines = analyzer.take_source_file_lines();
         self.interpreter = analyzer.into_interpreter();
+        if self.args.skip_check {
+            return Ok(());
+        }
         let mut errored = false;
         for message in messages {
             match message {
@@ -109,7 +112,7 @@ impl StdioInterpreter {
         }
         if errored {
             self.printer
-                .eprintln("Please fix the above errors before running the program again.");
+                .eprintln("Please fix the above errors before running the program again, or use --skip-check to disable static analysis.");
             Err(1)
         } else {
             Ok(())

@@ -256,6 +256,11 @@ There's a lot of things that haven't been implemented, some of which include:
   expediency, though I also liked the idea of preserving the behavior of
   first-generation BASIC interpreters.
 
+  That said, when loading input from a file, ABASIC performs static analysis,
+  and will error if it notices anything out of the ordinary, such as a type
+  mismatch, a `GOTO` to an undefined line number, or the line shown above.
+  This can be disabled with the `--skip-check` flag.
+
 * ABASIC has the optional ability to warn users about suspect code,
   such as when a variable that has never been assigned to is used in an
   expression (in such cases the variable defaults to zero or an empty string,

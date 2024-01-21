@@ -13,9 +13,13 @@ pub struct CliArgs {
     #[arg(short, long)]
     interactive: bool,
 
-    /// Enable warnings (e.g. use of undeclared variables).
+    /// Enable runtime warnings (e.g. use of undeclared variables).
     #[arg(short, long)]
     pub warnings: bool,
+
+    /// Skip static analysis of input files.
+    #[arg(short, long)]
+    pub skip_check: bool,
 
     /// Enable line number tracing
     #[arg(short, long)]
