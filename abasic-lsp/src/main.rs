@@ -71,6 +71,9 @@ fn handle_one_connection() -> LspResult<()> {
                         token_modifiers: vec![],
                     },
                     range: None,
+                    // TODO: It'd be nice to be more incremental in our approach,
+                    // it's expensive to send a full re-tokenization on every
+                    // keystroke.
                     full: Some(SemanticTokensFullOptions::Bool(true)),
                 },
             ),
@@ -78,6 +81,8 @@ fn handle_one_connection() -> LspResult<()> {
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
+                // TODO: It'd be nice to do deltas eventually, this can get really
+                // expensive to do on every keystroke.
                 change: Some(TextDocumentSyncKind::FULL),
                 will_save: None,
                 will_save_wait_until: None,

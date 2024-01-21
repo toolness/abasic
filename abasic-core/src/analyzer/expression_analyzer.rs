@@ -8,6 +8,9 @@ use crate::{
 
 use super::value_type::ValueType;
 
+/// This is basically a fork of the expression evaluator, which isn't great.
+/// Ideally we'd have some kind of abstraction that allowed the evaluator and
+/// analyzer to share the same core parsing logic.
 pub struct ExpressionAnalyzer<'a> {
     program: &'a mut Program,
 }

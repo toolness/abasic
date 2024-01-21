@@ -9,6 +9,9 @@ struct LValue {
     array_index_arity: Option<usize>,
 }
 
+/// This is basically a fork of the statement evaluator, which isn't great.
+/// Ideally we'd have some kind of abstraction that allowed the evaluator and
+/// analyzer to share the same core parsing logic.
 pub struct StatementAnalyzer<'a> {
     program: &'a mut Program,
 }
