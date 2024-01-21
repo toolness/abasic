@@ -250,7 +250,7 @@ fn token_types_works() {
     use TokenType::*;
 
     assert_program_token_types(
-        "10 print \"hi\"",
-        vec![vec![(Number, 0..2), (Keyword, 3..8), (String, 9..13)]],
+        "10 pr int  \"hi\"",
+        vec![vec![(Number, 0..2), (Keyword, 3..9), (String, 11..15)]],
     );
 }
