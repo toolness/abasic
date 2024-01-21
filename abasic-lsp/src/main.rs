@@ -6,11 +6,8 @@ use lsp_server::{
     Request as ServerRequest, RequestId, Response, ResponseError,
 };
 use lsp_types::{
-    notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
-        PublishDiagnostics,
-    },
-    request::{Request, SemanticTokensFullRequest},
+    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
+    request::SemanticTokensFullRequest,
     Diagnostic, DiagnosticSeverity, InitializeParams, Position, PublishDiagnosticsParams, Range,
     SemanticToken, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
     SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
@@ -112,16 +109,14 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
     let mut files: HashMap<String, SourceFileAnalyzer> = HashMap::new();
 
     for msg in &connection.receiver {
-        eprintln!("Got message: {msg:?}");
         match msg {
             Message::Request(req) => {
+                eprintln!("Got request: {}", req.method);
                 if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
-                eprintln!("Got request: {req:?}");
-                match req.method.as_ref() {
-                    SemanticTokensFullRequest::METHOD => {
-                        let (id, params) = cast_request::<SemanticTokensFullRequest>(req).unwrap();
+                let req = match cast_request::<SemanticTokensFullRequest>(req) {
+                    CastResult::Match((id, params)) => {
                         let Some(analyzer) = files.get(&params.text_document.uri.to_string())
                         else {
                             connection.sender.send(Message::Response(Response {
@@ -169,18 +164,19 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                             result: Some(result),
                             error: None,
                         }))?;
+                        continue;
                     }
-                    _ => {}
-                }
+                    CastResult::NoMatch(req) => req,
+                };
+                eprintln!("Unhandled request: {req:?}");
             }
             Message::Response(resp) => {
-                eprintln!("Got response: {resp:?}");
+                eprintln!("Unhandled response: {resp:?}");
             }
             Message::Notification(not) => {
-                eprintln!("Got notification: {not:?}");
-                match not.method.as_ref() {
-                    DidOpenTextDocument::METHOD => {
-                        let params = cast_notification::<DidOpenTextDocument>(not).unwrap();
+                eprintln!("Got notification: {}", not.method);
+                let not = match cast_notification::<DidOpenTextDocument>(not) {
+                    CastResult::Match(params) => {
                         let analyzer = SourceFileAnalyzer::analyze(params.text_document.text);
                         let diagnostics = analyze_source_file(&analyzer);
                         files.insert(params.text_document.uri.to_string(), analyzer);
@@ -192,9 +188,12 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                                 version: None,
                             },
                         )?;
+                        continue;
                     }
-                    DidChangeTextDocument::METHOD => {
-                        let params = cast_notification::<DidChangeTextDocument>(not).unwrap();
+                    CastResult::NoMatch(not) => not,
+                };
+                let not = match cast_notification::<DidChangeTextDocument>(not) {
+                    CastResult::Match(params) => {
                         // TODO: I think we only get one change b/c we're using TextDocumentSyncKind::FULL but not sure...
                         if let Some(last_change) = params.content_changes.into_iter().last() {
                             let analyzer = SourceFileAnalyzer::analyze(last_change.text);
@@ -209,13 +208,18 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                                 },
                             )?;
                         }
+                        continue;
                     }
-                    DidCloseTextDocument::METHOD => {
-                        let params = cast_notification::<DidCloseTextDocument>(not).unwrap();
+                    CastResult::NoMatch(not) => not,
+                };
+                let not = match cast_notification::<DidChangeTextDocument>(not) {
+                    CastResult::Match(params) => {
                         files.remove(&params.text_document.uri.to_string());
+                        continue;
                     }
-                    _ => {}
-                }
+                    CastResult::NoMatch(not) => not,
+                };
+                eprintln!("Unhandled notification: {not:?}");
             }
         }
     }
@@ -249,24 +253,40 @@ fn analyze_source_file(analyzer: &SourceFileAnalyzer) -> Vec<Diagnostic> {
     diagnostics
 }
 
-fn cast_request<R>(
-    req: ServerRequest,
-) -> Result<(RequestId, R::Params), ExtractError<ServerRequest>>
+/// Represents the result of an attempted cast. In the case of no match, ownership of
+/// the original subject is passed back to the caller so they can do something with it
+/// (e.g., attempt to cast it to something else).
+pub enum CastResult<Subject, Target> {
+    Match(Target),
+    NoMatch(Subject),
+}
+
+fn cast_request<R>(req: ServerRequest) -> CastResult<ServerRequest, (RequestId, R::Params)>
 where
     R: lsp_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
 {
-    req.extract(R::METHOD)
+    match req.extract::<R::Params>(R::METHOD) {
+        Ok(result) => CastResult::Match(result),
+        Err(ExtractError::MethodMismatch(req)) => CastResult::NoMatch(req),
+        Err(ExtractError::JsonError { method, error }) => {
+            panic!("Failed to deserialize {method} {error:?}");
+        }
+    }
 }
 
-fn cast_notification<N>(
-    not: ServerNotification,
-) -> Result<N::Params, ExtractError<ServerNotification>>
+fn cast_notification<N>(not: ServerNotification) -> CastResult<ServerNotification, N::Params>
 where
     N: lsp_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,
 {
-    not.extract(N::METHOD)
+    match not.extract::<N::Params>(N::METHOD) {
+        Ok(params) => CastResult::Match(params),
+        Err(ExtractError::MethodMismatch(not)) => CastResult::NoMatch(not),
+        Err(ExtractError::JsonError { method, error }) => {
+            panic!("Failed to deserialize {method} {error:?}");
+        }
+    }
 }
 
 fn send_notification<N: lsp_types::notification::Notification>(
