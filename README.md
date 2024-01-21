@@ -110,7 +110,7 @@ is in the `abasic-lsp` directory.
 
 At the moment, actually using it takes a bit of work:
 
-1. In the terminal, run the LSP server with `cargo run -p abasic-lsp`.
+1. In the terminal, run the LSP server with `cargo run -p abasic-lsp -- --listen`.
 
 2. In VSCode, open the root of the repository and press F5.
 
