@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     line_number_parser::parse_line_number,
-    program::{Program, ProgramLine, ProgramLocation},
+    program::{NumberedProgramLocation, Program, ProgramLine, ProgramLocation},
     string_manager::StringManager,
     tokenizer::Tokenizer,
     Interpreter, InterpreterError, SyntaxError, Token, TracedInterpreterError,
@@ -10,10 +10,26 @@ use crate::{
 
 use super::statement_analyzer::StatementAnalyzer;
 
+/// The way we're encoding error/warning locations here is an
+/// unmitigated disaster:
+///
+///   * We don't really have a consistent way of pointing to "a place in
+///     a BASIC program". Sometimes we want to point at a line number, which
+///     isn't part of the tokenization process, while other times we want to
+///     point at a particular place in the tokenized form of the program,
+///     while other times a tokenization error has occurred, and we need
+///     to point to a particular range in a string.
+///
+///   * This is further complicated by the fact that we sometimes want to
+///     show errors in the parsed version of the code (e.g., so the user
+///     can easily see that their "NOTCOOL" variable is actually parsed as
+///     "NOT COOL"), while in other contexts we want to be able to point
+///     at the original source file (e.g. for use by text editors).
 #[derive(Debug)]
 pub enum DiagnosticMessage {
-    /// The first number is the file line number, then the warning message.
-    Warning(usize, String),
+    /// The first number is the file line number, then an optional program location,
+    /// then the warning message.
+    Warning(usize, Option<NumberedProgramLocation>, String),
     /// The first number is the file line number, then the error that occurred.
     Error(usize, TracedInterpreterError),
 }
@@ -70,9 +86,13 @@ impl SourceFileMap {
 
     pub fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
         match message {
-            DiagnosticMessage::Warning(file_line_number, _) => {
-                let source_line_ranges = &self.file_line_ranges[*file_line_number];
-                Some((*file_line_number, 0..source_line_ranges.line_number_end))
+            DiagnosticMessage::Warning(file_line_number, location, _) => {
+                if let Some(location) = location {
+                    self.map_location_to_source(&(*location).into())
+                } else {
+                    let source_line_ranges = &self.file_line_ranges[*file_line_number];
+                    Some((*file_line_number, 0..source_line_ranges.line_number_end))
+                }
             }
             DiagnosticMessage::Error(file_line_number, err) => {
                 match &err.error {
@@ -205,9 +225,10 @@ impl SourceFileAnalyzer {
         &self.line_tokens
     }
 
-    fn warn<T: AsRef<str>>(&mut self, line_number: usize, message: T) {
+    fn warn_line<T: AsRef<str>>(&mut self, line_number: usize, message: T) {
         self.messages.push(DiagnosticMessage::Warning(
             line_number,
+            None,
             message.as_ref().to_string(),
         ));
     }
@@ -222,7 +243,7 @@ impl SourceFileAnalyzer {
             let Some((basic_line_number, line_number_end)) = parse_line_number(line) else {
                 self.source_file_map.add_empty();
                 self.line_tokens.push(vec![]);
-                self.warn(i, "Line has no line number, ignoring it.");
+                self.warn_line(i, "Line has no line number, ignoring it.");
                 continue;
             };
             let mut source_line_ranges = SourceLineRanges {
@@ -233,7 +254,7 @@ impl SourceFileAnalyzer {
             let mut line_tokens: Vec<(TokenType, Range<usize>)> =
                 vec![(TokenType::Number, 0..line_number_end)];
             if self.program.has_line_number(basic_line_number) {
-                self.warn(i, "Redefinition of pre-existing BASIC line.");
+                self.warn_line(i, "Redefinition of pre-existing BASIC line.");
             }
             let tokenize_result = Tokenizer::new(line, &mut self.string_manager)
                 .skip_bytes(line_number_end)
@@ -245,7 +266,7 @@ impl SourceFileAnalyzer {
                     }
                     source_line_ranges.token_ranges = Some(token_ranges);
                     if tokens.is_empty() {
-                        self.warn(i, "Line contains no statements and will not be defined.");
+                        self.warn_line(i, "Line contains no statements and will not be defined.");
                     } else {
                         self.program.set_numbered_line(basic_line_number, tokens);
                     }

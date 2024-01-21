@@ -84,7 +84,7 @@ impl StdioInterpreter {
         let mut errored = false;
         for message in messages {
             match message {
-                abasic_core::DiagnosticMessage::Warning(file_line_number, message) => {
+                abasic_core::DiagnosticMessage::Warning(file_line_number, _, message) => {
                     self.printer.eprintln(
                         format!(
                             "Warning on line {} of '{}': {}",

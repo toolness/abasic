@@ -44,7 +44,7 @@ impl SourceMappedMessage {
         };
         let source_snippet = lines[line][range].to_string();
         match diagnostic {
-            DiagnosticMessage::Warning(line, message) => SourceMappedMessage {
+            DiagnosticMessage::Warning(line, _, message) => SourceMappedMessage {
                 _type: MessageType::Warning,
                 message: message.clone(),
                 line: *line,

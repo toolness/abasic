@@ -274,7 +274,7 @@ fn analyze_source_file(analyzer: &SourceFileAnalyzer) -> Vec<Diagnostic> {
                 Position::new(line as u32, range.end as u32),
             );
             let (severity, content) = match message {
-                DiagnosticMessage::Warning(_line, msg) => {
+                DiagnosticMessage::Warning(_line, _loc, msg) => {
                     (DiagnosticSeverity::WARNING, msg.clone())
                 }
                 DiagnosticMessage::Error(_line, err) => {
