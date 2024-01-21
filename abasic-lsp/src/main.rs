@@ -4,8 +4,9 @@
 use std::{collections::HashMap, error::Error};
 
 use abasic_core::{DiagnosticMessage, SourceFileAnalyzer, TokenType};
+use clap::Parser;
 use lsp_server::{
-    Connection, ErrorCode, ExtractError, Message, Notification as ServerNotification,
+    Connection, ErrorCode, ExtractError, IoThreads, Message, Notification as ServerNotification,
     Request as ServerRequest, RequestId, Response, ResponseError,
 };
 use lsp_types::{
@@ -17,16 +18,35 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 
-type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct CliArgs {
+    /// Listen on port 5007. Otherwise, stdio will be used.
+    #[arg(short, long)]
+    listen: bool,
+}
 
 const LISTEN_ADDR: &'static str = "127.0.0.1:5007";
 
+type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
+
 // This is partly based off https://github.com/rust-lang/rust-analyzer/blob/master/lib/lsp-server/examples/goto_def.rs
 fn main() -> LspResult<()> {
-    eprintln!("Starting LSP server on {LISTEN_ADDR}.");
+    let args = CliArgs::parse();
 
-    loop {
-        handle_one_connection()?;
+    if args.listen {
+        eprintln!("Starting LSP server on {LISTEN_ADDR}.");
+
+        loop {
+            eprintln!("Waiting for connection.");
+            let (connection, io_threads) = Connection::listen(LISTEN_ADDR)?;
+            eprintln!("Got connection.");
+            handle_one_connection(connection, io_threads)?;
+        }
+    } else {
+        eprintln!("Starting LSP server on stdio.");
+        let (connection, io_threads) = Connection::stdio();
+        handle_one_connection(connection, io_threads)
     }
 }
 
@@ -55,13 +75,7 @@ fn abasic_token_type_to_lsp_token_type(abasic_token_type: TokenType) -> u32 {
     }
 }
 
-fn handle_one_connection() -> LspResult<()> {
-    eprintln!("Waiting for connection.");
-
-    let (connection, io_threads) = Connection::listen(LISTEN_ADDR)?;
-
-    eprintln!("Got connection.");
-
+fn handle_one_connection(connection: Connection, io_threads: IoThreads) -> LspResult<()> {
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         semantic_tokens_provider: Some(
             lsp_types::SemanticTokensServerCapabilities::SemanticTokensOptions(

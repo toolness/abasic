@@ -22,6 +22,7 @@ name = "abasic-lsp"
 version = "0.1.0"
 dependencies = [
  "abasic-core",
+ "clap",
  "lsp-server",
  "lsp-types",
  "serde",
