@@ -1,5 +1,7 @@
+use std::ops::Range;
+
 use abasic_core::{
-    DiagnosticMessage, InterpreterError, SourceFileAnalyzer, SourceFileMap, SyntaxError,
+    DiagnosticMessage, InterpreterError, SourceFileAnalyzer, SourceFileMap, SyntaxError, TokenType,
 };
 
 fn analyze(program: &'static str) -> SourceFileAnalyzer {
@@ -110,6 +112,13 @@ fn assert_program_has_error(program: &'static str, error: InterpreterError) {
             panic!("Expected analyzer for program {program} to have one error but got {message:?}");
         }
     }
+}
+
+fn assert_program_token_types(
+    program: &'static str,
+    token_types: Vec<Vec<(TokenType, Range<usize>)>>,
+) {
+    assert_eq!(analyze(program).token_types(), &token_types);
 }
 
 #[test]
@@ -233,5 +242,15 @@ fn type_mismatch_works() {
             0,
             "\"hi\"",
         )],
+    );
+}
+
+#[test]
+fn token_types_works() {
+    use TokenType::*;
+
+    assert_program_token_types(
+        "10 print \"hi\"",
+        vec![vec![(Number, 0..2), (Keyword, 3..8), (String, 9..13)]],
     );
 }

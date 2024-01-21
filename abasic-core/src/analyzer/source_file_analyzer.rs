@@ -5,7 +5,7 @@ use crate::{
     program::{Program, ProgramLine, ProgramLocation},
     string_manager::StringManager,
     tokenizer::Tokenizer,
-    Interpreter, InterpreterError, SyntaxError, TracedInterpreterError,
+    Interpreter, InterpreterError, SyntaxError, Token, TracedInterpreterError,
 };
 
 use super::statement_analyzer::StatementAnalyzer;
@@ -92,9 +92,73 @@ impl SourceFileMap {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TokenType {
+    Symbol,
+    String,
+    Number,
+    Operator,
+    Comment,
+    Keyword,
+    Delimiter,
+    Data,
+}
+
+impl From<&Token> for TokenType {
+    fn from(value: &Token) -> Self {
+        match value {
+            Token::Dim => TokenType::Keyword,
+            Token::Let => TokenType::Keyword,
+            Token::Print => TokenType::Keyword,
+            Token::Input => TokenType::Keyword,
+            Token::Goto => TokenType::Keyword,
+            Token::Gosub => TokenType::Keyword,
+            Token::Return => TokenType::Keyword,
+            Token::Colon => TokenType::Delimiter,
+            Token::Semicolon => TokenType::Delimiter,
+            Token::Comma => TokenType::Delimiter,
+            Token::QuestionMark => TokenType::Keyword,
+            Token::LeftParen => TokenType::Delimiter,
+            Token::RightParen => TokenType::Delimiter,
+            Token::Plus => TokenType::Operator,
+            Token::Minus => TokenType::Operator,
+            Token::Multiply => TokenType::Operator,
+            Token::Divide => TokenType::Operator,
+            Token::Caret => TokenType::Operator,
+            Token::Equals => TokenType::Operator,
+            Token::NotEquals => TokenType::Operator,
+            Token::LessThan => TokenType::Operator,
+            Token::LessThanOrEqualTo => TokenType::Operator,
+            Token::GreaterThan => TokenType::Operator,
+            Token::GreaterThanOrEqualTo => TokenType::Operator,
+            Token::And => TokenType::Operator,
+            Token::Or => TokenType::Operator,
+            Token::Not => TokenType::Operator,
+            Token::If => TokenType::Keyword,
+            Token::Then => TokenType::Keyword,
+            Token::Else => TokenType::Keyword,
+            Token::End => TokenType::Keyword,
+            Token::Stop => TokenType::Keyword,
+            Token::For => TokenType::Keyword,
+            Token::To => TokenType::Keyword,
+            Token::Step => TokenType::Keyword,
+            Token::Next => TokenType::Keyword,
+            Token::Read => TokenType::Keyword,
+            Token::Restore => TokenType::Keyword,
+            Token::Def => TokenType::Keyword,
+            Token::Remark(_) => TokenType::Comment,
+            Token::Symbol(_) => TokenType::Symbol,
+            Token::StringLiteral(_) => TokenType::String,
+            Token::NumericLiteral(_) => TokenType::Number,
+            Token::Data(_) => TokenType::Data,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct SourceFileAnalyzer {
     lines: Vec<String>,
+    line_tokens: Vec<Vec<(TokenType, Range<usize>)>>,
     program: Program,
     messages: Vec<DiagnosticMessage>,
     string_manager: StringManager,
@@ -133,6 +197,10 @@ impl SourceFileAnalyzer {
         std::mem::take(&mut self.lines)
     }
 
+    pub fn token_types(&self) -> &Vec<Vec<(TokenType, Range<usize>)>> {
+        &self.line_tokens
+    }
+
     fn warn<T: AsRef<str>>(&mut self, line_number: usize, message: T) {
         self.messages.push(DiagnosticMessage::Warning(
             line_number,
@@ -144,10 +212,12 @@ impl SourceFileAnalyzer {
         for (i, line) in lines.iter().enumerate() {
             if line.is_empty() {
                 self.source_file_map.add_empty();
+                self.line_tokens.push(vec![]);
                 continue;
             }
             let Some((basic_line_number, line_number_end)) = parse_line_number(line) else {
                 self.source_file_map.add_empty();
+                self.line_tokens.push(vec![]);
                 self.warn(i, "Line has no line number, ignoring it.");
                 continue;
             };
@@ -156,6 +226,8 @@ impl SourceFileAnalyzer {
                 length: line.len(),
                 ..Default::default()
             };
+            let mut line_tokens: Vec<(TokenType, Range<usize>)> =
+                vec![(TokenType::Number, 0..line_number_end)];
             if self.program.has_line_number(basic_line_number) {
                 self.warn(i, "Redefinition of pre-existing BASIC line.");
             }
@@ -164,6 +236,9 @@ impl SourceFileAnalyzer {
                 .remaining_tokens_and_ranges();
             match tokenize_result {
                 Ok((tokens, token_ranges)) => {
+                    for (token, range) in tokens.iter().zip(&token_ranges) {
+                        line_tokens.push((token.into(), range.clone()));
+                    }
                     source_line_ranges.token_ranges = Some(token_ranges);
                     if tokens.is_empty() {
                         self.warn(i, "Line contains no statements and will not be defined.");
@@ -175,6 +250,7 @@ impl SourceFileAnalyzer {
             }
             self.source_file_map
                 .add(basic_line_number, source_line_ranges);
+            self.line_tokens.push(line_tokens);
         }
         self.lines = lines;
         self.program.run_from_first_numbered_line();

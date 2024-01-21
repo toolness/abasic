@@ -20,7 +20,7 @@ mod tokenizer;
 mod value;
 mod variables;
 
-pub use analyzer::{DiagnosticMessage, SourceFileAnalyzer, SourceFileMap};
+pub use analyzer::{DiagnosticMessage, SourceFileAnalyzer, SourceFileMap, TokenType};
 pub use interpreter::{Interpreter, InterpreterState};
 pub use interpreter_error::{InterpreterError, OutOfMemoryError, TracedInterpreterError};
 pub use interpreter_output::InterpreterOutput;
