@@ -72,19 +72,26 @@ impl ProgramLines {
         }
     }
 
+    pub fn list_tokens(&self) -> Vec<(u64, &Vec<Token>)> {
+        let mut lines: Vec<(u64, &Vec<Token>)> = Vec::with_capacity(self.numbered_lines.len());
+
+        for line_number in &self.sorted_line_numbers {
+            let line = self.numbered_lines.get(line_number).unwrap();
+            lines.push((*line_number, line));
+        }
+
+        lines
+    }
+
     pub fn list(&self) -> Vec<String> {
         let mut lines: Vec<String> = Vec::with_capacity(self.numbered_lines.len());
 
-        for line_number in &self.sorted_line_numbers {
-            let line = self
-                .numbered_lines
-                .get(line_number)
-                .unwrap()
+        for (line_number, tokens) in self.list_tokens() {
+            let line = tokens
                 .iter()
                 .map(|token| token.to_string())
                 .collect::<Vec<String>>()
                 .join(" ");
-
             let line_source = format!("{} {}\n", line_number, line);
             lines.push(line_source);
         }
