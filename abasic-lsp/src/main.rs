@@ -1,6 +1,6 @@
 use std::{collections::HashMap, error::Error};
 
-use abasic_core::{DiagnosticMessage, SourceFileAnalyzer};
+use abasic_core::{DiagnosticMessage, SourceFileAnalyzer, TokenType};
 use lsp_server::{
     Connection, ErrorCode, ExtractError, Message, Notification as ServerNotification,
     Request as ServerRequest, RequestId, Response, ResponseError,
@@ -30,6 +30,31 @@ fn main() -> LspResult<()> {
     }
 }
 
+const TOKEN_TYPES: &[SemanticTokenType; 8] = &[
+    SemanticTokenType::VARIABLE, // 0
+    SemanticTokenType::STRING,   // 1
+    SemanticTokenType::NUMBER,   // 2
+    SemanticTokenType::OPERATOR, // 3
+    SemanticTokenType::COMMENT,  // 4
+    SemanticTokenType::KEYWORD,  // 5
+    SemanticTokenType::MODIFIER, // 6
+    SemanticTokenType::REGEXP,   // 7
+];
+
+fn abasic_token_type_to_lsp_token_type(abasic_token_type: TokenType) -> u32 {
+    match abasic_token_type {
+        // These numbers are indices into `TOKEN_TYPES`.
+        TokenType::Symbol => 0,
+        TokenType::String => 1,
+        TokenType::Number => 2,
+        TokenType::Operator => 3,
+        TokenType::Comment => 4,
+        TokenType::Keyword => 5,
+        TokenType::Delimiter => 6,
+        TokenType::Data => 7,
+    }
+}
+
 fn handle_one_connection() -> LspResult<()> {
     eprintln!("Waiting for connection.");
 
@@ -45,7 +70,7 @@ fn handle_one_connection() -> LspResult<()> {
                         work_done_progress: None,
                     },
                     legend: SemanticTokensLegend {
-                        token_types: vec![SemanticTokenType::COMMENT, SemanticTokenType::KEYWORD],
+                        token_types: Vec::from(TOKEN_TYPES),
                         token_modifiers: vec![],
                     },
                     range: None,
@@ -112,28 +137,31 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> LspResult<()>
                             continue;
                         };
 
-                        // TODO: Actually parse the content, etc.
-                        let _unused = analyzer;
+                        let mut data: Vec<SemanticToken> = vec![];
+                        let mut prev_line_number = 0;
+                        for (line_number, line) in analyzer.token_types().iter().enumerate() {
+                            let mut prev_token_start = 0;
+                            for (abasic_token_type, range) in line {
+                                let delta_line = (line_number - prev_line_number) as u32;
+                                prev_line_number = line_number;
+                                let delta_start = (range.start - prev_token_start) as u32;
+                                prev_token_start = range.start;
+                                let length = range.len() as u32;
+                                let token_type =
+                                    abasic_token_type_to_lsp_token_type(*abasic_token_type);
+                                data.push(SemanticToken {
+                                    delta_line,
+                                    delta_start,
+                                    length,
+                                    token_type,
+                                    token_modifiers_bitset: 0,
+                                })
+                            }
+                        }
 
                         let result = Some(SemanticTokens {
                             result_id: None,
-                            data: vec![
-                                // TODO: Actually return real stuff for this.
-                                SemanticToken {
-                                    delta_line: 0,
-                                    delta_start: 0,
-                                    length: 2,
-                                    token_type: 0,
-                                    token_modifiers_bitset: 0,
-                                },
-                                SemanticToken {
-                                    delta_line: 1,
-                                    delta_start: 0,
-                                    length: 3,
-                                    token_type: 1,
-                                    token_modifiers_bitset: 0,
-                                },
-                            ],
+                            data,
                         });
                         let result = serde_json::to_value(&result).unwrap();
                         connection.sender.send(Message::Response(Response {
