@@ -1,7 +1,7 @@
 use crate::{
     builtins::Builtin,
     operators::{AddOrSubtractOp, EqualityOp, MultiplyOrDivideOp, UnaryOp},
-    program::Program,
+    program::{Program, ProgramLocation},
     symbol::Symbol,
     SyntaxError, Token, TracedInterpreterError,
 };
@@ -55,6 +55,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_user_defined_function_call(
         &mut self,
         function_name: &Symbol,
+        location: &ProgramLocation,
     ) -> Result<Option<ValueType>, TracedInterpreterError> {
         let Some(arg_names) = self
             .program
@@ -67,6 +68,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Ok(None);
         };
 
+        self.symbol_accesses
+            .log_access(&function_name, &location, SymbolAccess::Read);
         self.program.expect_next_token(Token::LeftParen)?;
         let arity = arg_names.len();
         for (i, arg) in arg_names.into_iter().enumerate() {
@@ -84,6 +87,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn evaluate_function_call(
         &mut self,
         function_name: &Symbol,
+        location: &ProgramLocation,
     ) -> Result<Option<ValueType>, TracedInterpreterError> {
         if let Some(builtin) = Builtin::try_from(function_name) {
             match builtin {
@@ -93,7 +97,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             .map(|value| Some(value))
         } else {
-            self.evaluate_user_defined_function_call(function_name)
+            self.evaluate_user_defined_function_call(function_name, location)
         }
     }
 
@@ -102,21 +106,24 @@ impl<'a> ExpressionAnalyzer<'a> {
             Token::StringLiteral(_string) => Ok(ValueType::String),
             Token::NumericLiteral(_number) => Ok(ValueType::Number),
             Token::Symbol(symbol) => {
-                self.symbol_accesses.log_access(
-                    &symbol,
-                    &self.program.get_prev_location(),
-                    SymbolAccess::Read,
-                );
+                let symbol_location = self.program.get_prev_location();
                 let is_array_or_function_call =
                     self.program.peek_next_token() == Some(Token::LeftParen);
                 if is_array_or_function_call {
-                    if let Some(value) = self.evaluate_function_call(&symbol)? {
+                    if let Some(value) = self.evaluate_function_call(&symbol, &symbol_location)? {
                         Ok(value)
                     } else {
                         self.evaluate_array_index()?;
+                        self.symbol_accesses.log_access(
+                            &symbol,
+                            &symbol_location,
+                            SymbolAccess::Read,
+                        );
                         Ok(ValueType::from_variable_name(symbol))
                     }
                 } else {
+                    self.symbol_accesses
+                        .log_access(&symbol, &symbol_location, SymbolAccess::Read);
                     Ok(ValueType::from_variable_name(symbol))
                 }
             }

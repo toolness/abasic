@@ -128,6 +128,11 @@ fn print_works() {
 }
 
 #[test]
+fn builtins_work() {
+    assert_program_is_fine("10 print rnd(1)");
+}
+
+#[test]
 fn for_loops_work() {
     assert_program_is_fine("10 for i = 1 to 3: next i");
     assert_program_has_error(
