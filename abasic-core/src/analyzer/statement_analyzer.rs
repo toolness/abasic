@@ -6,7 +6,7 @@ use crate::{
 
 use super::{
     expression_analyzer::ExpressionAnalyzer,
-    source_file_analyzer::{SymbolAccess, SymbolAccessMap},
+    symbol_access::{SymbolAccess, SymbolAccessMap},
     value_type::ValueType,
 };
 

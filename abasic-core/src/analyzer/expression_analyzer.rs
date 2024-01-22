@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    source_file_analyzer::{SymbolAccess, SymbolAccessMap},
+    symbol_access::{SymbolAccess, SymbolAccessMap},
     value_type::ValueType,
 };
 

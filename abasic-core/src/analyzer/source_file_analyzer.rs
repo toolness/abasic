@@ -4,12 +4,11 @@ use crate::{
     line_number_parser::parse_line_number,
     program::{NumberedProgramLocation, Program, ProgramLine, ProgramLocation},
     string_manager::StringManager,
-    symbol::Symbol,
     tokenizer::Tokenizer,
     Interpreter, InterpreterError, SyntaxError, Token, TracedInterpreterError,
 };
 
-use super::statement_analyzer::StatementAnalyzer;
+use super::{statement_analyzer::StatementAnalyzer, symbol_access::SymbolAccessMap};
 
 /// The way we're encoding error/warning locations here is an
 /// unmitigated disaster:
@@ -173,31 +172,6 @@ impl From<&Token> for TokenType {
             Token::NumericLiteral(_) => TokenType::Number,
             Token::Data(_) => TokenType::Data,
         }
-    }
-}
-
-pub enum SymbolAccess {
-    Read,
-    Write,
-}
-
-pub struct SymbolAccessLocation(SymbolAccess, NumberedProgramLocation);
-
-#[derive(Default)]
-pub struct SymbolAccessMap(HashMap<Symbol, Vec<SymbolAccessLocation>>);
-
-impl SymbolAccessMap {
-    pub fn log_access(
-        &mut self,
-        symbol: &Symbol,
-        location: &ProgramLocation,
-        access: SymbolAccess,
-    ) {
-        let entry = self.0.entry(symbol.clone()).or_default();
-        entry.push(SymbolAccessLocation(
-            access,
-            (*location).try_into().unwrap(),
-        ));
     }
 }
 
