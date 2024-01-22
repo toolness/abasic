@@ -143,8 +143,8 @@ impl SourceFileAnalyzer {
     fn populate_symbol_access_warnings(&mut self) {
         for (warning, symbol, location) in self.symbol_accesses.get_warnings() {
             let message = match warning {
-                SymbolAccessWarning::UndefinedSymbol => format!("'{symbol}' is never defined"),
-                SymbolAccessWarning::UnusedSymbol => format!("'{symbol}' is never used"),
+                SymbolAccessWarning::UndefinedSymbol => format!("'{symbol}' is never defined."),
+                SymbolAccessWarning::UnusedSymbol => format!("'{symbol}' is never used."),
             };
             let source_line = self
                 .source_file_map

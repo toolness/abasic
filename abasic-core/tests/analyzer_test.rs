@@ -218,6 +218,32 @@ fn line_without_number_warning_works() {
 }
 
 #[test]
+fn unused_symbol_works() {
+    assert_program_has_source_mapped_diagnostics(
+        "10 a = 5",
+        vec![SourceMappedMessage::new(
+            Warning,
+            "'A' is never used.",
+            0,
+            "a",
+        )],
+    );
+}
+
+#[test]
+fn undefined_symbol_works() {
+    assert_program_has_source_mapped_diagnostics(
+        "10 print a",
+        vec![SourceMappedMessage::new(
+            Warning,
+            "'A' is never defined.",
+            0,
+            "a",
+        )],
+    );
+}
+
+#[test]
 fn redefined_line_warning_works() {
     assert_program_has_source_mapped_diagnostics(
         "10 print 5\n10 print 10",
