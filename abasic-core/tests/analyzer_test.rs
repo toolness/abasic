@@ -130,8 +130,14 @@ fn print_works() {
 #[test]
 fn for_loops_work() {
     assert_program_is_fine("10 for i = 1 to 3: next i");
-    assert_program_has_error("10 for i$ = 1 to 3: next i", InterpreterError::TypeMismatch);
-    assert_program_has_error("10 for i = 1 to 3: next i$", InterpreterError::TypeMismatch);
+    assert_program_has_error(
+        "5 i = 0\n10 for i$ = 1 to 3: next i\n20 print i$;i",
+        InterpreterError::TypeMismatch,
+    );
+    assert_program_has_error(
+        "5 i$ = \"hi\"\n10 for i = 1 to 3: next i$\n20 print i",
+        InterpreterError::TypeMismatch,
+    );
 }
 
 #[test]
@@ -144,14 +150,14 @@ fn goto_and_gosub_work() {
 
 #[test]
 fn conditionals_work() {
-    assert_program_is_fine("10 if x = 1 then print \"one\" else print \"not one\"");
-    assert_program_is_fine("10 if x = 0 then print \"zero\" else print \"not zero\"");
+    assert_program_is_fine("5 x = 0\n10 if x = 1 then print \"one\" else print \"not one\"");
+    assert_program_is_fine("5 x = 0\n10 if x = 0 then print \"zero\" else print \"not zero\"");
     assert_program_has_error(
-        "10 if x = 1 then a = \"hi\" else a = 1",
+        "5 x = 0\n10 if x = 1 then a = \"hi\" else a = 1\n20 print a",
         InterpreterError::TypeMismatch,
     );
     assert_program_has_error(
-        "10 if x = 0 then a = 1 else a = \"hi\"",
+        "5 x = 0\n10 if x = 0 then a = 1 else a = \"hi\"\n20 print a",
         InterpreterError::TypeMismatch,
     );
 }
@@ -235,7 +241,7 @@ fn unterminated_string_literal_works() {
 #[test]
 fn type_mismatch_works() {
     assert_program_has_source_mapped_diagnostics(
-        "10 a = \"hi\"",
+        "10 a = \"hi\"\n20 print a",
         vec![SourceMappedMessage::new(
             Error,
             "TYPE MISMATCH IN 10",
