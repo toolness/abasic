@@ -4,6 +4,7 @@ use crate::{
     line_number_parser::parse_line_number,
     program::{NumberedProgramLocation, Program, ProgramLine, ProgramLocation},
     string_manager::StringManager,
+    symbol::Symbol,
     tokenizer::Tokenizer,
     Interpreter, InterpreterError, SyntaxError, Token, TracedInterpreterError,
 };
@@ -175,6 +176,31 @@ impl From<&Token> for TokenType {
     }
 }
 
+pub enum SymbolAccess {
+    Read,
+    Write,
+}
+
+pub struct SymbolAccessLocation(SymbolAccess, NumberedProgramLocation);
+
+#[derive(Default)]
+pub struct SymbolAccessMap(HashMap<Symbol, Vec<SymbolAccessLocation>>);
+
+impl SymbolAccessMap {
+    pub fn log_access(
+        &mut self,
+        symbol: &Symbol,
+        location: &ProgramLocation,
+        access: SymbolAccess,
+    ) {
+        let entry = self.0.entry(symbol.clone()).or_default();
+        entry.push(SymbolAccessLocation(
+            access,
+            (*location).try_into().unwrap(),
+        ));
+    }
+}
+
 #[derive(Default)]
 pub struct SourceFileAnalyzer {
     lines: Vec<String>,
@@ -183,6 +209,7 @@ pub struct SourceFileAnalyzer {
     messages: Vec<DiagnosticMessage>,
     string_manager: StringManager,
     source_file_map: SourceFileMap,
+    symbol_accesses: SymbolAccessMap,
 }
 
 impl SourceFileAnalyzer {
@@ -281,7 +308,8 @@ impl SourceFileAnalyzer {
         self.program.run_from_first_numbered_line();
         loop {
             while self.program.has_next_token() {
-                let result = StatementAnalyzer::new(&mut self.program).evaluate_statement();
+                let result = StatementAnalyzer::new(&mut self.program, &mut self.symbol_accesses)
+                    .evaluate_statement();
                 if let Err(mut err) = result {
                     self.program.populate_error_location(&mut err);
                     let Some((file_line_number, _)) = self

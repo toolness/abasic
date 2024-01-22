@@ -1,11 +1,18 @@
 use crate::{
-    program::Program, symbol::Symbol, InterpreterError, SyntaxError, Token, TracedInterpreterError,
+    program::{Program, ProgramLocation},
+    symbol::Symbol,
+    InterpreterError, SyntaxError, Token, TracedInterpreterError,
 };
 
-use super::{expression_analyzer::ExpressionAnalyzer, value_type::ValueType};
+use super::{
+    expression_analyzer::ExpressionAnalyzer,
+    source_file_analyzer::{SymbolAccess, SymbolAccessMap},
+    value_type::ValueType,
+};
 
 struct LValue {
     symbol_name: Symbol,
+    symbol_location: ProgramLocation,
     array_index_arity: Option<usize>,
 }
 
@@ -14,11 +21,15 @@ struct LValue {
 /// analyzer to share the same core parsing logic.
 pub struct StatementAnalyzer<'a> {
     program: &'a mut Program,
+    symbol_accesses: &'a mut SymbolAccessMap,
 }
 
 impl<'a> StatementAnalyzer<'a> {
-    pub fn new(program: &'a mut Program) -> Self {
-        StatementAnalyzer { program }
+    pub fn new(program: &'a mut Program, symbol_accesses: &'a mut SymbolAccessMap) -> Self {
+        StatementAnalyzer {
+            program,
+            symbol_accesses,
+        }
     }
 
     pub fn evaluate_statement(&mut self) -> Result<(), TracedInterpreterError> {
@@ -52,15 +63,19 @@ impl<'a> StatementAnalyzer<'a> {
         &mut self.program
     }
 
+    fn expression_analyser(&mut self) -> ExpressionAnalyzer {
+        ExpressionAnalyzer::new(self.program, self.symbol_accesses)
+    }
+
     fn evaluate_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
-        ExpressionAnalyzer::new(self.program).evaluate_expression()
+        self.expression_analyser().evaluate_expression()
     }
 
     fn parse_optional_array_index(&mut self) -> Result<Option<usize>, TracedInterpreterError> {
         if self.program().peek_next_token() != Some(Token::LeftParen) {
             Ok(None)
         } else {
-            ExpressionAnalyzer::new(self.program)
+            self.expression_analyser()
                 .evaluate_array_index()
                 .map(|arity| Some(arity))
         }
@@ -94,6 +109,7 @@ impl<'a> StatementAnalyzer<'a> {
         // TODO: Do something with the arity.
         let _unused_for_now = lvalue.array_index_arity;
 
+        self.log_lvalue_access(&lvalue);
         ValueType::from_variable_name(lvalue.symbol_name).check(rvalue)?;
         Ok(())
     }
@@ -110,8 +126,10 @@ impl<'a> StatementAnalyzer<'a> {
         &mut self,
         symbol_name: Symbol,
     ) -> Result<(), TracedInterpreterError> {
+        let symbol_location = self.program.get_prev_location();
         let lvalue = LValue {
             symbol_name,
+            symbol_location,
             array_index_arity: self.parse_optional_array_index()?,
         };
 
@@ -131,9 +149,12 @@ impl<'a> StatementAnalyzer<'a> {
         let Some(Token::Symbol(symbol_name)) = self.program().next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
+        let symbol_location = self.program.get_prev_location();
+
         let array_index_arity = self.parse_optional_array_index()?;
         Ok(LValue {
             symbol_name,
+            symbol_location,
             array_index_arity,
         })
     }
@@ -150,9 +171,18 @@ impl<'a> StatementAnalyzer<'a> {
         Ok(())
     }
 
+    fn log_lvalue_access(&mut self, lvalue: &LValue) {
+        self.symbol_accesses.log_access(
+            &lvalue.symbol_name,
+            &lvalue.symbol_location,
+            SymbolAccess::Write,
+        );
+    }
+
     fn evaluate_input_statement(&mut self) -> Result<(), TracedInterpreterError> {
         // TODO: Support multiple comma-separated items.
-        let _lvalue = self.parse_lvalue()?;
+        let lvalue = self.parse_lvalue()?;
+        self.log_lvalue_access(&lvalue);
         Ok(())
     }
 
@@ -162,7 +192,8 @@ impl<'a> StatementAnalyzer<'a> {
     /// treat DIM statements this way, though, perhaps in part because it allows
     /// arrays to be dynamically sized based on user input and such.
     fn evaluate_dim_statement(&mut self) -> Result<(), TracedInterpreterError> {
-        let _lvalue = self.parse_lvalue()?;
+        let lvalue = self.parse_lvalue()?;
+        self.log_lvalue_access(&lvalue);
         // TODO: Do something with the array index arity.
         Ok(())
     }
@@ -201,6 +232,11 @@ impl<'a> StatementAnalyzer<'a> {
         let Some(Token::Symbol(symbol)) = self.program().next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
+        self.symbol_accesses.log_access(
+            &symbol,
+            &self.program.get_prev_location(),
+            SymbolAccess::Write,
+        );
         ValueType::from_variable_name(&symbol).check_number()?;
         self.program().expect_next_token(Token::Equals)?;
         let _from_value = self.evaluate_expression()?.check_number()?;
@@ -218,6 +254,11 @@ impl<'a> StatementAnalyzer<'a> {
         let Some(Token::Symbol(symbol)) = self.program().next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
+        self.symbol_accesses.log_access(
+            &symbol,
+            &self.program.get_prev_location(),
+            SymbolAccess::Read,
+        );
         ValueType::from_variable_name(&symbol).check_number()?;
         Ok(())
     }
@@ -226,6 +267,11 @@ impl<'a> StatementAnalyzer<'a> {
         let Some(Token::Symbol(function_name)) = self.program().next_token() else {
             return Err(SyntaxError::UnexpectedToken.into());
         };
+        self.symbol_accesses.log_access(
+            &function_name,
+            &self.program.get_prev_location(),
+            SymbolAccess::Write,
+        );
         self.program().expect_next_token(Token::LeftParen)?;
         let mut arg_names: Vec<Symbol> = vec![];
         loop {

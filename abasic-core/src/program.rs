@@ -399,6 +399,21 @@ impl Program {
         self.location
     }
 
+    /// Returns the program location just *before* the one
+    /// currently being evluated, but doesn't go back to
+    /// the previous line.
+    pub fn get_prev_location(&self) -> ProgramLocation {
+        let location = self.get_location();
+        ProgramLocation {
+            line: location.line,
+            token_index: if location.token_index > 0 {
+                location.token_index - 1
+            } else {
+                0
+            },
+        }
+    }
+
     pub fn get_line_with_pointer_caret(&self, location: ProgramLocation) -> Vec<String> {
         let tokens = self.tokens_for_line(location.line);
         if tokens.is_empty() {
@@ -611,19 +626,11 @@ impl Program {
         err.location = match err.error {
             InterpreterError::DataTypeMismatch => self.get_data_location(),
             _ => {
-                let location = self.get_location();
-                Some(ProgramLocation {
-                    line: location.line,
-                    token_index: if location.token_index > 0 {
-                        // Generally, we raise errors after we've already moved the
-                        // program's current location to the next token index, so
-                        // push it back one to arrive at the token that we actually
-                        // errored on.
-                        location.token_index - 1
-                    } else {
-                        0
-                    },
-                })
+                // Generally, we raise errors after we've already moved the
+                // program's current location to the next token index, so
+                // push it back one to arrive at the token that we actually
+                // errored on.
+                Some(self.get_prev_location())
             }
         };
     }

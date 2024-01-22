@@ -6,18 +6,25 @@ use crate::{
     SyntaxError, Token, TracedInterpreterError,
 };
 
-use super::value_type::ValueType;
+use super::{
+    source_file_analyzer::{SymbolAccess, SymbolAccessMap},
+    value_type::ValueType,
+};
 
 /// This is basically a fork of the expression evaluator, which isn't great.
 /// Ideally we'd have some kind of abstraction that allowed the evaluator and
 /// analyzer to share the same core parsing logic.
 pub struct ExpressionAnalyzer<'a> {
     program: &'a mut Program,
+    symbol_accesses: &'a mut SymbolAccessMap,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub fn new(program: &'a mut Program) -> Self {
-        ExpressionAnalyzer { program }
+    pub fn new(program: &'a mut Program, symbol_accesses: &'a mut SymbolAccessMap) -> Self {
+        ExpressionAnalyzer {
+            program,
+            symbol_accesses,
+        }
     }
 
     pub fn evaluate_expression(&mut self) -> Result<ValueType, TracedInterpreterError> {
@@ -95,6 +102,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             Token::StringLiteral(_string) => Ok(ValueType::String),
             Token::NumericLiteral(_number) => Ok(ValueType::Number),
             Token::Symbol(symbol) => {
+                self.symbol_accesses.log_access(
+                    &symbol,
+                    &self.program.get_prev_location(),
+                    SymbolAccess::Read,
+                );
                 let is_array_or_function_call =
                     self.program.peek_next_token() == Some(Token::LeftParen);
                 if is_array_or_function_call {
