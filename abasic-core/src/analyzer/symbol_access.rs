@@ -10,10 +10,14 @@ pub enum SymbolAccess {
     Write,
 }
 
-pub struct SymbolAccessLocation(SymbolAccess, NumberedProgramLocation);
+#[derive(Default)]
+struct SymbolAccessLocations {
+    writes: Vec<NumberedProgramLocation>,
+    reads: Vec<NumberedProgramLocation>,
+}
 
 #[derive(Default)]
-pub struct SymbolAccessMap(HashMap<Symbol, Vec<SymbolAccessLocation>>);
+pub struct SymbolAccessMap(HashMap<Symbol, SymbolAccessLocations>);
 
 impl SymbolAccessMap {
     pub fn log_access(
@@ -23,11 +27,13 @@ impl SymbolAccessMap {
         access: SymbolAccess,
     ) {
         let entry = self.0.entry(symbol.clone()).or_default();
-        entry.push(SymbolAccessLocation(
-            access,
-            // We're analyzing code, so we should always be passed in a
-            // numbered program location.
-            (*location).try_into().unwrap(),
-        ));
+        let target = match access {
+            SymbolAccess::Read => &mut entry.reads,
+            SymbolAccess::Write => &mut entry.writes,
+        };
+
+        // We're analyzing code, so we should always be passed in a
+        // numbered program location.
+        target.push((*location).try_into().unwrap());
     }
 }
