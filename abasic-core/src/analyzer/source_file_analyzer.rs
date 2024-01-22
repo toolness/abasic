@@ -6,8 +6,9 @@ use crate::{
 };
 
 use super::{
-    source_map::SourceLineRanges, statement_analyzer::StatementAnalyzer,
-    symbol_access::SymbolAccessMap,
+    source_map::SourceLineRanges,
+    statement_analyzer::StatementAnalyzer,
+    symbol_access::{SymbolAccessMap, SymbolAccessWarning},
 };
 
 #[derive(Default)]
@@ -136,12 +137,25 @@ impl SourceFileAnalyzer {
                 break;
             }
         }
+        self.populate_symbol_access_warnings();
+    }
 
-        for message in &self.messages {
-            // TODO: We're only doing this so we don't get dead code
-            // errors, and so we can verify that this code doesn't
-            // panic. But we should actually test it separately.
-            self.source_file_map.map_to_source(message);
+    fn populate_symbol_access_warnings(&mut self) {
+        for (warning, symbol, location) in self.symbol_accesses.get_warnings() {
+            let message = match warning {
+                SymbolAccessWarning::UndefinedSymbol => format!("'{symbol}' is never defined"),
+                SymbolAccessWarning::UnusedSymbol => format!("'{symbol}' is never used"),
+            };
+            let source_line = self
+                .source_file_map
+                .map_location_to_source(&location.into())
+                .unwrap()
+                .0;
+            self.messages.push(DiagnosticMessage::Warning(
+                source_line,
+                Some(location),
+                message,
+            ));
         }
     }
 
