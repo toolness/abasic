@@ -1,116 +1,14 @@
-use std::{collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use crate::{
-    line_number_parser::parse_line_number,
-    program::{NumberedProgramLocation, Program, ProgramLine, ProgramLocation},
-    string_manager::StringManager,
-    tokenizer::Tokenizer,
-    Interpreter, InterpreterError, SyntaxError, Token, TracedInterpreterError,
+    line_number_parser::parse_line_number, program::Program, string_manager::StringManager,
+    tokenizer::Tokenizer, DiagnosticMessage, Interpreter, SourceFileMap, Token,
 };
 
-use super::{statement_analyzer::StatementAnalyzer, symbol_access::SymbolAccessMap};
-
-/// The way we're encoding error/warning locations here is an
-/// unmitigated disaster:
-///
-///   * We don't really have a consistent way of pointing to "a place in
-///     a BASIC program". Sometimes we want to point at a line number, which
-///     isn't part of the tokenization process, while other times we want to
-///     point at a particular place in the tokenized form of the program,
-///     while other times a tokenization error has occurred, and we need
-///     to point to a particular range in a string.
-///
-///   * This is further complicated by the fact that we sometimes want to
-///     show errors in the parsed version of the code (e.g., so the user
-///     can easily see that their "NOTCOOL" variable is actually parsed as
-///     "NOT COOL"), while in other contexts we want to be able to point
-///     at the original source file (e.g. for use by text editors).
-#[derive(Debug)]
-pub enum DiagnosticMessage {
-    /// The first number is the file line number, then an optional program location,
-    /// then the warning message.
-    Warning(usize, Option<NumberedProgramLocation>, String),
-    /// The first number is the file line number, then the error that occurred.
-    Error(usize, TracedInterpreterError),
-}
-
-#[derive(Default)]
-struct SourceLineRanges {
-    line_number_end: usize,
-    token_ranges: Option<Vec<Range<usize>>>,
-    length: usize,
-}
-
-#[derive(Default)]
-pub struct SourceFileMap {
-    basic_lines_to_file_lines: HashMap<u64, usize>,
-    file_line_ranges: Vec<SourceLineRanges>,
-}
-
-impl SourceFileMap {
-    fn add_empty(&mut self) {
-        self.file_line_ranges.push(SourceLineRanges::default());
-    }
-
-    fn add(&mut self, basic_line: u64, ranges: SourceLineRanges) {
-        let file_line_number = self.file_line_ranges.len();
-        self.basic_lines_to_file_lines
-            .insert(basic_line, file_line_number);
-        self.file_line_ranges.push(ranges);
-    }
-
-    pub fn map_location_to_source(
-        &self,
-        location: &ProgramLocation,
-    ) -> Option<(usize, Range<usize>)> {
-        if let ProgramLine::Line(basic_line_number) = location.line {
-            if let Some(&file_line_number) = self.basic_lines_to_file_lines.get(&basic_line_number)
-            {
-                let source_line_ranges = &self.file_line_ranges[file_line_number];
-                if let Some(token_ranges) = &source_line_ranges.token_ranges {
-                    let token_index =
-                        if location.token_index == token_ranges.len() && !token_ranges.is_empty() {
-                            // The error is at the very end of the line, just use the very last token for now.
-                            token_ranges.len() - 1
-                        } else {
-                            location.token_index
-                        };
-                    if let Some(range) = token_ranges.get(token_index) {
-                        return Some((file_line_number, range.clone()));
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    pub fn map_to_source(&self, message: &DiagnosticMessage) -> Option<(usize, Range<usize>)> {
-        match message {
-            DiagnosticMessage::Warning(file_line_number, location, _) => {
-                if let Some(location) = location {
-                    self.map_location_to_source(&(*location).into())
-                } else {
-                    let source_line_ranges = &self.file_line_ranges[*file_line_number];
-                    Some((*file_line_number, 0..source_line_ranges.line_number_end))
-                }
-            }
-            DiagnosticMessage::Error(file_line_number, err) => {
-                match &err.error {
-                    InterpreterError::Syntax(SyntaxError::Tokenization(t)) => {
-                        let range = t.string_range(self.file_line_ranges[*file_line_number].length);
-                        return Some((*file_line_number, range));
-                    }
-                    _ => {}
-                }
-                if let Some(location) = err.location {
-                    self.map_location_to_source(&location)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
+use super::{
+    source_map::SourceLineRanges, statement_analyzer::StatementAnalyzer,
+    symbol_access::SymbolAccessMap,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
