@@ -174,6 +174,9 @@ To use the LSP server with [Helix][]:
 
 Now when you open any BASIC file in Helix, it will use the LSP.
 
+To see the stderr logs of the LSP server in Helix, you can run `hx -v`
+and then `:log-open`.
+
 [Helix]: https://helix-editor.com/
 [helix-docs]: https://docs.helix-editor.com/languages.html
 
