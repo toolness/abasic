@@ -108,25 +108,32 @@ npm run publish
 An experimental [Language Server Protocol][LSP] server and VSCode client
 is in the `abasic-lsp` directory.
 
-At the moment, actually using it takes a bit of work:
+To use it:
 
-1. In the terminal, run the LSP server with `cargo run -p abasic-lsp -- --listen`.
+1. In the root of the repository, run `cargo install --path=abasic-lsp`.
 
-2. In VSCode, open the root of the repository and press F5.
+2. Make sure that abasic-lsp is now on your `PATH` by
+   running `abasic-lsp` (press Ctrl-C to exit it). Also make
+   sure that VSCode is inheriting your `PATH`, so it can
+   find the executable too.
 
-3. In the newly-opened Extension Development Host VSCode instance, open or
-   create a .BAS file. As you type into it, you should see warnings and
-   errors appear (for example, try leaving out a closing double-quote on
-   a string, or GOTO a non-existent line).
+3. In VSCode, open the root of the repository and press F5.
 
-If you make changes to the Rust server code, you'll need to manually recompile
-and re-run it.  While I originally wrote the VSCode extension to attempt to
-reconnect to it, it doesn't seem to work with notifications from VSCode, so
-you might need to restart the Extension Development Host whenever you change
-the server too (you can try cmd-shift-F5, or quit the host and press F5 again).
+4. In the newly-opened Extension Development Host VSCode instance,
+   open the command palette and choose "Output: Show output channels...",
+   then choose "ABASIC Language Server". This should show the stderr of
+   the language server.
+
+5. Open or create a .BAS file. As you type into it, you should see
+   warnings and errors appear (for example, try leaving out a closing
+   double-quote on a string, or GOTO a non-existent line).
+
+If you make changes to the Rust server code, you'll need to rebuild
+it.  You will probably need to quit the Extension Development Host so
+Cargo can actually overwrite the `abasic-lsp` executable.
 
 If you make changes to the VSCode extension, they should be automatically
-re-transpiled to JS, though you will likely need to restart the Extension
+re-transpiled to JS, though you will need to restart the Extension
 Development Host to see them take effect.
 
 [LSP]: https://microsoft.github.io/language-server-protocol/
