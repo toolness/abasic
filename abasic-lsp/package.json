@@ -3,20 +3,24 @@
   "version": "1.0.0",
   "displayName": "abasic-lsp",
   "description": "ABASIC Language Server",
+  "repository": "https://github.com/toolness/abasic",
   "main": "./ts/extension.js",
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "ext": "cargo install --path=. && npm run compile && vsce package && code --install-extension abasic-lsp-1.0.0.vsix"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Atul Varma <varmaa@gmail.com>",
+  "license": "CC0-1.0",
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
   "engines": {
-    "vscode": "^1.52.0"
+    "vscode": "^1.85.0"
   },
-  "activationEvents": ["onLanguage:abasic"],
+  "activationEvents": [
+    "onLanguage:abasic"
+  ],
   "contributes": {
     "languages": [
       {
@@ -24,19 +28,21 @@
         "extensions": [
           ".bas"
         ],
-        "aliases": ["ABASIC"]
+        "aliases": [
+          "ABASIC"
+        ]
       }
     ],
     "configuration": {
       "type": "object",
       "title": "ABASIC configuration",
-      "properties": {
-      }
+      "properties": {}
     }
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
     "typescript": "^5.3.3"
   }
 }

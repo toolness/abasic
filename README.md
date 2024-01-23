@@ -131,6 +131,19 @@ If you make changes to the VSCode extension, they should be automatically
 re-transpiled to JS, though you will need to restart the Extension
 Development Host to see them take effect.
 
+#### Installation
+
+To install the extension to your local VSCode so you can actually use
+it normally:
+
+```
+cd abasic-lsp
+npm run ext
+```
+
+Note that you may need to quit VSCode to do this, if it's already running
+the LSP server.
+
 [LSP]: https://microsoft.github.io/language-server-protocol/
 
 ## Rationale
