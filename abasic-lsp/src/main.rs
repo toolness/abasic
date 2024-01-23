@@ -34,8 +34,13 @@ type LspResult<T> = Result<T, Box<dyn Error + Sync + Send>>;
 fn main() -> LspResult<()> {
     let args = CliArgs::parse();
 
+    eprintln!(
+        "This is Atul's BASIC LSP server v{}.",
+        env!("CARGO_PKG_VERSION")
+    );
+
     if args.listen {
-        eprintln!("Starting LSP server on {LISTEN_ADDR}.");
+        eprintln!("Starting server on {LISTEN_ADDR}.");
 
         loop {
             eprintln!("Waiting for connection.");
@@ -44,7 +49,7 @@ fn main() -> LspResult<()> {
             handle_one_connection(connection, io_threads)?;
         }
     } else {
-        eprintln!("Starting LSP server on stdio.");
+        eprintln!("Starting server on stdio.");
         let (connection, io_threads) = Connection::stdio();
         handle_one_connection(connection, io_threads)
     }
