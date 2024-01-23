@@ -108,7 +108,11 @@ npm run publish
 An experimental [Language Server Protocol][LSP] server and VSCode client
 is in the `abasic-lsp` directory.
 
-To use it:
+[LSP]: https://microsoft.github.io/language-server-protocol/
+
+#### VSCode
+
+To use develop it in VSCode:
 
 1. In the root of the repository, run `cargo build -p abasic-lsp`.
 
@@ -131,7 +135,7 @@ If you make changes to the VSCode extension, they should be automatically
 re-transpiled to JS, though you will need to restart the Extension
 Development Host to see them take effect.
 
-#### Installation
+##### VSCode Installation
 
 To install the extension to your local VSCode so you can actually use
 it normally:
@@ -144,7 +148,34 @@ npm run ext
 Note that you may need to quit VSCode to do this, if it's already running
 the LSP server.
 
-[LSP]: https://microsoft.github.io/language-server-protocol/
+#### Helix
+
+To use the LSP server with [Helix][]:
+
+1. In the root of the repository, run `cargo install --path=abasic-lsp`.
+
+2. Add the following to your `languages.toml` (create it if it doesn't exist)
+   in your Helix configuration directory:
+
+   ```toml
+   [[language]]
+
+   name = "abasic"
+   scope = "source.abasic"
+   file-types = ["bas"]
+   language-servers = ["abasic-lsp"]
+   roots = []
+
+   [language-server.abasic-lsp]
+   command = "abasic-lsp"
+   ```
+
+   For more details, see the [Helix Languages documentation][helix-docs].
+
+Now when you open any BASIC file in Helix, it will use the LSP.
+
+[Helix]: https://helix-editor.com/
+[helix-docs]: https://docs.helix-editor.com/languages.html
 
 ## Rationale
 
