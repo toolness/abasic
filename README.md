@@ -110,27 +110,22 @@ is in the `abasic-lsp` directory.
 
 To use it:
 
-1. In the root of the repository, run `cargo install --path=abasic-lsp`.
+1. In the root of the repository, run `cargo build -p abasic-lsp`.
 
-2. Make sure that abasic-lsp is now on your `PATH` by
-   running `abasic-lsp` (press Ctrl-C to exit it). Also make
-   sure that VSCode is inheriting your `PATH`, so it can
-   find the executable too.
+2. In VSCode, open the root of the repository and press F5.
 
-3. In VSCode, open the root of the repository and press F5.
-
-4. In the newly-opened Extension Development Host VSCode instance,
+3. In the newly-opened Extension Development Host VSCode instance,
    open the command palette and choose "Output: Show output channels...",
    then choose "ABASIC Language Server". This should show the stderr of
    the language server.
 
-5. Open or create a .BAS file. As you type into it, you should see
+4. Open or create a .BAS file. As you type into it, you should see
    warnings and errors appear (for example, try leaving out a closing
    double-quote on a string, or GOTO a non-existent line).
 
 If you make changes to the Rust server code, you'll need to rebuild
 it.  You will probably need to quit the Extension Development Host so
-Cargo can actually overwrite the `abasic-lsp` executable.
+Cargo can actually overwrite the server executable.
 
 If you make changes to the VSCode extension, they should be automatically
 re-transpiled to JS, though you will need to restart the Extension

@@ -1,3 +1,4 @@
+import * as path from "path";
 import { ExtensionContext } from "vscode";
 
 import {
@@ -17,13 +18,20 @@ export function activate(context: ExtensionContext) {
     "abasicLanguageServer",
     "ABASIC Language Server",
     {
-      // Note that the server needs to be installed somewhere on the PATH.
-      command: "abasic-lsp",
-      // Note that we're not specifying any kind of 'transport'. This is
-      // an extremely confusing property and seems to only be relevant
-      // for node-based LSP servers--it just ends up confusing VSCode if we
-      // use it for our LSP. If we leave it out entirely, VSCode just uses
-      // stdio to communicate with the LSP server and everything works fine.
+      run: {
+        // Note that the server needs to be installed somewhere on the PATH.
+        command: "abasic-lsp",
+        // Note that we're not specifying any kind of 'transport'. This is
+        // an extremely confusing property and seems to only be relevant
+        // for node-based LSP servers--it just ends up confusing VSCode if we
+        // use it for our LSP. If we leave it out entirely, VSCode just uses
+        // stdio to communicate with the LSP server and everything works fine.
+      },
+      debug: {
+        command: context.asAbsolutePath(
+          path.join("..", "target", "debug", "abasic-lsp")
+        ),
+      },
     },
     clientOptions
   );
